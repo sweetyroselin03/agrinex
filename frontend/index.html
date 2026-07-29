@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgriNex AI</title>
+    <script>
+      (function() {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.style.backgroundColor = isDark ? '#06131D' : '#F8FAFC';
+        document.body.style.backgroundColor = isDark ? '#06131D' : '#F8FAFC';
+      })();
+    </script>
+  </head>
+  <body class="transition-colors duration-500">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
