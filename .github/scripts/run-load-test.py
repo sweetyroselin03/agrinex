@@ -15,10 +15,12 @@ def main():
 
     endpoints = [
         {"name": "Docs Health Check", "path": "/docs", "method": "GET"},
+        {"name": "Community Feed", "path": "/posts/feed", "method": "GET"},
         {"name": "User Search", "path": "/messages/search?q=test", "method": "GET"},
         {"name": "Conversations List", "path": "/messages/conversations", "method": "GET"},
         {"name": "Weather Forecast", "path": "/api/weather?location=Dhaka", "method": "GET"},
         {"name": "Suggested Farmers", "path": "/users/suggested", "method": "GET"},
+        {"name": "AI Vision Health", "path": "/ai/health", "method": "GET"},
     ]
 
     stages = [

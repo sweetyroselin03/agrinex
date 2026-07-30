@@ -1,0 +1,15 @@
+node_modules/
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+coverage.xml
+junit.xml
+frontend/test-results/
+.env
+dist/
+build/
+.venv/
+venv/

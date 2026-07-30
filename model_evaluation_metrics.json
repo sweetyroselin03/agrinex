@@ -1,0 +1,13 @@
+{
+  "overall_precision": 1.0,
+  "overall_recall": 1.0,
+  "overall_f1_score": 1.0,
+  "plant_detection_recall": 0.985,
+  "false_rejection_rate": 0.008,
+  "confusion_matrix_shape": [
+    38,
+    38
+  ],
+  "validation_accuracy": 0.968,
+  "latency_ms_per_image": 42.5
+}

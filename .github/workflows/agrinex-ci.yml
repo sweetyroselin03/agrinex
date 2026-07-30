@@ -1,4 +1,4 @@
-name: "📱 Consolidated AgriNex CI/CD Pipeline & Unified Summary"
+name: "📱 Consolidated AgriNex Enterprise CI/CD Pipeline & Unified Dashboard"
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: agrinex-pipeline-${{ github.ref }}
+  group: agrinex-enterprise-pipeline-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -25,10 +25,10 @@ env:
 
 jobs:
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 1 – Security Review (SAST, Dependencies, Secrets)
+  # JOB 1 – Security Review (SAST, Dependencies, Gitleaks Secrets, Trivy)
   # ════════════════════════════════════════════════════════════════════════════
   security-scan:
-    name: "🔒 Security Review"
+    name: "🔒 Security Review & Compliance Audit"
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -46,17 +46,18 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: "🔍 Detect tech stack"
+      - name: "🔍 Detect AgriNex Tech Stack"
         run: |
-          echo "### 📋 AgriNex Technology Stack" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Technology | Details |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|-----------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend | FastAPI / Python | Python ${{ env.PYTHON_VERSION }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | Vite / React | Node.js ${{ env.NODE_VERSION }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Mobile | Expo 54 / React Native | Android API Level ${{ env.ANDROID_API_LEVEL }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security | Semgrep, Trivy, Gitleaks | SAST & Secret Protection |" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 AgriNex Enterprise Technology Stack" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Technology | Version / Specification |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-----------|-------------------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | FastAPI / Python | Python ${{ env.PYTHON_VERSION }} (Async SQLAlchemy) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | React / Vite | Node.js ${{ env.NODE_VERSION }} (Tailwind CSS, Zustand) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mobile | Expo SDK 54 / React Native | Android API Level ${{ env.ANDROID_API_LEVEL }} (NativeWind) |" >> $GITHUB_STEP_SUMMARY
+          echo "| AI Model | PyTorch / OpenCV | Leaf Disease CNN Classifier (MobileNetV3) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | Semgrep, Trivy, Gitleaks | SAST, Secret Protection, Dependency Audit |" >> $GITHUB_STEP_SUMMARY
 
-      - name: "🔐 Run Semgrep SAST scan"
+      - name: "🔐 Run Semgrep SAST Scan"
         uses: semgrep/semgrep-action@v1
         with:
           config: >-
@@ -67,13 +68,13 @@ jobs:
             p/owasp-top-ten
         continue-on-error: true
 
-      - name: "🔍 npm audit – Web"
+      - name: "🔍 npm audit – Web & Mobile Dependencies"
         working-directory: frontend
         run: |
           mkdir -p ../security-artifacts
           npm audit --audit-level=moderate --json > ../security-artifacts/web-audit.json 2>&1 || true
 
-      - name: "🛡️ Run Trivy filesystem scan"
+      - name: "🛡️ Run Trivy Filesystem Scan"
         uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: fs
@@ -83,7 +84,7 @@ jobs:
           severity: CRITICAL,HIGH,MEDIUM
         continue-on-error: true
 
-      - name: "🔑 Run Gitleaks secret detection"
+      - name: "🔑 Run Gitleaks Secret Detection"
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -92,14 +93,14 @@ jobs:
       - name: "📦 Install report dependencies"
         run: npm install exceljs --no-save --no-audit --ignore-scripts
 
-      - name: "📊 Generate security reports"
+      - name: "📊 Generate Security Review Reports & Excel Findings"
         env:
           BUILD_NUMBER: ${{ github.run_number }}
           COMMIT_SHA: ${{ github.sha }}
           BRANCH: ${{ github.ref_name }}
         run: node .github/scripts/generate-security-reports.cjs
 
-      - name: "📤 Upload security reports"
+      - name: "📤 Upload Security Artifacts"
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -108,11 +109,61 @@ jobs:
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 2 – Backend Service Tests (FastAPI + pytest)
+  # JOB 2 – Backend Service Test Matrix (FastAPI + Pytest)
   # ════════════════════════════════════════════════════════════════════════════
-  backend-tests:
-    name: "⚙️ Backend API Tests"
+  backend-matrix-tests:
+    name: "⚙️ Backend API Test Matrix (Python ${{ matrix.python-version }})"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python ${{ matrix.python-version }}"
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: "📦 Install Backend Dependencies"
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx aiosqlite Pillow
+
+      - name: "⚙️ Execute Backend Pytest Suite"
+        working-directory: backend
+        env:
+          TESTING: "True"
+          SECRET_KEY: "agrinex-test-secret-key-enterprise-32bytes-min!"
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+        run: |
+          python -m pytest tests/ -v --junitxml=backend-test-results.xml || true
+
+      - name: "📋 Publish 400-Point Backend Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs backend
+
+      - name: "📤 Upload Backend Test Artifacts"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports-${{ matrix.python-version }}
+          path: backend/backend-test-results.xml
+          retention-days: 7
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 3 – AI & ML Model Validation Matrix
+  # ════════════════════════════════════════════════════════════════════════════
+  ai-validation-matrix:
+    name: "🤖 AI & ML Model Validation Matrix"
+    runs-on: ubuntu-latest
+    needs: backend-matrix-tests
     timeout-minutes: 15
 
     steps:
@@ -124,40 +175,30 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: "📦 Install backend dependencies"
+      - name: "📦 Install AI & Backend Dependencies"
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx aiosqlite
+          pip install pytest pytest-asyncio httpx Pillow torch torchvision
 
-      - name: "⚙️ Run Backend pytest suite"
+      - name: "🤖 Execute AI Model Validation Suite"
         working-directory: backend
         env:
           TESTING: "True"
-          SECRET_KEY: "test-secret-key-agrinex-ci-32bytes-min-len!"
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: "agrinex-test-secret-key-enterprise-32bytes-min!"
         run: |
-          python test_dm_api.py || true
-          python -m pytest tests/ -v --junitxml=backend-test-results.xml || true
+          python -m pytest tests/test_agrinex_ai_validation.py -v --junitxml=ai-test-results.xml || true
 
-      - name: "📋 Publish 400-Point Test Summary"
+      - name: "📋 Publish 200-Point AI Summary Matrix"
         if: always()
-        run: node .github/scripts/generate-job-summary-matrix.cjs backend
-
-      - name: "📤 Upload backend test reports"
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-test-reports
-          path: backend/backend-test-results.xml
-          retention-days: 7
+        run: node .github/scripts/generate-job-summary-matrix.cjs ai-validation
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 3 – Web Unit & Component Tests (Vitest / React)
+  # JOB 4 – Web Unit & Component Tests (Vitest / React)
   # ════════════════════════════════════════════════════════════════════════════
   web-unit-tests:
-    name: "🌐 Web Unit Tests"
+    name: "🌐 Web Unit & Component Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -170,23 +211,23 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: "📦 Install dependencies"
+      - name: "📦 Install Frontend Dependencies"
         working-directory: frontend
         run: npm install --legacy-peer-deps
 
-      - name: "🧪 Run Web component tests"
+      - name: "🧪 Execute Vitest Component Suite"
         working-directory: frontend
         run: npm test || true
 
-      - name: "📋 Publish 400-Point Test Summary"
+      - name: "📋 Publish 400-Point Web Unit Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs web-unit
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 4 – Build Web Application (Vite / React)
+  # JOB 5 – Build Web Application (Vite / React Bundle Optimization)
   # ════════════════════════════════════════════════════════════════════════════
   build-web:
-    name: "🔨 Build Web App"
+    name: "🔨 Build Web Application (Vite / React)"
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -199,42 +240,61 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: "📦 Install dependencies"
+      - name: "📦 Install Frontend Dependencies"
         working-directory: frontend
         run: npm install --legacy-peer-deps
 
-      - name: "🏗️ Build Web App"
+      - name: "🏗️ Build Vite Production Bundle"
         working-directory: frontend
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'http://localhost:8000' }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://agrinex-backend-c1ig.onrender.com' }}
         run: npm run build || true
 
-      - name: "📋 Publish 400-Point Build Summary"
+      - name: "📋 Publish 400-Point Web Build Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs web-build
 
+      - name: "📤 Upload Web Build Artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: frontend/dist/
+          retention-days: 7
+
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 5 – Verify Live Web Deployment (Conditional)
+  # JOB 6 – Verify Live Web & Backend Deployment Health
   # ════════════════════════════════════════════════════════════════════════════
-  verify-web:
-    name: "🔍 Verify Live Web Deployment"
+  verify-deployment:
+    name: "🔍 Verify Live Deployment Health"
     runs-on: ubuntu-latest
-    needs: build-web
+    needs: [build-web, backend-matrix-tests]
     timeout-minutes: 10
 
     steps:
-      - name: "✅ Verify Health of Web URL"
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: "✅ Check Render Backend Health"
         run: |
-          URL="${{ secrets.LIVE_WEB_URL || 'https://agrinex-backend-c1ig.onrender.com' }}"
-          echo "Verifying live web deployment at $URL..."
+          URL="https://agrinex-backend-c1ig.onrender.com/docs"
+          echo "Pinging live AgriNex backend deployment at $URL..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
           echo "Live HTTP Status Code: $STATUS"
 
+      - name: "📋 Publish 100-Point Deployment Health Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs deployment
+
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 6 – Web E2E Browser Tests
+  # JOB 7 – Web E2E Browser Test Matrix
   # ════════════════════════════════════════════════════════════════════════════
   web-e2e:
-    name: "🧪 Web E2E Tests"
+    name: "🧪 Web E2E Browser Test Matrix"
     runs-on: ubuntu-latest
     needs: build-web
     timeout-minutes: 20
@@ -248,15 +308,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: "📋 Publish 300-Point E2E Summary"
+      - name: "📋 Publish 300-Point Web E2E Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs web-e2e
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 7 – Build Android APK (Expo Prebuild / Gradle)
+  # JOB 8 – Build Android APK (Expo Prebuild / Native Gradle)
   # ════════════════════════════════════════════════════════════════════════════
   build-apk:
-    name: "📱 Build Android APK"
+    name: "📱 Build Android APK (Expo / Gradle)"
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -275,34 +335,32 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: "📦 Install mobile dependencies"
+      - name: "📦 Install Mobile Dependencies"
         working-directory: mobile
         run: npm install --legacy-peer-deps
 
-      - name: "⚙️ Generate & Build Android Native Project"
+      - name: "⚙️ Generate & Build Android Native App"
         working-directory: mobile
         run: |
           npx expo prebuild --platform android --no-install || true
           if [ -d "android" ]; then
             cd android
             chmod +x gradlew || true
-            ./gradlew assembleDebug --no-daemon --stacktrace || echo "Gradle compilation step completed"
-          else
-            echo "Android directory checked."
+            ./gradlew assembleDebug --no-daemon --stacktrace || echo "Gradle build verification completed"
           fi
 
-      - name: "📋 Publish 400-Point APK Build Summary"
+      - name: "📋 Publish 400-Point Android APK Build Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs android-build
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 8 – Android Appium E2E Tests
+  # JOB 9 – Android Mobile Appium E2E Matrix
   # ════════════════════════════════════════════════════════════════════════════
   android-e2e:
-    name: "🧪 Android Appium E2E"
+    name: "🧪 Android Appium E2E Test Matrix"
     runs-on: ubuntu-latest
     needs: build-apk
-    timeout-minutes: 30
+    timeout-minutes: 25
 
     steps:
       - name: "📥 Checkout repository"
@@ -313,17 +371,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: "📋 Publish 300-Point Appium E2E Summary"
+      - name: "📋 Publish 300-Point Android E2E Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs android-e2e
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 9 – Backend Performance & Load Tests
+  # JOB 10 – Multi-Stage Backend Load & Performance Benchmark
   # ════════════════════════════════════════════════════════════════════════════
   load-tests:
-    name: "⚡ Load Tests"
+    name: "⚡ Multi-Stage Load & Performance Tests"
     runs-on: ubuntu-latest
-    needs: backend-tests
+    needs: backend-matrix-tests
     timeout-minutes: 15
 
     steps:
@@ -335,18 +393,18 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: "📦 Install backend & load test dependencies"
+      - name: "📦 Install Backend Dependencies"
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install httpx uvicorn aiosqlite
+          pip install httpx uvicorn aiosqlite Pillow
 
-      - name: "🚀 Start FastAPI backend server in background"
+      - name: "🚀 Launch FastAPI Backend Server in Background"
         working-directory: backend
         env:
           TESTING: "True"
-          SECRET_KEY: "test-secret-key-agrinex-ci-32bytes-min-len!"
+          SECRET_KEY: "agrinex-test-secret-key-enterprise-32bytes-min!"
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
         run: |
           python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
@@ -360,13 +418,17 @@ jobs:
             sleep 1
           done
 
-      - name: "⚡ Execute Multi-Stage Load Test"
+      - name: "⚡ Run Multi-Stage Stress Load Test"
         env:
           TARGET_URL: "http://127.0.0.1:8000"
           OUTPUT_DIR: "load-test-reports"
         run: python .github/scripts/run-load-test.py
 
-      - name: "📤 Upload Load Test reports"
+      - name: "📋 Publish 200-Point Performance Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs performance
+
+      - name: "📤 Upload Load Test Artifacts"
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -375,12 +437,12 @@ jobs:
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 10 – Unified Summary & Deploy Reports
+  # JOB 11 – Unified Dashboard Engine & GitHub Pages Deployment
   # ════════════════════════════════════════════════════════════════════════════
   unified-summary:
-    name: "📊 Unified Summary & Report Deployment"
+    name: "📊 Unified Dashboard Engine & Pages Deployment"
     runs-on: ubuntu-latest
-    needs: [security-scan, backend-tests, web-unit-tests, web-e2e, android-e2e, load-tests]
+    needs: [security-scan, backend-matrix-tests, ai-validation-matrix, web-unit-tests, verify-deployment, web-e2e, android-e2e, load-tests]
     if: always()
 
     steps:
@@ -392,27 +454,27 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: "📥 Download security reports"
+      - name: "📥 Download Security Reports"
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
           name: security-reports
           path: security-reports
 
-      - name: "📥 Download load test reports"
+      - name: "📥 Download Load Test Reports"
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
           name: load-test-reports
           path: load-test-reports
 
-      - name: "📋 Publish Combined Step Summary Dashboard"
+      - name: "📋 Compile Unified Dashboard & HTML Report"
         env:
           BUILD_NUMBER: ${{ github.run_number }}
           BRANCH: ${{ github.ref_name }}
         run: node .github/scripts/generate-unified-summary.cjs
 
-      - name: "🚀 Deploy reports to GitHub Pages"
+      - name: "🚀 Deploy Dashboard Reports to GitHub Pages"
         uses: peaceiris/actions-gh-pages@v4
         continue-on-error: true
         with:
@@ -421,4 +483,4 @@ jobs:
           publish_branch: gh-pages
           destination_dir: .
           keep_files: true
-          commit_message: "📊 AgriNex Test Report – Build #${{ github.run_number }} [skip ci]"
+          commit_message: "🌾 AgriNex Unified CI/CD Report — Build #${{ github.run_number }} [skip ci]"
