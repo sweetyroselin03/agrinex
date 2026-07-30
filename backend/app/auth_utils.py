@@ -43,38 +43,48 @@ def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(pw_bytes, salt).decode('utf-8')
 
+from datetime import datetime, timedelta, timezone
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
+    now_utc = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now_utc + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = now_utc + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
+    now_utc = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now_utc + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = now_utc + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 def verify_token(token: str, expected_type: str = "access") -> Optional[dict]:
     """Verify and decode a JWT token. Returns payload if valid, None otherwise."""
+    if not token or "\x00" in token:
+        return None
     try:
+        header = jwt.get_unverified_header(token)
+        if not header or header.get("alg", "").lower() == "none" or header.get("alg") != ALGORITHM:
+            return None
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         token_type = payload.get("type", "access")
         if token_type != expected_type:
             logger.warning(f"[JWT] Token type mismatch: expected {expected_type}, got {token_type}")
             return None
         return payload
-    except JWTError as e:
+    except Exception as e:
         logger.warning(f"[JWT] Token verification failed: {e}")
         return None
+
 
 def send_otp_email(email: str, otp: str):
     """

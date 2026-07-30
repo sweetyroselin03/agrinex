@@ -8,7 +8,15 @@ try:
 except ImportError:
     pass
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./agrinex.db")
+import sys
+
+TESTING = os.getenv("TESTING", "").lower() in ("true", "1", "yes") or "pytest" in sys.modules
+
+if TESTING:
+    SQLALCHEMY_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite:///./agrinex.db")
+else:
+    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./agrinex.db")
+
 
 # Fixing the URL for SQLAlchemy if it's using the 'postgres://' prefix (Heroku/older style)
 if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):

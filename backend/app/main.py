@@ -8,7 +8,7 @@ import httpx
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from . import models, schemas, ai_service, auth_utils, auth_router
 from .database import engine, get_db
 from .websocket_manager import manager as ws_manager
@@ -85,33 +85,47 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    if not token:
-        logger.warning("Unauthenticated access attempt")
+    if not token or "\x00" in token:
+        logger.warning("Unauthenticated access attempt or null-byte token")
         raise credentials_exception
     try:
-        payload = jwt.decode(token, auth_utils.SECRET_KEY, algorithms=[auth_utils.ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        header = jwt.get_unverified_header(token)
+        if not header or header.get("alg", "").lower() == "none" or header.get("alg") != auth_utils.ALGORITHM:
             raise credentials_exception
-    except JWTError:
+
+        payload = jwt.decode(token, auth_utils.SECRET_KEY, algorithms=[auth_utils.ALGORITHM])
+        sub: str = payload.get("sub")
+        if sub is None:
+            raise credentials_exception
+    except Exception:
         raise credentials_exception
         
-    user = db.query(models.User).filter(models.User.email == email).first()
+    if str(sub).isdigit():
+        user = db.query(models.User).filter(models.User.id == int(sub)).first()
+    else:
+        user = db.query(models.User).filter(models.User.email == str(sub)).first()
+
     if user is None:
         raise credentials_exception
     return user
 
 def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Optional[models.User]:
-    if not token:
+    if not token or "\x00" in token:
         return None
     try:
+        header = jwt.get_unverified_header(token)
+        if not header or header.get("alg", "").lower() == "none" or header.get("alg") != auth_utils.ALGORITHM:
+            return None
         payload = jwt.decode(token, auth_utils.SECRET_KEY, algorithms=[auth_utils.ALGORITHM])
-        email: str = payload.get("sub")
-        if email:
-            return db.query(models.User).filter(models.User.email == email).first()
+        sub: str = payload.get("sub")
+        if sub:
+            if str(sub).isdigit():
+                return db.query(models.User).filter(models.User.id == int(sub)).first()
+            return db.query(models.User).filter(models.User.email == str(sub)).first()
     except Exception:
         pass
     return None
+
 
 @app.get("/")
 def read_root():
@@ -133,7 +147,7 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     following_count = db.query(models.Follow).filter(models.Follow.follower_id == current_user.id).count()
     posts_count = db.query(models.Post).filter(models.Post.user_id == current_user.id).count()
     
-    user_out = schemas.UserOut.from_orm(current_user)
+    user_out = schemas.UserOut.model_validate(current_user, from_attributes=True)
     user_out.followers_count = followers_count
     user_out.following_count = following_count
     user_out.posts_count = posts_count
@@ -171,7 +185,7 @@ def update_profile(user_update: schemas.UserUpdate, current_user: models.User = 
     if user_update.bio and len(user_update.bio.strip()) > 250:
         raise HTTPException(status_code=400, detail="Bio cannot exceed 250 characters.")
 
-    update_dict = user_update.dict(exclude_unset=True)
+    update_dict = user_update.model_dump(exclude_unset=True)
     for key, value in update_dict.items():
         if hasattr(user_db, key):
             if value is not None and isinstance(value, str):
@@ -201,7 +215,7 @@ def prepare_user_out(user_obj: models.User, current_user_id: Optional[int], db: 
             models.Follow.following_id == user_obj.id
         ).first() is not None
 
-    user_out = schemas.UserOut.from_orm(user_obj)
+    user_out = schemas.UserOut.model_validate(user_obj, from_attributes=True)
     user_out.display_name = user_obj.full_name or f"Farmer {user_obj.id}"
     user_out.specialization = user_obj.crop_specialization or "Agriculture Specialist"
     user_out.joined_date = user_obj.created_at
@@ -441,8 +455,9 @@ def create_notification(db, user_id: int, actor_id: int, notif_type: str, messag
 def create_post(post: schemas.PostCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"[CreatePost] User {current_user.id} creating post")
-        post_dict = post.dict()
+        post_dict = post.model_dump()
         images_list = post_dict.pop("images", None)
+        post_dict.pop("poll_options", None)
 
         # Validate content
         if not post_dict.get("content", "").strip():
@@ -460,7 +475,6 @@ def create_post(post: schemas.PostCreate, current_user: models.User = Depends(ge
         db.commit()
         db.refresh(db_post)
         logger.info(f"[CreatePost] Post {db_post.id} created successfully for user {current_user.id}")
-        # Pass current_user directly to avoid DetachedInstanceError on lazy-loaded relationship
         return prepare_post_out(db_post, current_user.id, db, author=current_user)
     except HTTPException:
         raise
@@ -468,6 +482,60 @@ def create_post(post: schemas.PostCreate, current_user: models.User = Depends(ge
         logger.error(f"[CreatePost] Error creating post for user {current_user.id}: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create post: {str(e)}")
+
+@app.post("/posts/poll", response_model=schemas.PostOut)
+def create_poll_post(post: schemas.PostCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not post.content or not post.content.strip():
+        raise HTTPException(status_code=400, detail="Post content cannot be empty")
+    db_post = models.Post(content=post.content, user_id=current_user.id)
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    return prepare_post_out(db_post, current_user.id, db, author=current_user)
+
+@app.get("/posts/search", response_model=List[schemas.PostOut])
+def search_posts(
+    q: str = Query("", min_length=0),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, le=100),
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    current_id = current_user.id if current_user else 0
+    search_term = f"%{q}%"
+    posts = db.query(models.Post).filter(models.Post.content.ilike(search_term)).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+    return [prepare_post_out(p, current_id, db) for p in posts]
+
+@app.get("/posts/trending", response_model=List[schemas.PostOut])
+def get_trending_posts(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, le=100),
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    current_id = current_user.id if current_user else 0
+    posts = db.query(models.Post).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+    return [prepare_post_out(p, current_id, db) for p in posts]
+
+@app.get("/posts/pinned", response_model=List[schemas.PostOut])
+def get_pinned_posts(
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    current_id = current_user.id if current_user else 0
+    posts = db.query(models.Post).order_by(models.Post.created_at.desc()).limit(5).all()
+    return [prepare_post_out(p, current_id, db) for p in posts]
+
+@app.get("/posts/following-feed", response_model=List[schemas.PostOut])
+def get_following_feed(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, le=100),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    following_ids = [f.following_id for f in db.query(models.Follow.following_id).filter(models.Follow.follower_id == current_user.id).all()]
+    posts = db.query(models.Post).filter(models.Post.user_id.in_(following_ids)).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+    return [prepare_post_out(p, current_user.id, db) for p in posts]
 
 @app.get("/posts/feed", response_model=List[schemas.PostOut])
 @app.get("/posts", response_model=List[schemas.PostOut])
@@ -500,13 +568,25 @@ def get_user_posts_by_alias(
     posts = db.query(models.Post).filter(models.Post.user_id == user_id).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
     return [prepare_post_out(p, current_id, db) for p in posts]
 
+@app.get("/posts/{post_id}", response_model=schemas.PostOut)
+def get_post_by_id(
+    post_id: int,
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    current_id = current_user.id if current_user else 0
+    return prepare_post_out(post, current_id, db)
+
 @app.put("/posts/{post_id}", response_model=schemas.PostOut)
 def update_post(post_id: int, post_update: schemas.PostUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     post = db.query(models.Post).filter(models.Post.id == post_id, models.Post.user_id == current_user.id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found or unauthorized")
         
-    post_dict = post_update.dict(exclude_unset=True)
+    post_dict = post_update.model_dump(exclude_unset=True)
     if "images" in post_dict:
         images_list = post_dict.pop("images")
         post.images = json.dumps(images_list) if images_list is not None else None
@@ -529,13 +609,14 @@ def delete_post(post_id: int, current_user: models.User = Depends(get_current_us
     db.commit()
     return {"message": "Post deleted successfully"}
 
+
 def prepare_post_out(post, current_user_id, db, author=None):
     likes_count = db.query(models.Like).filter(models.Like.post_id == post.id).count()
     comments_count = db.query(models.Comment).filter(models.Comment.post_id == post.id).count()
     is_liked = db.query(models.Like).filter(models.Like.post_id == post.id, models.Like.user_id == current_user_id).first() is not None
     is_saved = db.query(models.SavedPost).filter(models.SavedPost.post_id == post.id, models.SavedPost.user_id == current_user_id).first() is not None
 
-    post_out = schemas.PostOut.from_orm(post)
+    post_out = schemas.PostOut.model_validate(post, from_attributes=True)
     post_out.likes_count = likes_count
     post_out.comments_count = comments_count
     post_out.is_liked = is_liked
@@ -612,7 +693,7 @@ def comment_post(post_id: int, comment: schemas.CommentCreate, current_user: mod
         actor_name = current_user.full_name or f"Farmer {current_user.id}"
         create_notification(db, post.user_id, current_user.id, "COMMENT",
             f"{actor_name} commented on your post", post_id=post_id)
-    out = schemas.CommentOut.from_orm(db_comment)
+    out = schemas.CommentOut.model_validate(db_comment, from_attributes=True)
     out.author_name = current_user.full_name or f"Farmer {current_user.id}"
     out.author_avatar = current_user.profile_picture
     return out
@@ -622,7 +703,7 @@ def get_comments(post_id: int, db: Session = Depends(get_db)):
     comments = db.query(models.Comment).filter(models.Comment.post_id == post_id, models.Comment.parent_id == None).order_by(models.Comment.created_at.desc()).all()
     res = []
     for c in comments:
-        out = schemas.CommentOut.from_orm(c)
+        out = schemas.CommentOut.model_validate(c, from_attributes=True)
         out.author_name = c.user.full_name or f"Farmer {c.user_id}"
         out.author_avatar = c.user.profile_picture
         res.append(out)
@@ -666,7 +747,7 @@ def get_notifications(
 
     result = []
     for n in notifs:
-        out = schemas.NotificationOut.from_orm(n)
+        out = schemas.NotificationOut.model_validate(n, from_attributes=True)
         if n.actor_id:
             actor = db.query(models.User).filter(models.User.id == n.actor_id).first()
             out.actor_name = actor.full_name if actor else None
@@ -984,7 +1065,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             prevention="Align a plant leaf, fruit, or stem in the camera frame for accurate disease detection.",
             detected_object=detected,
             rejection_reason=reason,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
     
     # ━━━ STAGE 2: Run disease detection (only for validated crop images) ━━━
@@ -1026,7 +1107,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             prevention="Make sure the leaf is in focus and there is adequate lighting.",
             detected_object=analysis.get("crop_type", "non-crop object"),
             rejection_reason="Unable to identify a crop. Please upload a clear image of a plant leaf.",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
     
     db_scan = models.CropScan(
@@ -1057,7 +1138,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
     db.refresh(db_scan)
     
     # Return with extra fields from analysis
-    result = schemas.CropScanOut.from_orm(db_scan)
+    result = schemas.CropScanOut.model_validate(db_scan, from_attributes=True)
     return result
 
 @app.get("/ai/scan-history", response_model=List[schemas.CropScanOut])
@@ -1450,8 +1531,8 @@ def prepare_message_out(msg: models.Message, current_user_id: int, db: Session) 
     sender_name = sender_u.full_name if sender_u else f"Farmer {msg.sender_id}"
     sender_avatar = sender_u.profile_picture if sender_u else None
 
-    attachments_out = [schemas.MessageAttachmentOut.from_orm(a) for a in msg.attachments]
-    reactions_out = [schemas.MessageReactionOut.from_orm(r) for r in msg.reactions]
+    attachments_out = [schemas.MessageAttachmentOut.model_validate(a, from_attributes=True) for a in msg.attachments]
+    reactions_out = [schemas.MessageReactionOut.model_validate(r, from_attributes=True) for r in msg.reactions]
 
     return schemas.MessageOut(
         id=msg.id,
@@ -1644,7 +1725,7 @@ def get_conversation_messages(
                 db.add(models.MessageRead(message_id=m.id, user_id=current_user.id, status="seen"))
             else:
                 read_entry.status = "seen"
-        part.last_read_at = datetime.utcnow()
+        part.last_read_at = datetime.now(timezone.utc)
         db.commit()
 
         other_parts = db.query(models.Participant.user_id).filter(
@@ -1728,7 +1809,7 @@ def send_message(
 
     conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id).first()
     if conv:
-        conv.updated_at = datetime.utcnow()
+        conv.updated_at = datetime.now(timezone.utc)
         db.commit()
 
     msg_out = prepare_message_out(message, current_user.id, db)
@@ -1737,7 +1818,7 @@ def send_message(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(ws_manager.broadcast_message(msg_out.dict(), other_uids + [current_user.id]))
+            loop.create_task(ws_manager.broadcast_message(msg_out.model_dump(), other_uids + [current_user.id]))
     except Exception as e:
         logger.warning(f"WebSocket broadcast error: {e}")
 
@@ -1765,7 +1846,8 @@ def edit_message(
     if not message:
         raise HTTPException(status_code=404, detail="Message not found or unauthorized")
 
-    time_diff = (datetime.utcnow() - message.created_at).total_seconds()
+    created_at = message.created_at.replace(tzinfo=timezone.utc) if message.created_at and message.created_at.tzinfo is None else message.created_at
+    time_diff = (datetime.now(timezone.utc) - created_at).total_seconds()
     if time_diff > 900:
         raise HTTPException(status_code=400, detail="Messages can only be edited within 15 minutes of sending")
 
@@ -1784,7 +1866,7 @@ def edit_message(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_edited", "message": msg_out.dict()}))
+            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_edited", "message": msg_out.model_dump()}))
     except Exception:
         pass
 
@@ -1869,7 +1951,7 @@ def mark_messages_read(
     if not part:
         raise HTTPException(status_code=403, detail="Not a participant")
 
-    part.last_read_at = datetime.utcnow()
+    part.last_read_at = datetime.now(timezone.utc)
 
     unread_msgs = db.query(models.Message).filter(
         models.Message.conversation_id == target_id,
@@ -1950,7 +2032,7 @@ def toggle_message_reaction(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_reaction", "message": msg_out.dict()}))
+            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_reaction", "message": msg_out.model_dump()}))
     except Exception:
         pass
 
@@ -2133,11 +2215,11 @@ async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Sessio
 
     status_entry = db.query(models.UserOnlineStatus).filter(models.UserOnlineStatus.user_id == user_id).first()
     if not status_entry:
-        status_entry = models.UserOnlineStatus(user_id=user_id, is_online=True, last_seen=datetime.utcnow())
+        status_entry = models.UserOnlineStatus(user_id=user_id, is_online=True, last_seen=datetime.now(timezone.utc))
         db.add(status_entry)
     else:
         status_entry.is_online = True
-        status_entry.last_seen = datetime.utcnow()
+        status_entry.last_seen = datetime.now(timezone.utc)
     db.commit()
 
     try:
@@ -2170,6 +2252,6 @@ async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Sessio
         status_entry = db.query(models.UserOnlineStatus).filter(models.UserOnlineStatus.user_id == user_id).first()
         if status_entry:
             status_entry.is_online = False
-            status_entry.last_seen = datetime.utcnow()
+            status_entry.last_seen = datetime.now(timezone.utc)
             db.commit()
 

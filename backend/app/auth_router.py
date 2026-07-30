@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 import os
 import logging
@@ -30,7 +30,7 @@ def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
     # 1. Automatic cleanup of expired OTP records for this user to prevent database pollution
     try:
         expired_count = db.query(models.OTPCode).filter(
-            (models.OTPCode.email_or_phone == identifier) & (models.OTPCode.expires_at < datetime.utcnow())
+            (models.OTPCode.email_or_phone == identifier) & (models.OTPCode.expires_at < datetime.now(timezone.utc))
         ).delete()
         if expired_count > 0:
             db.commit()
@@ -43,7 +43,7 @@ def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
     
     # 2. Check 30s cooldown only if db_otp exists and has last_sent_at set.
     if db_otp and db_otp.last_sent_at:
-        time_elapsed = (datetime.utcnow() - db_otp.last_sent_at).total_seconds()
+        time_elapsed = (datetime.now(timezone.utc) - db_otp.last_sent_at).total_seconds()
         if time_elapsed < 30:
             retry_after = int(30 - time_elapsed)
             logger.warning(f"[OTP Cooldown Blocked] {identifier} requested OTP again in {time_elapsed:.1f}s. Cooldown active for {retry_after}s.")
@@ -53,7 +53,7 @@ def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
             )
 
     otp = str(random.randint(100000, 999999))
-    expiry = datetime.utcnow() + timedelta(minutes=5)
+    expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
     
     # Prepare update/insert but do not commit yet.
     if db_otp:
@@ -61,13 +61,13 @@ def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
         db_otp.expires_at = expiry
         db_otp.verified = False
         db_otp.attempts = 0
-        db_otp.last_sent_at = datetime.utcnow()
+        db_otp.last_sent_at = datetime.now(timezone.utc)
     else:
         db_otp = models.OTPCode(
             email_or_phone=identifier,
             otp_code=otp,
             expires_at=expiry,
-            last_sent_at=datetime.utcnow()
+            last_sent_at=datetime.now(timezone.utc)
         )
         db.add(db_otp)
     
@@ -134,7 +134,7 @@ def verify_otp(request: schemas.OTPVerify, db: Session = Depends(get_db)):
                 logger.error(f"[OTP Verification Failed] No custom OTP record found for {identifier}")
                 raise HTTPException(status_code=400, detail="No OTP requested for this phone number")
             
-            if db_otp.otp_code != request.otp or datetime.utcnow() > db_otp.expires_at:
+            if db_otp.otp_code != request.otp or datetime.now(timezone.utc) > db_otp.expires_at:
                 logger.error(f"[OTP Verification Failed] Custom OTP code invalid or expired for {identifier}")
                 raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
             db_otp.verified = True
@@ -165,7 +165,7 @@ def verify_otp(request: schemas.OTPVerify, db: Session = Depends(get_db)):
             logger.error(f"[OTP Verification Failed] Invalid OTP entered for {identifier}. Remaining attempts: {remaining}")
             raise HTTPException(status_code=400, detail=f"Invalid OTP code. You have {remaining} attempts remaining.")
         
-        if datetime.utcnow() > db_otp.expires_at:
+        if datetime.now(timezone.utc) > db_otp.expires_at:
             logger.error(f"[OTP Verification Failed] OTP code expired for {identifier} (Expired at {db_otp.expires_at})")
             db.delete(db_otp)
             db.commit()
@@ -350,7 +350,7 @@ def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depend
         raise HTTPException(status_code=404, detail="Phone not registered" if is_phone else "Email not registered")
     
     otp = str(random.randint(100000, 999999))
-    expiry = datetime.utcnow() + timedelta(minutes=5)
+    expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
     
     db_otp = db.query(models.OTPCode).filter(models.OTPCode.email_or_phone == target).first()
     if db_otp:
@@ -358,9 +358,9 @@ def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depend
         db_otp.expires_at = expiry
         db_otp.verified = False
         db_otp.attempts = 0
-        db_otp.last_sent_at = datetime.utcnow()
+        db_otp.last_sent_at = datetime.now(timezone.utc)
     else:
-        db_otp = models.OTPCode(email_or_phone=target, otp_code=otp, expires_at=expiry, last_sent_at=datetime.utcnow())
+        db_otp = models.OTPCode(email_or_phone=target, otp_code=otp, expires_at=expiry, last_sent_at=datetime.now(timezone.utc))
         db.add(db_otp)
     db.commit()
     
@@ -385,7 +385,7 @@ def reset_password(request: schemas.ResetPasswordRequest, db: Session = Depends(
     db_otp = db.query(models.OTPCode).filter(
         models.OTPCode.email_or_phone == target,
         models.OTPCode.otp_code == request.otp,
-        models.OTPCode.expires_at > datetime.utcnow()
+        models.OTPCode.expires_at > datetime.now(timezone.utc)
     ).first()
     
     if not db_otp:
