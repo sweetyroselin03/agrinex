@@ -431,7 +431,7 @@ export default function CommunityTab() {
         </View>
       )}
 
-      {!error && (isLoading || posts.length > 0 || filteredPosts.length > 0) && (
+      {!error && (!isLoading || searchQuery.trim().length > 0 || posts.length > 0) && (
         <FlatList
           data={filteredPosts}
           keyExtractor={(item, index) => item.id?.toString() || index.toString()}
@@ -454,7 +454,7 @@ export default function CommunityTab() {
                       <TouchableOpacity
                         key={u.id}
                         style={{
-                          width: 130,
+                          width: 145,
                           padding: 12,
                           borderRadius: 16,
                           backgroundColor: theme.card,
@@ -470,42 +470,69 @@ export default function CommunityTab() {
                           }
                         }}
                       >
-                        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.primary, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.primary, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
                           {u.profile_picture ? (
                             <Image source={{ uri: u.profile_picture }} style={{ width: '100%', height: '100%' }} />
                           ) : (
-                            <UserIcon color="white" size={22} />
+                            <UserIcon color="white" size={24} />
                           )}
                         </View>
                         <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: theme.text, textAlign: 'center' }}>
-                          {u.full_name || u.username || 'Farmer'}
+                          {u.full_name || u.display_name || u.username || 'Farmer'}
                         </Text>
                         <Text numberOfLines={1} style={{ fontSize: 11, color: theme.textLight, marginBottom: 8 }}>
                           @{u.username || `farmer_${u.id}`}
                         </Text>
-                        {u.id !== user?.id && (
+
+                        <View style={{ gap: 6, width: '100%' }}>
+                          {u.id !== user?.id && (
+                            <TouchableOpacity
+                              style={{
+                                paddingVertical: 5,
+                                paddingHorizontal: 10,
+                                borderRadius: 10,
+                                backgroundColor: u.is_following ? theme.border : theme.primary,
+                                width: '100%',
+                                alignItems: 'center',
+                              }}
+                              onPress={() => followUser(u.id)}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: u.is_following ? theme.text : '#FFF' }}>
+                                {u.is_following ? 'Following' : 'Follow'}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+
                           <TouchableOpacity
                             style={{
                               paddingVertical: 5,
-                              paddingHorizontal: 10,
+                              paddingHorizontal: 8,
                               borderRadius: 10,
-                              backgroundColor: u.is_following ? theme.border : theme.primary,
+                              borderWidth: 1,
+                              borderColor: theme.border,
+                              backgroundColor: theme.card,
                               width: '100%',
                               alignItems: 'center',
                             }}
-                            onPress={() => followUser(u.id)}
+                            onPress={() => {
+                              if (u.id !== user?.id) {
+                                router.push(`/user/${u.id}` as any);
+                              } else {
+                                router.push('/(tabs)/profile');
+                              }
+                            }}
                           >
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: u.is_following ? theme.text : '#FFF' }}>
-                              {u.is_following ? 'Following' : 'Follow'}
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: theme.text }}>
+                              View Profile
                             </Text>
                           </TouchableOpacity>
-                        )}
+                        </View>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
                 ) : (
                   <Text style={{ fontSize: 13, color: theme.textLight, fontStyle: 'italic', marginBottom: 8 }}>
-                    No registered farmers matching "{searchQuery}"
+                    No matching users found.
                   </Text>
                 )}
               </View>

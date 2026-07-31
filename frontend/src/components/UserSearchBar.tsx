@@ -98,8 +98,8 @@ export default function UserSearchBar({
             </div>
           ) : searchResults.length === 0 ? (
             <div className="p-6 text-center text-xs text-textSec">
-              <p className="font-semibold text-brandDark">No farmers found for "{searchQuery}"</p>
-              <p className="text-[11px] text-slate-400 mt-1">Try searching by village name, crop type, or username.</p>
+              <p className="font-semibold text-brandDark">No matching users found.</p>
+              <p className="text-[11px] text-slate-400 mt-1">Try searching by full name, username, or email address.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-50">

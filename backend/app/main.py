@@ -248,8 +248,9 @@ def search_users(
 ):
     from sqlalchemy import or_
     current_id = current_user.id if current_user else None
-    if q.strip():
-        search_term = f"%{q.strip()}%"
+    q_str = q.strip()
+    if q_str:
+        search_term = f"%{q_str}%"
         query = db.query(models.User).filter(
             or_(
                 models.User.full_name.ilike(search_term),
@@ -265,8 +266,9 @@ def search_users(
 
     if current_id:
         blocked_uids = get_blocked_user_ids(db, current_id)
-        exclude_uids = blocked_uids | {current_id}
-        query = query.filter(~models.User.id.in_(exclude_uids))
+        # Exclude blocked users; exclude current user unless current user is explicitly searching for their own name/email
+        if blocked_uids:
+            query = query.filter(~models.User.id.in_(blocked_uids))
 
     users = query.offset(skip).limit(limit).all()
 
@@ -300,6 +302,17 @@ def search_users(
             is_following=is_following,
             isFollowing=is_following,
         ))
+
+    # Log search details for debugging & verification
+    try:
+        compiled_sql = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+    except Exception:
+        compiled_sql = str(query.statement)
+
+    logger.info(f"[Search Debug] Query: '{q_str}' | Matches: {len(results)} | SQL: {compiled_sql}")
+    if len(results) == 0:
+        logger.warning(f"[Search Debug] Search for '{q_str}' returned 0 users. SQL executed: {compiled_sql}")
+
     return results
 
 @app.get("/users/suggested", response_model=List[schemas.UserSearchOut])
