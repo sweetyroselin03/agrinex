@@ -15,6 +15,11 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [devOtp, setDevOtp] = useState<string | null>(null);
 
+  const [touchedFullName, setTouchedFullName] = useState(false);
+  const [touchedEmail, setTouchedEmail] = useState(false);
+  const [touchedPassword, setTouchedPassword] = useState(false);
+  const [touchedConfirm, setTouchedConfirm] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
