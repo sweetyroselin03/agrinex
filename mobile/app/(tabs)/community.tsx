@@ -471,8 +471,8 @@ export default function CommunityTab() {
                         }}
                       >
                         <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.primary, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-                          {u.profile_picture ? (
-                            <Image source={{ uri: u.profile_picture }} style={{ width: '100%', height: '100%' }} />
+                          {(u.avatar_url || u.profile_picture) ? (
+                            <Image source={{ uri: u.avatar_url || u.profile_picture }} style={{ width: '100%', height: '100%' }} />
                           ) : (
                             <UserIcon color="white" size={24} />
                           )}

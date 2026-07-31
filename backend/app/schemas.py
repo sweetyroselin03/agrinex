@@ -70,6 +70,7 @@ class UserSearchOut(BaseModel):
     village: Optional[str] = None
     profile_picture: Optional[str] = None
     profile_photo: Optional[str] = None
+    avatar_url: Optional[str] = None
     bio: Optional[str] = None
     verified: Optional[bool] = True
     is_verified: Optional[bool] = True

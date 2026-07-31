@@ -293,6 +293,7 @@ def search_users(
             village=u.village or "Agricultural Hub",
             profile_picture=u.profile_picture,
             profile_photo=u.profile_picture,
+            avatar_url=u.profile_picture,
             bio=u.bio,
             verified=u.is_verified,
             is_verified=u.is_verified,

@@ -10,6 +10,7 @@ export interface UserSearchItem {
   village?: string;
   profile_picture?: string;
   profile_photo?: string;
+  avatar_url?: string;
   bio?: string;
   verified?: boolean;
   is_verified?: boolean;

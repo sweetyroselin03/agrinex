@@ -115,7 +115,7 @@ export default function UserSearchBar({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <img
-                      src={user.profile_photo || user.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.email}`}
+                      src={user.avatar_url || user.profile_photo || user.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.email}`}
                       alt={user.display_name || user.full_name || 'farmer'}
                       className="w-11 h-11 rounded-full border border-slate-200 object-cover bg-slate-50 shrink-0"
                     />
