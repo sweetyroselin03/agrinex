@@ -12,7 +12,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../store/useAuthStore';
-import Svg, { Path, Circle } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_KEY = 'agrinex_onboarding_completed';
@@ -173,47 +172,16 @@ export default function Splash() {
 
       {/* Center Hero */}
       <View style={styles.centerContent}>
-        {/* Soft Glow Effect */}
-        <Animated.View style={[styles.glowCircle, { opacity: glowOpacity }]} />
-
-        {/* Animated Logo Container */}
-        <Animated.View
-          style={[
-            styles.logoWrapper,
-            {
-              opacity: logoOpacity,
-              transform: [{ scale: logoScale }],
-            },
-          ]}
-        >
-          <View style={styles.logoCircle}>
-            <Svg width={64} height={64} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22L6.66 19.7C7.14 19.87 7.64 20 8.17 20C12.87 20 16.46 15.94 17.73 12.42C19 8.9 19 4 19 4C15.18 4 12.42 5.07 10.6 6.4"
-                stroke="#22C55E"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="rgba(34, 197, 94, 0.2)"
-              />
-              <Path
-                d="M8 16C9.5 13 12 10 17 8"
-                stroke="#4ADE80"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-              />
-              <Circle cx={17} cy={8} r={2} fill="#86EFAC" />
-              <Circle cx={12} cy={10} r={1.5} fill="#4ADE80" />
-            </Svg>
-          </View>
-        </Animated.View>
-
-        {/* AgriNex Text & Subtitle */}
+        {/* AgriNex Title & Subtitle */}
         <Animated.View
           style={{
             opacity: textOpacity,
-            transform: [{ translateY: textTranslateY }],
+            transform: [
+              { translateY: textTranslateY },
+              { scale: logoScale }
+            ],
             alignItems: 'center',
+            marginBottom: 32,
           }}
         >
           <Text style={styles.brandTitle}>AgriNex AI</Text>
@@ -285,35 +253,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-  },
-  glowCircle: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(34, 197, 94, 0.25)',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 50,
-  },
-  logoWrapper: {
-    marginBottom: 24,
-  },
-  logoCircle: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    backgroundColor: 'rgba(6, 78, 59, 0.8)',
-    borderWidth: 2,
-    borderColor: '#22C55E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
   },
   brandTitle: {
     fontSize: 40,
