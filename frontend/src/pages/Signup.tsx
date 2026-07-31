@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Sparkles } from 'lucide-react';
+import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, XCircle, Sparkles, Check } from 'lucide-react';
 
 export default function Signup() {
   const [step, setStep] = useState(1);
@@ -14,7 +14,13 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [devOtp, setDevOtp] = useState<string | null>(null);
-  
+
+  // Field touched states
+  const [touchedFullName, setTouchedFullName] = useState(false);
+  const [touchedEmail, setTouchedEmail] = useState(false);
+  const [touchedPassword, setTouchedPassword] = useState(false);
+  const [touchedConfirm, setTouchedConfirm] = useState(false);
+
   const [localError, setLocalError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -29,25 +35,46 @@ export default function Signup() {
     clearError 
   } = useAuthStore();
 
+  // ── Validation Heuristics ───────────────────────────────────────────────────
+  const fullNameValid = useMemo(() => fullName.trim().length >= 3, [fullName]);
+  const emailValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), [email]);
+  
+  const pwdCriteria = useMemo(() => ({
+    minLen: password.length >= 8,
+    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+  }), [password]);
+
+  const isPasswordValid = useMemo(() => (
+    pwdCriteria.minLen &&
+    pwdCriteria.hasUpper &&
+    pwdCriteria.hasLower &&
+    pwdCriteria.hasNumber &&
+    pwdCriteria.hasSpecial
+  ), [pwdCriteria]);
+
+  const passwordsMatch = useMemo(() => (
+    password.length > 0 && confirmPassword === password
+  ), [password, confirmPassword]);
+
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setTouchedFullName(true);
+    setTouchedEmail(true);
     setLocalError(null);
     clearError();
 
-    if (!fullName.trim() || !email.trim()) {
-      setLocalError('Full name and email are required.');
-      return;
-    }
+    if (!fullNameValid || !emailValid) return;
 
     try {
-      // 1. Verify if account exists
       const checkRes = await checkAccount(email.trim());
       if (checkRes.exists) {
         setLocalError(checkRes.message || 'Account already exists. Please login.');
         return;
       }
 
-      // 2. Send OTP
       const otpRes = await sendOTP(email.trim());
       if (otpRes.dev_otp) {
         setDevOtp(otpRes.dev_otp);
@@ -61,8 +88,8 @@ export default function Signup() {
     setLocalError(null);
     clearError();
 
-    if (!otp.trim()) {
-      setLocalError('Please enter the verification code.');
+    if (!otp.trim() || otp.trim().length < 6) {
+      setLocalError('Please enter the 6-digit verification code.');
       return;
     }
 
@@ -74,33 +101,20 @@ export default function Signup() {
 
   const handleStep3Submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setTouchedPassword(true);
+    setTouchedConfirm(true);
     setLocalError(null);
     clearError();
 
-    if (!password || !confirmPassword) {
-      setLocalError('Please fill in password fields.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setLocalError('Passwords do not match.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setLocalError('Password must be at least 6 characters long.');
-      return;
-    }
+    if (!isPasswordValid || !passwordsMatch) return;
 
     try {
-      // 1. Complete DB user creation
       await register({
         full_name: fullName.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined
       });
 
-      // 2. Set password & receive token
       await setStorePassword(email.trim(), password);
       navigate('/dashboard');
     } catch (err) {}
@@ -132,7 +146,7 @@ export default function Signup() {
             Smart Farming Made Exceptionally Simple
           </h1>
           <p className="text-slate-400 text-sm leading-relaxed">
-            Create an account to join over 10,000 farmers diagnostic scan logs, chat archives, and localized crop forums.
+            Create an account to join over 10,000 farmers sharing diagnostic scan logs, chat archives, and localized crop forums.
           </p>
         </div>
 
@@ -174,12 +188,12 @@ export default function Signup() {
             <h2 className="text-2xl font-extrabold text-brandDark tracking-tight">
               {step === 1 && 'Create Your Account'}
               {step === 2 && 'Verify Your Email'}
-              {step === 3 && 'Choose a Password'}
+              {step === 3 && 'Choose a Secure Password'}
             </h2>
             <p className="text-sm text-textSec font-medium">
               {step === 1 && 'Enter details to verify and register your farm.'}
               {step === 2 && `We sent a 6-digit OTP code to ${email}.`}
-              {step === 3 && 'Choose a secure password to complete signup.'}
+              {step === 3 && 'Choose a password matching all security requirements.'}
             </p>
           </div>
 
@@ -194,13 +208,13 @@ export default function Signup() {
             </div>
           )}
 
-          {/* Errors display */}
+          {/* Global Errors display */}
           {(localError || error) && (
-            <div className="p-4 rounded-xl bg-rose/5 border border-rose/10 flex items-start gap-3 text-rose text-sm">
+            <div className="p-4 rounded-xl bg-rose/10 border border-rose/20 flex items-start gap-3 text-rose text-xs font-bold">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold">Error:</span>
-                <p className="mt-0.5">{localError || error}</p>
+                <p className="mt-0.5 font-medium">{localError || error}</p>
               </div>
             </div>
           )}
@@ -227,11 +241,24 @@ export default function Signup() {
                       type="text"
                       required
                       placeholder="Jane Doe"
-                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
+                      className={`w-full pl-11 pr-10 py-3 rounded-xl border ${
+                        touchedFullName && !fullNameValid 
+                          ? 'border-rose text-rose bg-rose/5' 
+                          : touchedFullName && fullNameValid 
+                          ? 'border-emerald-500 bg-emerald-50/30' 
+                          : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20'
+                      } text-brandDark placeholder-slate-400 outline-none text-sm transition-all`}
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      onChange={(e) => { setFullName(e.target.value); setTouchedFullName(true); }}
+                      onBlur={() => setTouchedFullName(true)}
                     />
+                    {touchedFullName && fullNameValid && (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 absolute right-3 top-3.5" />
+                    )}
                   </div>
+                  {touchedFullName && !fullNameValid && (
+                    <p className="text-xs text-rose font-semibold mt-1">Full Name is required (at least 3 characters).</p>
+                  )}
                 </div>
 
                 {/* Email Address */}
@@ -245,11 +272,24 @@ export default function Signup() {
                       type="email"
                       required
                       placeholder="jane@example.com"
-                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
+                      className={`w-full pl-11 pr-10 py-3 rounded-xl border ${
+                        touchedEmail && !emailValid 
+                          ? 'border-rose text-rose bg-rose/5' 
+                          : touchedEmail && emailValid 
+                          ? 'border-emerald-500 bg-emerald-50/30' 
+                          : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20'
+                      } text-brandDark placeholder-slate-400 outline-none text-sm transition-all`}
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); setTouchedEmail(true); }}
+                      onBlur={() => setTouchedEmail(true)}
                     />
+                    {touchedEmail && emailValid && (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 absolute right-3 top-3.5" />
+                    )}
                   </div>
+                  {touchedEmail && !emailValid && (
+                    <p className="text-xs text-rose font-semibold mt-1">A valid email address is required.</p>
+                  )}
                 </div>
 
                 {/* Mobile Phone (Optional) */}
@@ -274,7 +314,7 @@ export default function Signup() {
                 <button
                   type="submit"
                   className="w-full py-3.5 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  disabled={isLoading}
+                  disabled={isLoading || !fullNameValid || !emailValid}
                 >
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Send Verification OTP'}
                 </button>
@@ -306,7 +346,7 @@ export default function Signup() {
                 <button
                   type="submit"
                   className="w-full py-3.5 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  disabled={isLoading}
+                  disabled={isLoading || otp.trim().length < 6}
                 >
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify & Continue'}
                 </button>
@@ -340,10 +380,17 @@ export default function Signup() {
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
-                      placeholder="Min 6 characters"
-                      className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
+                      placeholder="Enter new password"
+                      className={`w-full pl-11 pr-11 py-3 rounded-xl border ${
+                        touchedPassword && !isPasswordValid
+                          ? 'border-rose text-rose bg-rose/5'
+                          : touchedPassword && isPasswordValid
+                          ? 'border-emerald-500 bg-emerald-50/30'
+                          : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20'
+                      } text-brandDark placeholder-slate-400 outline-none text-sm transition-all`}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => { setPassword(e.target.value); setTouchedPassword(true); }}
+                      onBlur={() => setTouchedPassword(true)}
                     />
                     <button
                       type="button"
@@ -352,6 +399,36 @@ export default function Signup() {
                     >
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
+                  </div>
+                  {touchedPassword && !password && (
+                    <p className="text-xs text-rose font-semibold mt-1">Password is required.</p>
+                  )}
+                </div>
+
+                {/* Password Strength Requirements Checklist */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                  <p className="font-bold text-brandDark text-[11px] uppercase tracking-wider mb-2">Password must contain:</p>
+                  <div className="grid grid-cols-2 gap-1.5 font-medium">
+                    <div className={`flex items-center gap-1.5 ${pwdCriteria.minLen ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                      {pwdCriteria.minLen ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-slate-300" />}
+                      <span>8+ characters</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 ${pwdCriteria.hasUpper ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                      {pwdCriteria.hasUpper ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-slate-300" />}
+                      <span>Uppercase</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 ${pwdCriteria.hasLower ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                      {pwdCriteria.hasLower ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-slate-300" />}
+                      <span>Lowercase</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 ${pwdCriteria.hasNumber ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                      {pwdCriteria.hasNumber ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-slate-300" />}
+                      <span>Number</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 ${pwdCriteria.hasSpecial ? 'text-emerald-600 font-bold' : 'text-slate-400'} col-span-2`}>
+                      {pwdCriteria.hasSpecial ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-slate-300" />}
+                      <span>Special character (!@#$%^&*)</span>
+                    </div>
                   </div>
                 </div>
 
@@ -366,17 +443,30 @@ export default function Signup() {
                       type={showPassword ? 'text' : 'password'}
                       required
                       placeholder="Retype password"
-                      className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
+                      className={`w-full pl-11 pr-10 py-3 rounded-xl border ${
+                        touchedConfirm && !passwordsMatch
+                          ? 'border-rose text-rose bg-rose/5'
+                          : touchedConfirm && passwordsMatch
+                          ? 'border-emerald-500 bg-emerald-50/30'
+                          : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20'
+                      } text-brandDark placeholder-slate-400 outline-none text-sm transition-all`}
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onChange={(e) => { setConfirmPassword(e.target.value); setTouchedConfirm(true); }}
+                      onBlur={() => setTouchedConfirm(true)}
                     />
+                    {touchedConfirm && passwordsMatch && (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 absolute right-3 top-3.5" />
+                    )}
                   </div>
+                  {touchedConfirm && !passwordsMatch && (
+                    <p className="text-xs text-rose font-semibold mt-1">Passwords do not match.</p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 rounded-xl bg-brandDark text-white font-extrabold text-sm hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer animate-pulse"
-                  disabled={isLoading}
+                  className="w-full py-3.5 rounded-xl bg-brandDark text-white font-extrabold text-sm hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  disabled={isLoading || !isPasswordValid || !passwordsMatch}
                 >
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Complete Registration'}
                 </button>

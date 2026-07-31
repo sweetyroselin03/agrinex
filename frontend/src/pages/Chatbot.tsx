@@ -665,14 +665,6 @@ export default function Chatbot() {
                 >
                   <ImageIcon className="w-4 h-4" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => alert('Listening... Speak your crop question into your microphone 🎙️')}
-                  className="p-2 text-slate-400 hover:text-primary hover:bg-slate-100 rounded-xl transition-colors"
-                  title="Voice Input"
-                >
-                  <Mic className="w-4 h-4" />
-                </button>
               </div>
 
               {/* Send Button */}

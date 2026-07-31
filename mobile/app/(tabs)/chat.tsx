@@ -751,9 +751,47 @@ export default function ChatTab() {
                 </MotiView>
               );
             }}
-            contentContainerStyle={[styles.chatArea, { paddingTop: 12, paddingBottom: 140 }]}
+            contentContainerStyle={[styles.chatArea, { paddingTop: 8, paddingBottom: 140 }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={styles.headerComponentWrapper}>
+                {/* Compact AI Welcome Greeting Card */}
+                <MotiView
+                  from={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  style={[styles.welcomeCardCompact, { backgroundColor: theme.card, borderColor: theme.border }]}
+                >
+                  <Text style={[styles.welcomeTitleCompact, { color: theme.text }]}>
+                    Hello {user?.full_name || 'Farmer'}! 🌾
+                  </Text>
+                  <Text style={[styles.welcomeSubtitleCompact, { color: theme.textLight }]}>
+                    AgriNex AI Assistant. Ask anything about crops, fertilizers, pest alerts, or organic farming.
+                  </Text>
+                </MotiView>
+
+                {/* Horizontal Suggestion Chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsHeaderScroll}>
+                  {SUGGESTIONS.map((s, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.suggestionChip, { backgroundColor: theme.card, borderColor: theme.border }]}
+                      onPress={() => handleSend(s)}
+                      activeOpacity={0.75}
+                    >
+                      <LinearGradient
+                        colors={isDarkMode ? ['rgba(16,185,129,0.15)', 'rgba(5,150,105,0.05)'] : ['#ECFDF5', '#F0FDF4']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.suggestionGrad}
+                      >
+                        <Text style={[styles.suggestionChipText, { color: theme.text }]}>{s}</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            }
             ListFooterComponent={
               isLoading ? (
                 <MotiView from={{ opacity: 0 }} animate={{ opacity: 1 }} style={[styles.msgRow, styles.aiRow]}>
@@ -789,87 +827,7 @@ export default function ChatTab() {
                 </MotiView>
               ) : null
             }
-            ListEmptyComponent={
-              !isLoading ? (
-                <View style={styles.welcomeContainer}>
-                  {/* Premium Compact AI Welcome Card */}
-                  <MotiView
-                    from={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    style={[styles.welcomeCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-                  >
-                    <Text style={[styles.welcomeTitle, { color: theme.text }]}>
-                      Hello {user?.full_name || 'Farmer'}! 🌾
-                    </Text>
-                    <Text style={[styles.welcomeSubtitle, { color: theme.textLight }]}>
-                      I’m AgriNex AI Assistant. Ask anything about crops, fertilizers, diseases, irrigation, or organic
-                      farming.
-                    </Text>
-
-                    {/* Quick action buttons */}
-                    <View style={styles.quickActionsContainer}>
-                      <TouchableOpacity
-                        style={[
-                          styles.quickActionButton,
-                          { backgroundColor: theme.mint, borderColor: theme.primary + '30' },
-                        ]}
-                        onPress={() => handleSend('Describe crop leaf blight disease detection and organic solutions. 🍂')}
-                        activeOpacity={0.7}
-                      >
-                        <Sparkles color={theme.primary} size={13} />
-                        <Text style={[styles.quickActionText, { color: theme.primary }]}>Crop Disease</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.quickActionButton,
-                          { backgroundColor: theme.mint, borderColor: theme.primary + '30' },
-                        ]}
-                        onPress={() => handleSend('What are the best organic fertilizers for tomato yields? 🍅')}
-                        activeOpacity={0.7}
-                      >
-                        <Sparkles color={theme.primary} size={13} />
-                        <Text style={[styles.quickActionText, { color: theme.primary }]}>Fertilizer</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.quickActionButton,
-                          { backgroundColor: theme.mint, borderColor: theme.primary + '30' },
-                        ]}
-                        onPress={() => handleSend('Provide top organic weed prevention tips. 🌱')}
-                        activeOpacity={0.7}
-                      >
-                        <Sparkles color={theme.primary} size={13} />
-                        <Text style={[styles.quickActionText, { color: theme.primary }]}>Organic Tips</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </MotiView>
-                </View>
-              ) : null
-            }
           />
-
-          {/* Suggested quick question chips positioned perfectly above floating composer */}
-          <View style={styles.suggestionsWrapper}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScrollContent}>
-              {SUGGESTIONS.map((s, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.suggestionChip, { backgroundColor: theme.card, borderColor: theme.border }]}
-                  onPress={() => handleSend(s)}
-                  activeOpacity={0.75}
-                >
-                  <LinearGradient
-                    colors={isDarkMode ? ['rgba(16,185,129,0.15)', 'rgba(5,150,105,0.05)'] : ['#ECFDF5', '#F0FDF4']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.suggestionGrad}
-                  >
-                    <Text style={[styles.suggestionChipText, { color: theme.text }]}>{s}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
 
           {/* Dynamic input composer with safe area height offsets to prevent tab bar overlapping */}
           <View style={[styles.inputContainer, { paddingBottom: isKeyboardActive ? 12 : Math.max(insets.bottom + 65, 84) }]}>
@@ -921,18 +879,6 @@ export default function ChatTab() {
                 activeOpacity={0.6}
               >
                 <ImageIcon color={theme.textLight} size={20} />
-              </TouchableOpacity>
-
-              {/* Voice Button */}
-              <TouchableOpacity
-                style={styles.attachBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  showToast('Listening... Speak your crop question 🎙️');
-                }}
-                activeOpacity={0.6}
-              >
-                <Mic color={theme.primary} size={20} />
               </TouchableOpacity>
 
               {/* Language Selector */}
@@ -1395,12 +1341,26 @@ const styles = StyleSheet.create({
   previewLabel: { fontSize: 12.5, fontWeight: '600' },
   removeImg: { padding: 4 },
 
-  // Suggested Quick Chips above input bar
+  headerComponentWrapper: {
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  welcomeCardCompact: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  welcomeTitleCompact: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  welcomeSubtitleCompact: { fontSize: 12.5, lineHeight: 17 },
+  suggestionsHeaderScroll: { gap: 8, paddingBottom: 2 },
   suggestionsWrapper: { paddingVertical: 4 },
   suggestionsScrollContent: { paddingHorizontal: 14, gap: 8 },
   suggestionChip: { borderRadius: 20, overflow: 'hidden', borderWidth: 1 },
-  suggestionGrad: { paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
-  suggestionChipText: { fontSize: 12.5, fontWeight: '600' },
+  suggestionGrad: { paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
+  suggestionChipText: { fontSize: 12, fontWeight: '600' },
 
   // Bottom Floating Composer
   inputContainer: {
