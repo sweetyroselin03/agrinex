@@ -92,7 +92,7 @@ export default function OTPScreen() {
     const t = setTimeout(() => {
       const firstInputRef = inputRefs.current[0];
       if (firstInputRef) firstInputRef.focus();
-    }, 600);
+    }, 200);
     return () => clearTimeout(t);
   }, []);
 
@@ -101,7 +101,7 @@ export default function OTPScreen() {
       hasAutoFilled.current = true;
       setOtp(devOtp.split(''));
       showToast(`Dev OTP auto-filled: ${devOtp}`, 'success');
-      setTimeout(() => { handleVerify(devOtp); }, 1200);
+      setTimeout(() => { handleVerify(devOtp); }, 800);
     }
   }, [devOtp]);
 
@@ -124,8 +124,7 @@ export default function OTPScreen() {
     const digits = code.replace(/[^0-9]/g, '').slice(0, 6).split('');
     if (digits.length === 6) {
       setOtp(digits);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setTimeout(() => handleVerify(digits.join('')), 400);
+      setTimeout(() => handleVerify(digits.join('')), 300);
     }
   }, []);
 
@@ -314,12 +313,16 @@ export default function OTPScreen() {
           onHide={() => setToast({ ...toast, visible: false })}
         />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          style={{ flex: 1 }}
+        >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="none"
+            keyboardDismissMode="on-drag"
           >
             {/* Back button */}
             <TouchableOpacity 

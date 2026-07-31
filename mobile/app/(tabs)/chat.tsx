@@ -142,13 +142,16 @@ export default function ChatTab() {
 
   // Keyboard listener
   useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardActive(true));
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      setIsKeyboardActive(true);
+      scrollToBottom(true);
+    });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardActive(false));
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [scrollToBottom]);
 
   // Load chat system on mount
   useEffect(() => {
@@ -662,9 +665,9 @@ export default function ChatTab() {
 
         {/* Keyboard Avoiding Layout */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 10}
         >
           {/* Main Message viewport */}
           <FlatList

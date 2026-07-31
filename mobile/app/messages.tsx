@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Dimensions,
   Pressable,
@@ -108,6 +109,14 @@ export default function MessagesScreen() {
   const [lightboxImageUri, setLightboxImageUri] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList>(null);
+
+  // Keyboard listener for auto-scrolling on active chat
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => showSub.remove();
+  }, []);
 
   // Suggested Farmers state
   const [suggestedFarmers, setSuggestedFarmers] = useState<any[]>([]);
@@ -587,7 +596,8 @@ export default function MessagesScreen() {
       ) : (
         /* ─── ACTIVE CHAT SCREEN ─── */
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 10}
           style={styles.chatContainer}
         >
           {/* Header */}

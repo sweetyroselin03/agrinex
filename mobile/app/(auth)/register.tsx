@@ -112,7 +112,7 @@ export default function RegisterScreen() {
       </View>
       <SafeAreaView style={{ flex: 1 }}>
         <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={() => setToast({ ...toast, visible: false })} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
             <TouchableOpacity style={[s.backBtn, { backgroundColor: backBtnBg }]} onPress={() => router.back()}>
               <ArrowLeft color={isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.6)'} size={20} />
