@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Dimensions,
   ScrollView,
   InteractionManager,
   StatusBar,
@@ -19,19 +18,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Animated, {
-  FadeInDown,
-  useSharedValue,
-  withTiming,
-  withSpring,
-  useAnimatedStyle,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import Toast from '../../components/Toast';
 import { checkInternet } from '../../utils/network';
-
-const { width, height } = Dimensions.get('window');
 
 export default function OTPScreen() {
   const router = useRouter();
@@ -40,10 +31,11 @@ export default function OTPScreen() {
   
   const { verifyOTP, sendOTP, isLoading } = useAuthStore();
 
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [isVerified, setIsVerified] = useState(false);
   const [localLoading, setLocalLoading] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(0);
   const inputRefs = useRef<Array<TextInput | null>>([]);
   const hasAutoFilled = useRef(false);
   const isVerifying = useRef(false);
@@ -65,7 +57,6 @@ export default function OTPScreen() {
   const shieldInnerRingBorder = isDark ? 'rgba(34,229,139,0.2)' : 'rgba(34,229,139,0.15)';
   const shieldInnerRingBg = isDark ? 'rgba(34,229,139,0.06)' : 'rgba(34,229,139,0.04)';
   const shieldCircleBg = isDark ? 'rgba(34,229,139,0.12)' : 'rgba(34,229,139,0.08)';
-  const inputDotBg = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
   const successRingBorder = isDark ? 'rgba(34,229,139,0.2)' : 'rgba(34,229,139,0.15)';
   const successCircleBg = isDark ? 'rgba(34,229,139,0.1)' : 'rgba(34,229,139,0.08)';
   const successCircleBorder = isDark ? 'rgba(34,229,139,0.2)' : 'rgba(34,229,139,0.15)';
@@ -79,32 +70,29 @@ export default function OTPScreen() {
     setToast({ visible: true, message, type });
   }, []);
 
-  const progressValue = useSharedValue(0);
-  const buttonScale = useSharedValue(1);
-  const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: buttonScale.value }] }));
-  const progressStyle = useAnimatedStyle(() => ({ width: `${progressValue.value * 100}%` as any }));
-
-  const isEmail = params.authType === 'email';
   const target = (params.email as string || '').trim().replace(/\s/g, '');
   const devOtp = params.dev_otp as string | undefined;
 
+  // Auto focus first box on mount
   useEffect(() => {
     const t = setTimeout(() => {
       const firstInputRef = inputRefs.current[0];
       if (firstInputRef) firstInputRef.focus();
-    }, 200);
+    }, 150);
     return () => clearTimeout(t);
   }, []);
 
+  // Handle Dev OTP auto-fill if present
   useEffect(() => {
     if (devOtp && devOtp.length === 6 && !hasAutoFilled.current) {
       hasAutoFilled.current = true;
       setOtp(devOtp.split(''));
       showToast(`Dev OTP auto-filled: ${devOtp}`, 'success');
-      setTimeout(() => { handleVerify(devOtp); }, 800);
+      setTimeout(() => { handleVerify(devOtp); }, 600);
     }
   }, [devOtp]);
 
+  // Countdown Timer
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (timer > 0 && !isVerified) {
@@ -113,44 +101,56 @@ export default function OTPScreen() {
     return () => clearInterval(interval);
   }, [timer, isVerified]);
 
+  // Haptic feedback on verification success
   useEffect(() => {
     if (isVerified) {
-      progressValue.value = withTiming(1, { duration: 1500 });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [isVerified]);
 
   const fillOtpFromString = useCallback((code: string) => {
     const digits = code.replace(/[^0-9]/g, '').slice(0, 6).split('');
-    if (digits.length === 6) {
-      setOtp(digits);
-      setTimeout(() => handleVerify(digits.join('')), 300);
+    if (digits.length > 0) {
+      const newOtp = ['', '', '', '', '', ''];
+      digits.forEach((d, idx) => { newOtp[idx] = d; });
+      setOtp(newOtp);
+      if (digits.length === 6) {
+        setTimeout(() => handleVerify(digits.join('')), 200);
+      } else {
+        const nextIndex = Math.min(digits.length, 5);
+        inputRefs.current[nextIndex]?.focus();
+      }
     }
   }, []);
 
   const handleOtpChange = useCallback((value: string, index: number) => {
     if (isVerified) return;
     const cleanValue = value.replace(/[^0-9]/g, '');
-    if (cleanValue.length >= 6) { fillOtpFromString(cleanValue); return; }
-    if (!cleanValue && value) return;
+
+    // Handle full paste
+    if (cleanValue.length >= 6) {
+      fillOtpFromString(cleanValue);
+      return;
+    }
+
     setOtp(prev => {
       const newOtp = [...prev];
       newOtp[index] = cleanValue.slice(-1);
+
       if (cleanValue && index < 5) {
         setTimeout(() => {
-          const nextInputRef = inputRefs.current[index + 1];
-          if (nextInputRef) {
-            nextInputRef.focus();
-          }
+          inputRefs.current[index + 1]?.focus();
         }, 10);
       }
+
       if (index === 5 && cleanValue) {
         const s = newOtp.join('');
         if (s.length === 6) setTimeout(() => handleVerify(s), 100);
       }
+
       return newOtp;
     });
-  }, [isVerified]);
+  }, [isVerified, fillOtpFromString]);
 
   const handleKeyPress = useCallback((e: any, index: number) => {
     if (e.nativeEvent.key === 'Backspace') {
@@ -159,10 +159,7 @@ export default function OTPScreen() {
           const newOtp = [...prev];
           newOtp[index - 1] = '';
           setTimeout(() => {
-            const prevInputRef = inputRefs.current[index - 1];
-            if (prevInputRef) {
-              prevInputRef.focus();
-            }
+            inputRefs.current[index - 1]?.focus();
           }, 10);
           return newOtp;
         }
@@ -191,7 +188,7 @@ export default function OTPScreen() {
         const response = await verifyOTP(target, otpString);
         if (response && response.access_token) {
           setIsVerified(true);
-          setTimeout(() => { InteractionManager.runAfterInteractions(() => { router.replace('/(tabs)'); }); }, 1500);
+          setTimeout(() => { InteractionManager.runAfterInteractions(() => { router.replace('/(tabs)'); }); }, 1200);
           return true;
         }
         if (params.type === 'register') {
@@ -203,14 +200,14 @@ export default function OTPScreen() {
                 params: { email: target, fullName: params.fullName as string },
               });
             });
-          }, 1500);
+          }, 1200);
         } else if (params.type === 'forgot') {
           setIsVerified(true);
           setTimeout(() => {
             InteractionManager.runAfterInteractions(() => {
               router.replace({ pathname: '/(auth)/reset-password', params: { email: target, otp: otpString } });
             });
-          }, 1500);
+          }, 1200);
         }
         return true;
       })();
@@ -222,8 +219,7 @@ export default function OTPScreen() {
       else if (e.response?.data?.detail) errorMsg = e.response.data.detail;
       showToast(errorMsg, 'error');
       setOtp(['', '', '', '', '', '']);
-      const firstInputRef = inputRefs.current[0];
-      if (firstInputRef) firstInputRef.focus();
+      inputRefs.current[0]?.focus();
     } finally {
       setLocalLoading(false);
       isVerifying.current = false;
@@ -247,8 +243,7 @@ export default function OTPScreen() {
       const result = await safeApiCall(() => sendOTP(target), 8000);
       setTimer(30);
       setOtp(['', '', '', '', '', '']);
-      const firstInputRef = inputRefs.current[0];
-      if (firstInputRef) firstInputRef.focus();
+      inputRefs.current[0]?.focus();
       if (result?.dev_otp) {
         setTimeout(() => { setOtp(result.dev_otp.split('')); showToast(`New code sent. Dev OTP: ${result.dev_otp}`, 'success'); }, 500);
       } else {
@@ -276,7 +271,7 @@ export default function OTPScreen() {
           end={{ x: 0.5, y: 0.8 }}
           style={StyleSheet.absoluteFill}
         />
-        <Animated.View entering={FadeInDown.springify().damping(14)} style={styles.successWrapper}>
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.successWrapper}>
           <View style={[styles.successRing, { borderColor: successRingBorder }]}>
             <View style={[styles.successCircle, { backgroundColor: successCircleBg, borderColor: successCircleBorder }]}>
               <CheckCircle2 color={PRIMARY} size={56} strokeWidth={1.8} />
@@ -284,9 +279,6 @@ export default function OTPScreen() {
           </View>
           <Text style={[styles.successTitle, { color: TEXT_PRIMARY }]}>Verified!</Text>
           <Text style={[styles.successSubtext, { color: TEXT_MUTED }]}>Taking you forward...</Text>
-          <View style={[styles.progressContainer, { backgroundColor: progressContainerBg }]}>
-            <Animated.View style={[styles.progressBar, progressStyle]} />
-          </View>
         </Animated.View>
       </View>
     );
@@ -315,14 +307,14 @@ export default function OTPScreen() {
 
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           style={{ flex: 1 }}
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
+            keyboardDismissMode="none"
           >
             {/* Back button */}
             <TouchableOpacity 
@@ -334,18 +326,18 @@ export default function OTPScreen() {
 
             {/* Step indicator for register flow */}
             {params.type === 'register' && (
-              <Animated.View entering={FadeInDown.springify().damping(12)} style={styles.stepContainer}>
+              <View style={styles.stepContainer}>
                 <View style={styles.stepBarRow}>
                   <View style={[styles.stepBar, styles.stepBarDone]} />
                   <View style={[styles.stepBar, styles.stepBarActive]} />
                   <View style={[styles.stepBar, { backgroundColor: stepBarIdleColor }]} />
                 </View>
                 <Text style={[styles.stepLabel, { color: TEXT_MUTED }]}>Step 2 of 3</Text>
-              </Animated.View>
+              </View>
             )}
 
             {/* Shield Icon */}
-            <Animated.View entering={FadeInDown.springify().damping(12).delay(60)} style={styles.iconSection}>
+            <View style={styles.iconSection}>
               <View style={[styles.shieldOuterRing, { borderColor: shieldOuterRingBorder }]}>
                 <View style={[styles.shieldInnerRing, { borderColor: shieldInnerRingBorder, backgroundColor: shieldInnerRingBg }]}>
                   <View style={[styles.shieldCircle, { backgroundColor: shieldCircleBg }]}>
@@ -353,48 +345,54 @@ export default function OTPScreen() {
                   </View>
                 </View>
               </View>
-            </Animated.View>
+            </View>
 
             {/* Header */}
-            <Animated.View entering={FadeInDown.springify().damping(12).delay(120)} style={styles.header}>
+            <View style={styles.header}>
               <Text style={[styles.title, { color: TEXT_PRIMARY }]}>Verify Your{'\n'}Identity</Text>
               <Text style={[styles.subtitle, { color: TEXT_MUTED }]}>
                 We sent a 6-digit code to{'\n'}
                 <Text style={styles.targetText}>{target}</Text>
               </Text>
-            </Animated.View>
+            </View>
 
-            {/* OTP Inputs */}
-            <Animated.View entering={FadeInDown.springify().damping(12).delay(180)} style={styles.otpSection}>
+            {/* Static Bordered OTP Inputs - Calmed and Professional */}
+            <View style={styles.otpSection}>
               <View style={styles.otpRow}>
-                {otp.map((digit, index) => (
-                  <View key={index} style={styles.inputContainer}>
-                    <TextInput
-                      ref={(ref) => { inputRefs.current[index] = ref; }}
-                      style={[
-                        styles.otpInput,
-                        { 
-                          borderColor: digit ? PRIMARY : BORDER_IDLE, 
-                          backgroundColor: CARD_BG,
-                          color: TEXT_PRIMARY
-                        },
-                        digit ? styles.otpInputFilled : {},
-                      ]}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      value={digit}
-                      onChangeText={(v) => handleOtpChange(v, index)}
-                      onKeyPress={(e) => handleKeyPress(e, index)}
-                      selectTextOnFocus
-                    />
-                    {digit === '' && <View style={[styles.inputDot, { backgroundColor: inputDotBg }]} />}
-                  </View>
-                ))}
+                {otp.map((digit, index) => {
+                  const isFocused = focusedIndex === index;
+                  const isFilled = Boolean(digit);
+
+                  return (
+                    <View key={index} style={styles.inputContainer}>
+                      <TextInput
+                        ref={(ref) => { inputRefs.current[index] = ref; }}
+                        style={[
+                          styles.otpInput,
+                          { 
+                            borderColor: isFocused ? PRIMARY : (isFilled ? PRIMARY : BORDER_IDLE), 
+                            backgroundColor: CARD_BG,
+                            color: TEXT_PRIMARY
+                          }
+                        ]}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                        value={digit}
+                        onChangeText={(v) => handleOtpChange(v, index)}
+                        onKeyPress={(e) => handleKeyPress(e, index)}
+                        onFocus={() => setFocusedIndex(index)}
+                        onBlur={() => setFocusedIndex(null)}
+                        selectTextOnFocus
+                        caretHidden={true}
+                      />
+                    </View>
+                  );
+                })}
               </View>
-            </Animated.View>
+            </View>
 
             {/* Timer / Resend */}
-            <Animated.View entering={FadeInDown.springify().damping(12).delay(240)} style={styles.timerRow}>
+            <View style={styles.timerRow}>
               {timer > 0 ? (
                 <Text style={[styles.timerText, { color: TEXT_MUTED }]}>
                   Resend code in <Text style={styles.timerHighlight}>{timer}s</Text>
@@ -409,16 +407,11 @@ export default function OTPScreen() {
                   <Text style={styles.resendBtnText}>Resend Code</Text>
                 </TouchableOpacity>
               )}
-            </Animated.View>
+            </View>
 
             {/* Verify Button */}
-            <Animated.View
-              entering={FadeInDown.springify().damping(12).delay(300)}
-              style={[styles.primaryBtnShadow, { opacity: otp.join('').length < 6 ? 0.5 : 1 }, btnStyle]}
-            >
+            <View style={[styles.primaryBtnShadow, { opacity: (otp.join('').length < 6 || localLoading || isLoading) ? 0.5 : 1 }]}>
               <Pressable
-                onPressIn={() => { buttonScale.value = withSpring(0.97, { damping: 14, stiffness: 220 }); }}
-                onPressOut={() => { buttonScale.value = withSpring(1, { damping: 14, stiffness: 220 }); }}
                 onPress={() => handleVerify()}
                 disabled={localLoading || isLoading || otp.join('').length < 6}
                 style={styles.primaryBtn}
@@ -436,7 +429,7 @@ export default function OTPScreen() {
                   )}
                 </LinearGradient>
               </Pressable>
-            </Animated.View>
+            </View>
 
           </ScrollView>
         </KeyboardAvoidingView>
@@ -458,11 +451,11 @@ const styles = StyleSheet.create({
   backButton: {
     width: 40, height: 40, borderRadius: 20,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
 
   // Step bar
-  stepContainer: { marginBottom: 32 },
+  stepContainer: { marginBottom: 28 },
   stepBarRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
   stepBar: { flex: 1, height: 4, borderRadius: 2 },
   stepBarDone: { backgroundColor: '#00E38C80' },
@@ -470,24 +463,24 @@ const styles = StyleSheet.create({
   stepLabel: { fontSize: 13, fontWeight: '600' },
 
   // Shield icon
-  iconSection: { alignItems: 'center', marginBottom: 32 },
+  iconSection: { alignItems: 'center', marginBottom: 28 },
   shieldOuterRing: {
-    width: 120, height: 120, borderRadius: 60,
+    width: 110, height: 110, borderRadius: 55,
     borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
   shieldInnerRing: {
-    width: 96, height: 96, borderRadius: 48,
+    width: 88, height: 88, borderRadius: 44,
     borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
   shieldCircle: {
-    width: 72, height: 72, borderRadius: 36,
+    width: 66, height: 66, borderRadius: 33,
     justifyContent: 'center', alignItems: 'center',
   },
 
   // Header
-  header: { alignItems: 'center', marginBottom: 40 },
+  header: { alignItems: 'center', marginBottom: 36 },
   title: {
     fontSize: 32, fontWeight: '800',
     letterSpacing: -0.8, textAlign: 'center', lineHeight: 38, marginBottom: 12,
@@ -495,31 +488,20 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, fontWeight: '500', lineHeight: 22, textAlign: 'center' },
   targetText: { color: '#00E38C', fontWeight: '700' },
 
-  // OTP
-  otpSection: { marginBottom: 32 },
-  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  inputContainer: { position: 'relative', justifyContent: 'center', alignItems: 'center' },
+  // Static Bordered OTP Input Boxes (No scale, no movement, no layout shift)
+  otpSection: { marginBottom: 28 },
+  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  inputContainer: { width: 46, height: 56 },
   otpInput: {
-    width: 48, height: 60,
-    borderRadius: 16, borderWidth: 1.5,
+    width: 46, height: 56,
+    borderRadius: 14, borderWidth: 1.5,
     textAlign: 'center',
-    fontSize: 24, fontWeight: '800',
-  },
-  otpInputFilled: {
-    backgroundColor: 'rgba(0,217,139,0.08)',
-    shadowColor: '#00E38C',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  inputDot: {
-    position: 'absolute',
-    width: 6, height: 6, borderRadius: 3,
+    fontSize: 22, fontWeight: '800',
+    padding: 0,
   },
 
   // Timer
-  timerRow: { alignItems: 'center', marginBottom: 32 },
+  timerRow: { alignItems: 'center', marginBottom: 28 },
   timerText: { fontSize: 14, fontWeight: '600' },
   timerHighlight: { color: '#00E38C', fontWeight: '800' },
   resendBtn: { flexDirection: 'row', alignItems: 'center' },
@@ -530,24 +512,24 @@ const styles = StyleSheet.create({
     width: '100%',
     shadowColor: '#00E38C',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 6,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  primaryBtn: { width: '100%', height: 58, borderRadius: 29, overflow: 'hidden' },
+  primaryBtn: { width: '100%', height: 56, borderRadius: 28, overflow: 'hidden' },
   primaryGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   primaryText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
 
   // Success
   successWrapper: { alignItems: 'center', paddingHorizontal: 32 },
   successRing: {
-    width: 160, height: 160, borderRadius: 80,
+    width: 150, height: 150, borderRadius: 75,
     borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   successCircle: {
-    width: 120, height: 120, borderRadius: 60,
+    width: 110, height: 110, borderRadius: 55,
     borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
@@ -556,9 +538,4 @@ const styles = StyleSheet.create({
     textAlign: 'center', marginBottom: 8, letterSpacing: -0.5,
   },
   successSubtext: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
-  progressContainer: {
-    width: 140, height: 4, borderRadius: 2,
-    marginTop: 36, overflow: 'hidden',
-  },
-  progressBar: { height: '100%', width: 0, backgroundColor: '#00E38C', borderRadius: 2 },
 });
