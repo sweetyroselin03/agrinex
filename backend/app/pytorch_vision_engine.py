@@ -200,8 +200,20 @@ class PyTorchVisionEngine:
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         # STAGE 1 GATE ASSESSMENT
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        # Non-plant threshold calibrated at 0.20 probability
-        if is_plant_prob < 0.20 and confidence_pct < 40.0:
+        # Check green/foliage hue ratio in original image to ensure real leaves pass
+        has_plant_color = False
+        try:
+            arr = np.array(original_img)
+            if arr.ndim == 3 and arr.shape[2] >= 3:
+                r, g, b = arr[:, :, 0].astype(float), arr[:, :, 1].astype(float), arr[:, :, 2].astype(float)
+                # Green/foliage dominance mask
+                foliage_mask = ((g > r * 0.75) & (g > b * 0.75) & (g > 25)) | ((r > 50) & (g > 40) & (b < 80))
+                has_plant_color = float(np.mean(foliage_mask)) > 0.08
+        except Exception:
+            has_plant_color = True
+
+        # Non-plant threshold calibrated: Only reject if definitely not plant color AND very low probability
+        if not has_plant_color and is_plant_prob < 0.10 and confidence_pct < 30.0:
             return {
                 "is_valid_crop": False,
                 "is_plant": False,

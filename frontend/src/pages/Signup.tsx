@@ -34,8 +34,8 @@ export default function Signup() {
     setLocalError(null);
     clearError();
 
-    if (!fullName.trim() || !email.trim() || !phone.trim()) {
-      setLocalError('All fields are required.');
+    if (!fullName.trim() || !email.trim()) {
+      setLocalError('Full name and email are required.');
       return;
     }
 
@@ -97,7 +97,7 @@ export default function Signup() {
       await register({
         full_name: fullName.trim(),
         email: email.trim(),
-        phone: phone.trim()
+        phone: phone.trim() || undefined
       });
 
       // 2. Set password & receive token
@@ -252,17 +252,18 @@ export default function Signup() {
                   </div>
                 </div>
 
-                {/* Mobile Phone */}
+                {/* Mobile Phone (Optional) */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Mobile Number</label>
+                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">
+                    Mobile Number <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                       <Phone className="w-5 h-5" />
                     </div>
                     <input
                       type="tel"
-                      required
-                      placeholder="+919876543210"
+                      placeholder="+919876543210 (optional)"
                       className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}

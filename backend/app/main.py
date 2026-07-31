@@ -247,17 +247,22 @@ def search_users(
     db: Session = Depends(get_db)
 ):
     from sqlalchemy import or_
-    search_term = f"%{q}%"
     current_id = current_user.id if current_user else None
-
-    # Filter strictly on Full Name, Username, and Email as specified
-    query = db.query(models.User).filter(
-        or_(
-            models.User.full_name.ilike(search_term),
-            models.User.username.ilike(search_term),
-            models.User.email.ilike(search_term),
+    if q.strip():
+        search_term = f"%{q.strip()}%"
+        query = db.query(models.User).filter(
+            or_(
+                models.User.full_name.ilike(search_term),
+                models.User.username.ilike(search_term),
+                models.User.email.ilike(search_term),
+                models.User.village.ilike(search_term),
+                models.User.district.ilike(search_term),
+                models.User.crop_specialization.ilike(search_term),
+            )
         )
-    )
+    else:
+        query = db.query(models.User).order_by(models.User.created_at.desc())
+
     if current_id:
         blocked_uids = get_blocked_user_ids(db, current_id)
         exclude_uids = blocked_uids | {current_id}

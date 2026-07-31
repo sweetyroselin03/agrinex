@@ -34,7 +34,7 @@ interface AuthState {
   checkAccount: (identifier: string) => Promise<{ exists: boolean; message?: string }>;
   sendOTP: (email: string) => Promise<{ message: string; dev_otp?: string }>;
   verifyOTP: (email: string, otp: string) => Promise<{ message: string }>;
-  register: (userData: { full_name: string; email: string; phone: string }) => Promise<any>;
+  register: (userData: { full_name: string; email: string; phone?: string }) => Promise<any>;
   setPassword: (email: string, password: string) => Promise<void>;
   login: (credentials: { email: string; password: any }) => Promise<void>;
   forgotPassword: (email: string) => Promise<{ message: string; dev_otp?: string }>;

@@ -86,7 +86,7 @@ class UserSearchOut(BaseModel):
 class RegisterRequest(BaseModel):
     full_name: str
     email: str
-    phone: str
+    phone: Optional[str] = None
 
 class PasswordSetRequest(BaseModel):
     email: str
