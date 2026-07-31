@@ -1,52 +1,70 @@
 {
   "status": "\u2705 PASSED",
   "target_url": "http://127.0.0.1:8000",
-  "timestamp": "2026-07-29T09:21:45.613627",
+  "timestamp": "2026-07-31T07:48:23.450275",
   "endpoints": [
     {
       "name": "Docs Health Check",
       "path": "/docs",
       "status": 200,
-      "latency_ms": 2092.07,
+      "latency_ms": 2077.04,
       "requests_sec": 0.48,
-      "p95_ms": 2615.09,
-      "p99_ms": 3347.31
+      "p95_ms": 2596.3,
+      "p99_ms": 3323.26
+    },
+    {
+      "name": "Community Feed",
+      "path": "/posts/feed",
+      "status": 200,
+      "latency_ms": 2039.99,
+      "requests_sec": 0.49,
+      "p95_ms": 2549.99,
+      "p99_ms": 3263.98
     },
     {
       "name": "User Search",
       "path": "/messages/search?q=test",
       "status": 200,
-      "latency_ms": 2052.21,
-      "requests_sec": 0.49,
-      "p95_ms": 2565.26,
-      "p99_ms": 3283.54
+      "latency_ms": 2069.79,
+      "requests_sec": 0.48,
+      "p95_ms": 2587.24,
+      "p99_ms": 3311.66
     },
     {
       "name": "Conversations List",
       "path": "/messages/conversations",
       "status": 200,
-      "latency_ms": 2042.73,
+      "latency_ms": 2053.03,
       "requests_sec": 0.49,
-      "p95_ms": 2553.41,
-      "p99_ms": 3268.37
+      "p95_ms": 2566.29,
+      "p99_ms": 3284.85
     },
     {
       "name": "Weather Forecast",
       "path": "/api/weather?location=Dhaka",
       "status": 200,
-      "latency_ms": 2055.69,
+      "latency_ms": 2056.37,
       "requests_sec": 0.49,
-      "p95_ms": 2569.61,
-      "p99_ms": 3289.1
+      "p95_ms": 2570.46,
+      "p99_ms": 3290.19
     },
     {
       "name": "Suggested Farmers",
       "path": "/users/suggested",
       "status": 200,
-      "latency_ms": 2041.38,
+      "latency_ms": 2033.29,
       "requests_sec": 0.49,
-      "p95_ms": 2551.73,
-      "p99_ms": 3266.21
+      "p95_ms": 2541.61,
+      "p99_ms": 3253.26
+    },
+    {
+      "name": "AI Vision Health",
+      "path": "/ai/health",
+      "status": 200,
+      "latency_ms": 2041.22,
+      "requests_sec": 0.49,
+      "p95_ms": 2551.53,
+      "p99_ms": 3265.95
     }
   ],
   "stages": [

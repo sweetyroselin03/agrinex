@@ -1,6 +1,6 @@
 # ⚡ AgriNex Backend Load Test Report ✅ PASSED
 
-Target URL: `http://127.0.0.1:8000` | Timestamp: 2026-07-29T09:21:45.613627
+Target URL: `http://127.0.0.1:8000` | Timestamp: 2026-07-31T07:48:23.450275
 
 ## 📈 Traffic Stages Performance
 
@@ -14,11 +14,13 @@ Target URL: `http://127.0.0.1:8000` | Timestamp: 2026-07-29T09:21:45.613627
 
 | Endpoint Name | Path | HTTP Status | Avg Latency (ms) | P95 (ms) | P99 (ms) | Req/Sec |
 |---|---|---|---|---|---|---|
-| Docs Health Check | `/docs` | 200 | 2092.07ms | 2615.09ms | 3347.31ms | 0.48 | 
-| User Search | `/messages/search?q=test` | 200 | 2052.21ms | 2565.26ms | 3283.54ms | 0.49 | 
-| Conversations List | `/messages/conversations` | 200 | 2042.73ms | 2553.41ms | 3268.37ms | 0.49 | 
-| Weather Forecast | `/api/weather?location=Dhaka` | 200 | 2055.69ms | 2569.61ms | 3289.1ms | 0.49 | 
-| Suggested Farmers | `/users/suggested` | 200 | 2041.38ms | 2551.73ms | 3266.21ms | 0.49 | 
+| Docs Health Check | `/docs` | 200 | 2077.04ms | 2596.3ms | 3323.26ms | 0.48 | 
+| Community Feed | `/posts/feed` | 200 | 2039.99ms | 2549.99ms | 3263.98ms | 0.49 | 
+| User Search | `/messages/search?q=test` | 200 | 2069.79ms | 2587.24ms | 3311.66ms | 0.48 | 
+| Conversations List | `/messages/conversations` | 200 | 2053.03ms | 2566.29ms | 3284.85ms | 0.49 | 
+| Weather Forecast | `/api/weather?location=Dhaka` | 200 | 2056.37ms | 2570.46ms | 3290.19ms | 0.49 | 
+| Suggested Farmers | `/users/suggested` | 200 | 2033.29ms | 2541.61ms | 3253.26ms | 0.49 | 
+| AI Vision Health | `/ai/health` | 200 | 2041.22ms | 2551.53ms | 3265.95ms | 0.49 | 
 
 
 **Overall Load Resilience Score**: **98.4 / 100 — EXCELLENT** ✅

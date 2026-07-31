@@ -51,16 +51,32 @@ const formatError = (error: any, defaultMsg: string): string => {
   console.error('[Auth Error]', error);
   const detail = error.response?.data?.detail;
   if (detail) {
-    if (typeof detail === 'string') return detail;
+    if (typeof detail === 'string') {
+      if (detail === 'Field required') return 'Please fill in all required fields.';
+      return detail;
+    }
     if (Array.isArray(detail)) {
-      return detail.map((e: any) => e.msg || e.detail || JSON.stringify(e)).join(', ');
+      const messages = detail.map((e: any) => {
+        const fieldLoc = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : '';
+        if (e.msg === 'Field required' || !e.msg) {
+          if (fieldLoc === 'email') return 'Email address is required.';
+          if (fieldLoc === 'full_name') return 'Full Name is required.';
+          if (fieldLoc === 'password') return 'Password is required.';
+          if (fieldLoc === 'confirm_password' || fieldLoc === 'confirmPassword') return 'Confirm Password is required.';
+          if (fieldLoc === 'otp' || fieldLoc === 'code') return 'OTP code is required.';
+          return fieldLoc ? `${fieldLoc.replace('_', ' ')} is required.` : 'Field required.';
+        }
+        return e.msg || e.detail || JSON.stringify(e);
+      });
+      return messages.join(', ');
     }
   }
   if (error.response?.data?.message) return error.response.data.message;
   if (error.message === 'Network Error') {
     return 'Unable to reach backend server. Please check internet connection or server status.';
   }
-  return error.message || defaultMsg;
+  const rawMsg = error.message || defaultMsg;
+  return rawMsg === 'Field required' ? 'Please fill in all required fields.' : rawMsg;
 };
 
 export const useAuthStore = create<AuthState>()(

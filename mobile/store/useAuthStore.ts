@@ -57,7 +57,27 @@ let globalConfirmationResult: any = null;
 const formatError = (error: any, defaultMsg: string): string => {
   if (!error) return defaultMsg;
   const msg = error.message || '';
-  const responseMsg = error.response?.data?.detail || '';
+  const detail = error.response?.data?.detail;
+  let responseMsg = '';
+
+  if (detail) {
+    if (typeof detail === 'string') {
+      responseMsg = detail === 'Field required' ? 'Please fill in all required fields.' : detail;
+    } else if (Array.isArray(detail)) {
+      responseMsg = detail.map((e: any) => {
+        const fieldLoc = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : '';
+        if (e.msg === 'Field required' || !e.msg) {
+          if (fieldLoc === 'email') return 'Email address is required.';
+          if (fieldLoc === 'full_name') return 'Full Name is required.';
+          if (fieldLoc === 'password') return 'Password is required.';
+          if (fieldLoc === 'confirm_password' || fieldLoc === 'confirmPassword') return 'Confirm Password is required.';
+          if (fieldLoc === 'otp' || fieldLoc === 'code') return 'OTP code is required.';
+          return fieldLoc ? `${fieldLoc.replace('_', ' ')} is required.` : 'Field required.';
+        }
+        return e.msg || e.detail || JSON.stringify(e);
+      }).join(', ');
+    }
+  }
   
   const isNetwork = 
     msg.includes('timeout') || 
@@ -80,7 +100,8 @@ const formatError = (error: any, defaultMsg: string): string => {
     return 'Verification expired. Please request a new OTP.';
   }
   
-  return responseMsg || msg || defaultMsg;
+  const finalMsg = responseMsg || msg || defaultMsg;
+  return finalMsg === 'Field required' ? 'Please fill in all required fields.' : finalMsg;
 };
 
 export const useAuthStore = create<AuthState>()(

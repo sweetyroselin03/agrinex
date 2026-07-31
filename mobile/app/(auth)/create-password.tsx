@@ -157,10 +157,24 @@ export default function CreatePasswordScreen() {
     } finally { setLocalLoading(false); }
   }, [email, fullName, passwordVal, confirmPassword, strength, localLoading, isLoading]);
 
+  // Auto redirect to Login after success animation
+  useEffect(() => {
+    if (isSuccess) {
+      const t = setTimeout(() => {
+        InteractionManager.runAfterInteractions(() => {
+          router.replace('/(auth)/login');
+        });
+      }, 2200);
+      return () => clearTimeout(t);
+    }
+  }, [isSuccess]);
+
   const handleEnterApp = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    InteractionManager.runAfterInteractions(() => { router.replace('/(tabs)'); });
+    InteractionManager.runAfterInteractions(() => { router.replace('/(auth)/login'); });
   }, []);
+
+  const isFormValid = passwordVal.length >= 8 && strength >= 3 && passwordVal === confirmPassword;
 
   // ── Success State ──
   if (isSuccess) {
@@ -182,13 +196,13 @@ export default function CreatePasswordScreen() {
 
         <Animated.View style={successTxtStyle}>
           <Text style={[s.successTitle, { color: theme.text }]}>Account Created Successfully</Text>
-          <Text style={[s.successSub, { color: theme.textLight }]}>Welcome to the future of smart farming</Text>
+          <Text style={[s.successSub, { color: theme.textLight }]}>Redirecting you to Sign In...</Text>
         </Animated.View>
 
         <Animated.View style={[s.successBtnWrap, successBtnStyle]}>
           <Pressable onPress={handleEnterApp} style={[s.successBtn, { shadowColor: PRIMARY }]}>
             <LinearGradient colors={[PRIMARY, PRIMARY_END]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.successBtnGrad}>
-              <Text style={s.successBtnText}>Enter AgriNex</Text>
+              <Text style={s.successBtnText}>Proceed to Sign In</Text>
               <ArrowRight color="white" size={18} />
             </LinearGradient>
           </Pressable>
@@ -271,8 +285,8 @@ export default function CreatePasswordScreen() {
               </View>
 
               {/* Create Account Button */}
-              <View style={[s.btnShadow, { shadowColor: PRIMARY }]}>
-                <Pressable onPress={handleCreateAccount} disabled={localLoading || isLoading} style={s.primaryBtn}>
+              <View style={[s.btnShadow, { shadowColor: PRIMARY, opacity: (!isFormValid || localLoading || isLoading) ? 0.5 : 1 }]}>
+                <Pressable onPress={handleCreateAccount} disabled={localLoading || isLoading || !isFormValid} style={s.primaryBtn}>
                   <LinearGradient colors={[PRIMARY, PRIMARY_END]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryGrad}>
                     {(localLoading || isLoading) ? <ActivityIndicator color="white" /> : (
                       <View style={s.btnContent}>

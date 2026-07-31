@@ -3,7 +3,7 @@ import sys
 import json
 import time
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 
 def main():
     print("[Load Tester] Starting AgriNex FastAPI backend multi-stage load test...")
@@ -59,7 +59,7 @@ def main():
     summary = {
         "status": "✅ PASSED",
         "target_url": target_url,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "endpoints": results,
         "stages": stages,
     }
