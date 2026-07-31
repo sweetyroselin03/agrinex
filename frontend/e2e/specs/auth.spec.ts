@@ -16,6 +16,8 @@ test.describe('AgriNex Auth E2E Test Suite', () => {
 
   test('AUTH-002: OTP verification step', async ({ page }) => {
     await authPage.navigateToRegister();
+    await authPage.registerUser('Agri Tester', 'tester@agrinex.io');
+    await page.waitForTimeout(500);
     await authPage.enterOTP('123456');
   });
 

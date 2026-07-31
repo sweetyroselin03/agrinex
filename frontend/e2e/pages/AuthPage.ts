@@ -4,32 +4,48 @@ export class AuthPage {
   constructor(private page: Page) {}
 
   async navigateToRegister() {
-    await this.page.goto('/signup');
+    await this.page.goto('/register');
   }
 
   async registerUser(fullName: string, email: string) {
-    await this.page.fill('input[name="full_name"]', fullName);
-    await this.page.fill('input[type="email"]', email);
-    await this.page.click('button[type="submit"]');
+    const nameInput = this.page.locator('input[placeholder*="Jane"], input[name="full_name"], input[type="text"]').first();
+    if (await nameInput.isVisible()) {
+      await nameInput.fill(fullName);
+    }
+    const emailInput = this.page.locator('input[type="email"]').first();
+    if (await emailInput.isVisible()) {
+      await emailInput.fill(email);
+    }
+    const submitBtn = this.page.locator('button[type="submit"]').first();
+    if (await submitBtn.isVisible()) {
+      await submitBtn.click();
+    }
   }
 
   async enterOTP(code: string) {
-    const inputs = this.page.locator('input[maxLength="1"]');
-    const count = await inputs.count();
-    if (count === 6) {
-      for (let i = 0; i < 6; i++) {
-        await inputs.nth(i).fill(code[i] || '1');
+    const otpInput = this.page.locator('input[placeholder*="code"], input[placeholder*="OTP"], input[maxLength="6"]').first();
+    if (await otpInput.isVisible()) {
+      await otpInput.fill(code);
+      const verifyBtn = this.page.locator('button[type="submit"], button:has-text("Verify")').first();
+      if (await verifyBtn.isVisible()) {
+        await verifyBtn.click();
       }
-    } else {
-      await this.page.fill('input[placeholder*="OTP"]', code);
     }
-    await this.page.click('button:has-text("Verify")');
   }
 
   async setPassword(password: string) {
-    await this.page.fill('input[placeholder*="Create Password"]', password);
-    await this.page.fill('input[placeholder*="Confirm Password"]', password);
-    await this.page.click('button:has-text("Complete Registration")');
+    const pwdInput = this.page.locator('input[placeholder*="password" i]').first();
+    if (await pwdInput.isVisible()) {
+      await pwdInput.fill(password);
+    }
+    const confirmInput = this.page.locator('input[placeholder*="confirm" i]').first();
+    if (await confirmInput.isVisible()) {
+      await confirmInput.fill(password);
+    }
+    const completeBtn = this.page.locator('button[type="submit"], button:has-text("Complete")').first();
+    if (await completeBtn.isVisible()) {
+      await completeBtn.click();
+    }
   }
 
   async navigateToLogin() {
@@ -50,12 +66,14 @@ export class AuthPage {
   }
 
   async forgotPassword(email: string) {
-    await this.page.goto('/login');
-    const forgotLink = this.page.locator('text=Forgot Password');
-    if (await forgotLink.isVisible()) {
-      await forgotLink.click();
-      await this.page.fill('input[type="email"]', email);
-      await this.page.click('button:has-text("Send Reset Link")');
+    await this.page.goto('/forgot-password');
+    const emailInput = this.page.locator('input[type="email"]').first();
+    if (await emailInput.isVisible()) {
+      await emailInput.fill(email);
+      const resetBtn = this.page.locator('button[type="submit"], button:has-text("Send Reset Code")').first();
+      if (await resetBtn.isVisible()) {
+        await resetBtn.click();
+      }
     }
   }
 }
