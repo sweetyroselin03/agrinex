@@ -2,13 +2,12 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, XCircle, Sparkles, Check } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, XCircle, Sparkles, Check } from 'lucide-react';
 
 export default function Signup() {
   const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -162,8 +161,7 @@ export default function Signup() {
     try {
       await register({
         full_name: fullName.trim(),
-        email: email.trim(),
-        phone: phone.trim() || undefined
+        email: email.trim()
       });
 
       await setStorePassword(email.trim(), password);
@@ -375,25 +373,6 @@ export default function Signup() {
                       {touchedEmail && email.trim().length > 0 && !emailValid && (
                         <p className="text-xs text-rose font-semibold mt-1">Please enter a valid email address.</p>
                       )}
-                    </div>
-
-                    {/* Mobile Phone (Optional) */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">
-                        Mobile Number <span className="text-slate-400 font-normal lowercase">(optional)</span>
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                          <Phone className="w-5 h-5" />
-                        </div>
-                        <input
-                          type="tel"
-                          placeholder="+919876543210 (optional)"
-                          className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                        />
-                      </div>
                     </div>
 
                     <button
