@@ -229,7 +229,13 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         set({ token: null, user: null, isAuthenticated: false, error: null });
-        localStorage.removeItem('agrinex-web-auth');
+        try {
+          Object.keys(localStorage).forEach((key) => {
+            if (key.includes('agrinex') || key.includes('chat') || key.includes('post') || key.includes('user')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (e) {}
       },
 
       clearError: () => set({ error: null }),
