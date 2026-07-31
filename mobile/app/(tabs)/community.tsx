@@ -47,6 +47,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
+import client from '../../api/client';
 
 const { width } = Dimensions.get('window');
 const CAROUSEL_IMAGE_WIDTH = width - 80;
@@ -100,7 +101,7 @@ const PostImageCarousel = ({ images, onImagePress }: { images: string[], onImage
 
 export default function CommunityTab() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, followUser } = useAuthStore();
   const { isDarkMode, theme } = useAppTheme();
 
   const { posts, fetchPosts, likePost, createPost, isLoading, error, clearError, addComment, fetchComments, toggleSavePost, savedPostIds, deletePost } = usePostStore();
@@ -113,6 +114,8 @@ export default function CommunityTab() {
   const [isUploading, setIsUploading] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchedUsers, setSearchedUsers] = useState<any[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
 
   // Fullscreen Image Viewer
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -122,6 +125,26 @@ export default function CommunityTab() {
   useEffect(() => {
     fetchPosts();
   }, []);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchedUsers([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingUsers(true);
+      try {
+        const res = await client.get('/users/search', { params: { q: searchQuery.trim() } });
+        setSearchedUsers(res.data || []);
+      } catch (e) {
+        console.log('Search users failed:', e);
+        setSearchedUsers([]);
+      } finally {
+        setIsSearchingUsers(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -416,6 +439,77 @@ export default function CommunityTab() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
+          }
+          ListHeaderComponent={
+            searchQuery.trim() ? (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 10 }}>
+                  Matching Farmers ({searchedUsers.length})
+                </Text>
+                {isSearchingUsers ? (
+                  <ActivityIndicator color={theme.primary} style={{ marginVertical: 12 }} />
+                ) : searchedUsers.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 4 }}>
+                    {searchedUsers.map((u) => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={{
+                          width: 130,
+                          padding: 12,
+                          borderRadius: 16,
+                          backgroundColor: theme.card,
+                          borderWidth: 1,
+                          borderColor: theme.border,
+                          alignItems: 'center',
+                        }}
+                        onPress={() => {
+                          if (u.id !== user?.id) {
+                            router.push(`/user/${u.id}` as any);
+                          } else {
+                            router.push('/(tabs)/profile');
+                          }
+                        }}
+                      >
+                        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.primary, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                          {u.profile_picture ? (
+                            <Image source={{ uri: u.profile_picture }} style={{ width: '100%', height: '100%' }} />
+                          ) : (
+                            <UserIcon color="white" size={22} />
+                          )}
+                        </View>
+                        <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: theme.text, textAlign: 'center' }}>
+                          {u.full_name || u.username || 'Farmer'}
+                        </Text>
+                        <Text numberOfLines={1} style={{ fontSize: 11, color: theme.textLight, marginBottom: 8 }}>
+                          @{u.username || `farmer_${u.id}`}
+                        </Text>
+                        {u.id !== user?.id && (
+                          <TouchableOpacity
+                            style={{
+                              paddingVertical: 5,
+                              paddingHorizontal: 10,
+                              borderRadius: 10,
+                              backgroundColor: u.is_following ? theme.border : theme.primary,
+                              width: '100%',
+                              alignItems: 'center',
+                            }}
+                            onPress={() => followUser(u.id)}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: u.is_following ? theme.text : '#FFF' }}>
+                              {u.is_following ? 'Following' : 'Follow'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={{ fontSize: 13, color: theme.textLight, fontStyle: 'italic', marginBottom: 8 }}>
+                    No registered farmers matching "{searchQuery}"
+                  </Text>
+                )}
+              </View>
+            ) : null
           }
           contentContainerStyle={styles.scrollContent}
           ListEmptyComponent={

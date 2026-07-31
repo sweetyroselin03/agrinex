@@ -153,11 +153,24 @@ export default function ChatTab() {
     };
   }, [scrollToBottom]);
 
-  // Load chat system on mount
+  const getChatStorageKey = useCallback((userId?: number) => {
+    return userId ? `@agrinex_chat_user_${userId}` : '@agrinex_chat_guest';
+  }, []);
+
+  // Load chat system on mount / user change
   useEffect(() => {
     checkAuth().catch(() => { });
-    loadConversations();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadConversations();
+    } else {
+      setConversations([]);
+      setMessages([]);
+      setActiveConversationId(null);
+    }
+  }, [user?.id]);
 
   // Sync scroll
   useEffect(() => {
@@ -192,8 +205,10 @@ export default function ChatTab() {
   });
 
   const loadConversations = async () => {
+    if (!user?.id) return;
+    const storageKey = getChatStorageKey(user.id);
     try {
-      const raw = await AsyncStorage.getItem(CHAT_STORAGE_KEY);
+      const raw = await AsyncStorage.getItem(storageKey);
       let localConvs: Conversation[] = [];
 
       if (raw) {
@@ -206,7 +221,7 @@ export default function ChatTab() {
         setConversations(localConvs);
         setActiveConversationId(fresh.id);
         setMessages(fresh.messages);
-        await AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(localConvs));
+        await AsyncStorage.setItem(storageKey, JSON.stringify(localConvs));
       } else {
         localConvs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         setConversations(localConvs);
@@ -233,8 +248,9 @@ export default function ChatTab() {
   };
 
   const saveConversations = async (list: Conversation[]) => {
+    if (!user?.id) return;
     try {
-      await AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(list));
+      await AsyncStorage.setItem(getChatStorageKey(user.id), JSON.stringify(list));
     } catch (e) {
       console.error(e);
     }
@@ -855,8 +871,8 @@ export default function ChatTab() {
             </ScrollView>
           </View>
 
-          {/* Dynamic input composer with height offsets to prevent tab bar overlapping */}
-          <View style={[styles.inputContainer, { paddingBottom: isKeyboardActive ? 12 : 106 }]}>
+          {/* Dynamic input composer with safe area height offsets to prevent tab bar overlapping */}
+          <View style={[styles.inputContainer, { paddingBottom: isKeyboardActive ? 12 : Math.max(insets.bottom + 65, 84) }]}>
             {selectedImage && (
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
@@ -880,40 +896,58 @@ export default function ChatTab() {
               style={[
                 styles.inputRow,
                 {
-                  backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+                  backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.98)' : 'rgba(255, 255, 255, 0.98)',
                   borderColor: theme.border,
+                  borderRadius: 28,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  alignItems: 'center',
                 },
               ]}
             >
+              {/* Camera Button */}
               <TouchableOpacity
                 style={styles.attachBtn}
-                onPress={() => {
-                  Alert.alert(
-                    'Attach Photo',
-                    'Choose image source for crop leaf analysis:',
-                    [
-                      { text: 'Take Photo (Camera)', onPress: () => pickImage('camera') },
-                      { text: 'Choose from Gallery', onPress: () => pickImage('library') },
-                      { text: 'Cancel', style: 'cancel' }
-                    ]
-                  );
-                }}
+                onPress={() => pickImage('camera')}
                 activeOpacity={0.6}
               >
                 <Camera color={theme.textLight} size={20} />
               </TouchableOpacity>
 
+              {/* Gallery Image Button */}
               <TouchableOpacity
-                style={[styles.attachBtn, { marginRight: 4 }]}
+                style={styles.attachBtn}
+                onPress={() => pickImage('library')}
+                activeOpacity={0.6}
+              >
+                <ImageIcon color={theme.textLight} size={20} />
+              </TouchableOpacity>
+
+              {/* Voice Button */}
+              <TouchableOpacity
+                style={styles.attachBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  showToast('Listening... Speak your crop question 🎙️');
+                }}
+                activeOpacity={0.6}
+              >
+                <Mic color={theme.primary} size={20} />
+              </TouchableOpacity>
+
+              {/* Language Selector */}
+              <TouchableOpacity
+                style={[styles.attachBtn, { marginRight: 2 }]}
                 onPress={handleLanguageCycle}
                 activeOpacity={0.6}
               >
                 <Globe color={selectedLanguage !== 'English' ? theme.primary : theme.textLight} size={20} />
               </TouchableOpacity>
 
+              {/* Text Input */}
               <TextInput
-                style={[styles.textInput, { color: theme.text }]}
-                placeholder="Ask AgriNex AI..."
+                style={[styles.textInput, { color: theme.text, fontSize: 15, maxHeight: 100, minHeight: 40 }]}
+                placeholder={`Ask in ${selectedLanguage}...`}
                 placeholderTextColor={theme.textLight + '90'}
                 value={input}
                 onChangeText={setInput}
@@ -922,16 +956,17 @@ export default function ChatTab() {
                 editable={!isLoading}
               />
 
+              {/* Send Button */}
               <TouchableOpacity
                 style={[
                   styles.sendBtnPremium,
-                  { backgroundColor: input.trim() || selectedImage ? theme.primary : theme.border },
+                  { backgroundColor: input.trim() || selectedImage ? theme.primary : theme.border, borderRadius: 20, width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
                 ]}
                 onPress={() => handleSend()}
                 disabled={(!input.trim() && !selectedImage) || isLoading}
                 activeOpacity={0.7}
               >
-                <Send color="#fff" size={14} />
+                <Send color="#fff" size={16} />
               </TouchableOpacity>
             </View>
           </View>

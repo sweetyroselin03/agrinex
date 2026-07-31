@@ -384,15 +384,21 @@ export const useAuthStore = create<AuthState>()(
         globalConfirmationResult = null;
 
         // Clear all AsyncStorage keys
-        AsyncStorage.multiRemove([
-          'agrinex-auth-storage',
-          'agrinex-post-storage',
-          'agrinex-chat-storage-v4',
-          'chat_history',
-          'notifications',
-          'feed_cache',
-          'scan_history',
-        ]).catch(() => {});
+        AsyncStorage.getAllKeys().then((keys) => {
+          const chatKeys = keys.filter(k => k.includes('chat') || k.includes('agrinex'));
+          AsyncStorage.multiRemove(chatKeys).catch(() => {});
+        }).catch(() => {
+          AsyncStorage.multiRemove([
+            'agrinex-auth-storage',
+            'agrinex-post-storage',
+            'agrinex-chat-storage-v4',
+            'agrinex_premium_chat_v5',
+            'chat_history',
+            'notifications',
+            'feed_cache',
+            'scan_history',
+          ]).catch(() => {});
+        });
       },
 
       reset: () => {
