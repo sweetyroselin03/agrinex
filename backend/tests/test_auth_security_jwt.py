@@ -10,7 +10,7 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.auth_utils import create_access_token, verify_token as decode_access_token, get_password_hash as hash_password, verify_password
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

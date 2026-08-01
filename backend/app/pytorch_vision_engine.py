@@ -118,6 +118,15 @@ class PyTorchVisionEngine:
         # Temperature calibration parameter for probability scaling
         self.temperature = 1.25
 
+        # Warmup model to load PyTorch layers into memory/cache
+        try:
+            dummy_input = torch.zeros(1, 3, 224, 224).to(self.device)
+            with torch.no_grad():
+                self.model(dummy_input)
+            logger.info("[PyTorch Vision Engine] Model warmed up successfully.")
+        except Exception as warmup_err:
+            logger.warning(f"[PyTorch Vision Engine] Model warmup failed: {warmup_err}")
+
     def preprocess_image(self, image_bytes: bytes) -> Tuple[torch.Tensor, Image.Image]:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         tensor = self.preprocess(img).unsqueeze(0).to(self.device)

@@ -370,6 +370,37 @@ def get_suggested_users(
         ))
     return res
 
+
+@app.get("/users/blocked", response_model=List[schemas.UserSearchOut])
+@app.get("/api/users/blocked", response_model=List[schemas.UserSearchOut])
+def get_blocked_users(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    blocked_entries = db.query(models.BlockedUser).filter(models.BlockedUser.blocker_id == current_user.id).all()
+    b_ids = [b.blocked_id for b in blocked_entries]
+    if not b_ids:
+        return []
+    users = db.query(models.User).filter(models.User.id.in_(b_ids)).all()
+    return [
+        schemas.UserSearchOut(
+            id=u.id,
+            full_name=u.full_name,
+            display_name=u.full_name or f"Farmer {u.id}",
+            username=u.username,
+            email=u.email,
+            village=u.village or "Agricultural Hub",
+            profile_picture=u.profile_picture,
+            profile_photo=u.profile_picture,
+            bio=u.bio,
+            verified=u.is_verified,
+            is_verified=u.is_verified,
+            followers=0,
+            followers_count=0,
+            following_count=0,
+            is_following=False,
+            isFollowing=False
+        ) for u in users
+    ]
+
+
 # ─── Dynamic User Routes ───
 @app.get("/users/{user_id}", response_model=schemas.UserOut)
 @app.get("/api/users/{user_id}", response_model=schemas.UserOut)
@@ -2173,37 +2204,6 @@ def unblock_user(user_id: int, current_user: models.User = Depends(get_current_u
         db.commit()
 
     return {"blocked": False, "user_id": user_id}
-
-
-@app.get("/users/blocked", response_model=List[schemas.UserSearchOut])
-@app.get("/api/users/blocked", response_model=List[schemas.UserSearchOut])
-
-def get_blocked_users(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    blocked_entries = db.query(models.BlockedUser).filter(models.BlockedUser.blocker_id == current_user.id).all()
-    b_ids = [b.blocked_id for b in blocked_entries]
-    if not b_ids:
-        return []
-    users = db.query(models.User).filter(models.User.id.in_(b_ids)).all()
-    return [
-        schemas.UserSearchOut(
-            id=u.id,
-            full_name=u.full_name,
-            display_name=u.full_name or f"Farmer {u.id}",
-            username=u.username,
-            email=u.email,
-            village=u.village or "Agricultural Hub",
-            profile_picture=u.profile_picture,
-            profile_photo=u.profile_picture,
-            bio=u.bio,
-            verified=u.is_verified,
-            is_verified=u.is_verified,
-            followers=0,
-            followers_count=0,
-            following_count=0,
-            is_following=False,
-            isFollowing=False
-        ) for u in users
-    ]
 
 
 # ─── MEDIA UPLOAD ENDPOINT ───

@@ -25,13 +25,13 @@ def generate_leaf_image_bytes(color=(34, 139, 34), size=(224, 224), fmt="JPEG"):
     buf.seek(0)
     return buf.getvalue()
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def auth_headers(client):
     google_payload = {
         "id_token": "ai_vision_suite_token",

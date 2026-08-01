@@ -14,7 +14,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     endpoints = [
-        {"name": "Docs Health Check", "path": "/docs", "method": "GET"},
+        {"name": "Health Check", "path": "/health", "method": "GET"},
         {"name": "Community Feed", "path": "/posts/feed", "method": "GET"},
         {"name": "User Search", "path": "/messages/search?q=test", "method": "GET"},
         {"name": "Conversations List", "path": "/messages/conversations", "method": "GET"},

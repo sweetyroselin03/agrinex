@@ -33,13 +33,13 @@ def generate_test_image(color=(34, 139, 34), size=(224, 224), format_type="JPEG"
 
 import pytest_asyncio
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def auth_headers(client):
     google_payload = {
         "id_token": "mock_google_oauth_token_12345",

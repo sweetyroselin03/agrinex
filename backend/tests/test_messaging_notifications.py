@@ -10,13 +10,13 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.websocket_manager import manager as ws_manager
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def auth_headers(client):
     google_payload = {
         "id_token": "msg_suite_token",

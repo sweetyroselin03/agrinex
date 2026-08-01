@@ -11,7 +11,7 @@ from app.main import app
 from app.database import get_db, engine
 from app.models import User, Post, Comment, Notification, CropScan
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
