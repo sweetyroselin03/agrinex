@@ -140,6 +140,17 @@ export default function ChatTab() {
 
   const flatListRef = useRef<FlatList<ChatMsg>>(null);
 
+  const scrollToBottom = useCallback(
+    (animated = true) => {
+      if (messages.length > 0) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated });
+        }, 100);
+      }
+    },
+    [messages]
+  );
+
   // Keyboard listener
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => {
@@ -168,14 +179,14 @@ export default function ChatTab() {
     } else {
       setConversations([]);
       setMessages([]);
-      setActiveConversationId(null);
+      setActiveConversationId('');
     }
   }, [user?.id]);
 
   // Sync scroll
   useEffect(() => {
     scrollToBottom(true);
-  }, [messages.length, isLoading]);
+  }, [messages.length, isLoading, scrollToBottom]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -185,17 +196,6 @@ export default function ChatTab() {
       setToastVisible(false);
     }, 3500);
   };
-
-  const scrollToBottom = useCallback(
-    (animated = true) => {
-      if (messages.length > 0) {
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated });
-        }, 100);
-      }
-    },
-    [messages]
-  );
 
   const welcomeMsg = (): ChatMsg => ({
     id: 'welcome_' + Date.now(),

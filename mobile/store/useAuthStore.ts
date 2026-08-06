@@ -206,40 +206,11 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      sendOTP: async (emailOrPhone, recaptchaVerifier?: any) => {
+      sendOTP: async (email) => {
         set({ isLoading: true, error: null });
         try {
-          const isPhone = emailOrPhone.trim().replace(/\s/g, '').replace('+', '').match(/^\d+$/);
-          if (isPhone) {
-            const { auth } = require('../utils/firebase');
-            const { signInWithPhoneNumber } = require('firebase/auth');
-            const { safeApiCall } = require('../utils/network');
-            
-            // Try Firebase Phone Auth with platform verifier safety
-            let verifier = recaptchaVerifier;
-            if (!verifier) {
-              if (Platform.OS === 'web') {
-                verifier = new (require('firebase/auth').RecaptchaVerifier)(auth, 'recaptcha-container', { size: 'invisible' });
-              } else {
-                verifier = {
-                  type: 'recaptcha',
-                  verify: async () => 'mock-recaptcha-token'
-                };
-              }
-            }
-
-            const confirmation = await safeApiCall(async () => {
-              return await signInWithPhoneNumber(auth, emailOrPhone, verifier);
-            }, 60000);
-            
-            globalConfirmationResult = confirmation;
-            set({ confirmationResult: confirmation, isLoading: false });
-            return { message: 'OTP sent via phone' };
-          }
-          
-          // Email OTP — send via backend API
           const { safeApiCall } = require('../utils/network');
-          const response = await safeApiCall(() => client.post('/auth/send-otp', { email: emailOrPhone }), 60000);
+          const response = await safeApiCall(() => client.post('/auth/send-otp', { email }), 60000);
           set({ isLoading: false });
           return response.data;
         } catch (error: any) {
@@ -250,49 +221,11 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      verifyOTP: async (emailOrPhone, otp) => {
+      verifyOTP: async (email, otp) => {
         set({ isLoading: true, error: null });
         try {
-          const isPhone = emailOrPhone.trim().replace(/\s/g, '').replace('+', '').match(/^\d+$/);
-          const confirmation = get().confirmationResult || globalConfirmationResult;
-          if (isPhone && confirmation) {
-            const { safeApiCall } = require('../utils/network');
-            const result = await safeApiCall(() => confirmation.confirm(otp), 60000);
-            const user = result.user;
-            
-            // Re-sync with backend (optionally create a backend session if verified)
-            let backendRes: any;
-            try {
-              backendRes = await safeApiCall(() => client.post('/auth/verify-otp', { email: emailOrPhone, otp }), 60000);
-            } catch (syncErr) {
-              console.log('[AuthStore] verifyOTP sync with backend failed, simulating backend user...', syncErr);
-              // Construct a simulated response if API fails
-              backendRes = {
-                data: {
-                  access_token: 'mock-firebase-token',
-                  user: {
-                    id: 999,
-                    email: emailOrPhone.includes('@') ? emailOrPhone : `${emailOrPhone}@agrinex.local`,
-                    full_name: 'AgriNex User',
-                    phone: isPhone ? emailOrPhone : undefined,
-                    is_verified: true
-                  }
-                }
-              };
-            }
-            
-            const { access_token, user: backendUser } = backendRes.data;
-            set({
-              token: access_token,
-              user: backendUser,
-              isAuthenticated: true,
-              isLoading: false
-            });
-            return backendRes.data;
-          }
-          
           const { safeApiCall } = require('../utils/network');
-          const response = await safeApiCall(() => client.post('/auth/verify-otp', { email: emailOrPhone, otp }), 60000);
+          const response = await safeApiCall(() => client.post('/auth/verify-otp', { email, otp }), 60000);
           const { access_token, user } = response.data;
           if (access_token) {
             set({ 

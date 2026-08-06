@@ -141,7 +141,7 @@ export default function CreatePasswordScreen() {
       const { safeApiCall } = require('../../utils/network');
 
       await safeApiCall(async () => {
-        await register({ email, full_name: fullName, phone: '' });
+        await register({ email, full_name: fullName });
         await setPassword(email, passwordVal);
       }, 12000);
 

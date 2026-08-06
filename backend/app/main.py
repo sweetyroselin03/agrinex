@@ -48,6 +48,7 @@ default_origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
     "https://agrinex-web.vercel.app",
+    "https://agrinex-ai.vercel.app",
     "https://agrinex-backend-c1ig.onrender.com",
 ]
 
@@ -619,6 +620,17 @@ def get_user_posts_by_alias(
     posts = db.query(models.Post).filter(models.Post.user_id == user_id).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
     return [prepare_post_out(p, current_id, db) for p in posts]
 
+@app.get("/posts/saved", response_model=List[schemas.PostOut])
+def get_saved_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    saved = db.query(models.SavedPost).filter(models.SavedPost.user_id == current_user.id).all()
+    posts = [s.post for s in saved if s.post]
+    return [prepare_post_out(p, current_user.id, db) for p in posts]
+
+@app.get("/posts/user", response_model=List[schemas.PostOut])
+def get_user_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    posts = db.query(models.Post).filter(models.Post.user_id == current_user.id).order_by(models.Post.created_at.desc()).all()
+    return [prepare_post_out(p, current_user.id, db) for p in posts]
+
 @app.get("/posts/{post_id}", response_model=schemas.PostOut)
 def get_post_by_id(
     post_id: int,
@@ -773,16 +785,7 @@ def save_post(post_id: int, current_user: models.User = Depends(get_current_user
         db.commit()
         return {"saved": True, "message": "Post saved"}
 
-@app.get("/posts/saved", response_model=List[schemas.PostOut])
-def get_saved_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    saved = db.query(models.SavedPost).filter(models.SavedPost.user_id == current_user.id).all()
-    posts = [s.post for s in saved if s.post]
-    return [prepare_post_out(p, current_user.id, db) for p in posts]
-
-@app.get("/posts/user", response_model=List[schemas.PostOut])
-def get_user_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    posts = db.query(models.Post).filter(models.Post.user_id == current_user.id).order_by(models.Post.created_at.desc()).all()
-    return [prepare_post_out(p, current_user.id, db) for p in posts]
+# Endpoints shifted above to prevent route conflict with /posts/{post_id}
 
 # ─── Notifications ───
 @app.get("/notifications", response_model=List[schemas.NotificationOut])
@@ -1687,7 +1690,13 @@ def get_user_conversations(current_user: models.User = Depends(get_current_user)
 
     convs = db.query(models.Conversation).filter(models.Conversation.id.in_(conv_ids)).order_by(models.Conversation.updated_at.desc()).all()
     res = [prepare_conversation_out(c, current_user.id, db) for c in convs]
-    res.sort(key=lambda x: (not x.is_pinned, x.updated_at), reverse=True)
+    res.sort(
+        key=lambda x: (
+            not x.is_pinned,
+            x.updated_at if x.updated_at is not None else (x.created_at if x.created_at is not None else datetime.min)
+        ),
+        reverse=True
+    )
     return res
 
 
@@ -2228,6 +2237,40 @@ async def upload_media_file(file: UploadFile = File(...), current_user: models.U
 
 
 # ─── WEBSOCKET ROUTE ───
+
+@app.websocket("/ws/chat")
+@app.websocket("/ws/messages")
+@app.websocket("/ws/notifications")
+async def websocket_generic_endpoint(
+    websocket: WebSocket,
+    user_id: Optional[int] = Query(None),
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    actual_user_id = user_id
+    if token:
+        try:
+            payload = jwt.decode(token, auth_utils.SECRET_KEY, algorithms=[auth_utils.ALGORITHM])
+            sub = payload.get("sub")
+            if sub:
+                if str(sub).isdigit():
+                    actual_user_id = int(sub)
+                else:
+                    user = db.query(models.User).filter(models.User.email == str(sub)).first()
+                    if user:
+                        actual_user_id = user.id
+        except Exception:
+            pass
+
+    if not actual_user_id:
+        try:
+            await websocket.accept()
+            await websocket.close(code=4003)
+        except Exception:
+            pass
+        return
+
+    await websocket_chat_endpoint(websocket, actual_user_id, db)
 
 @app.websocket("/ws/chat/{user_id}")
 async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Session = Depends(get_db)):
