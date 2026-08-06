@@ -32,9 +32,10 @@ def sync_db():
         add_column_if_missing(conn, "users", "experience", "VARCHAR")
         add_column_if_missing(conn, "users", "crop_specialization", "VARCHAR")
         add_column_if_missing(conn, "users", "website", "VARCHAR")
+        add_column_if_missing(conn, "users", "cover_photo", "VARCHAR")
+        add_column_if_missing(conn, "messages", "client_msg_id", "VARCHAR")
         add_column_if_missing(conn, "chat_messages", "conversation_id", "VARCHAR")
         add_column_if_missing(conn, "posts", "images", "TEXT")
-
         # Safely drop legacy phone column if it exists
         try:
             conn.execute(text("ALTER TABLE users DROP COLUMN phone;"))

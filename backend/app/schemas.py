@@ -22,6 +22,7 @@ class UserUpdate(BaseModel):
     crop_specialization: Optional[str] = None
     crop_types: Optional[str] = None
     profile_picture: Optional[str] = None
+    cover_photo: Optional[str] = None
     bio: Optional[str] = None
     website: Optional[str] = None
 
@@ -41,6 +42,7 @@ class UserOut(BaseModel):
     crop_types: Optional[str] = None
     profile_picture: Optional[str] = None
     profile_photo: Optional[str] = None
+    cover_photo: Optional[str] = None
     bio: Optional[str] = None
     website: Optional[str] = None
     is_verified: Optional[bool] = False
@@ -67,6 +69,7 @@ class UserSearchOut(BaseModel):
     village: Optional[str] = None
     profile_picture: Optional[str] = None
     profile_photo: Optional[str] = None
+    cover_photo: Optional[str] = None
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
     verified: Optional[bool] = True
@@ -369,6 +372,7 @@ class MessageOut(BaseModel):
     sender_name: Optional[str] = None
     sender_avatar: Optional[str] = None
     content: Optional[str] = None
+    client_msg_id: Optional[str] = None
     reply_to_id: Optional[int] = None
     reply_to_content: Optional[str] = None
     reply_to_sender: Optional[str] = None
@@ -419,6 +423,7 @@ class MessageCreate(BaseModel):
     conversation_id: Optional[int] = None
     recipient_id: Optional[int] = None
     content: Optional[str] = None
+    client_msg_id: Optional[str] = None
     reply_to_id: Optional[int] = None
     attachments: List[str] = []  # Image URLs
 

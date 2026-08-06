@@ -14,6 +14,7 @@ export interface User {
   experience?: string;
   crop_specialization?: string;
   profile_picture?: string;
+  cover_photo?: string;
   bio?: string;
   website?: string;
   is_verified: boolean;

@@ -148,15 +148,24 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
           </p>
         ) : (
           <>
-            {/* Attachment Images */}
+            {/* Attachment Images & Audio */}
             {message.attachments && message.attachments.length > 0 && (
               <div className="mb-2 flex flex-col gap-2">
                 {message.attachments.map((att) => (
-                  <ImageMessage
-                    key={att.id || att.url}
-                    url={att.url}
-                    onClick={() => onOpenImage(att.url)}
-                  />
+                  att.file_type === 'audio' ? (
+                    <audio
+                      key={att.id || att.url}
+                      src={att.url}
+                      controls
+                      className="max-w-[280px] rounded-xl focus:outline-none"
+                    />
+                  ) : (
+                    <ImageMessage
+                      key={att.id || att.url}
+                      url={att.url}
+                      onClick={() => onOpenImage(att.url)}
+                    />
+                  )
                 ))}
               </div>
             )}

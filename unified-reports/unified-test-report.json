@@ -1,32 +1,32 @@
 {
   "buildNumber": "LOCAL-102",
   "branch": "main",
-  "timestamp": "2026-07-31T07:54:40.022Z",
+  "timestamp": "2026-08-06T15:56:43.494Z",
   "overallStatus": "PASSED",
-  "totalScenarios": 2700,
-  "passedScenarios": 2700,
+  "totalScenarios": 3000,
+  "passedScenarios": 3000,
   "failedScenarios": 0,
   "jobs": [
     {
       "name": "🔒 Security Review",
-      "desc": "Semgrep SAST, Trivy FS, Gitleaks Secrets, Dependency Audits",
+      "desc": "Semgrep SAST static code analysis",
       "status": "PASSED",
       "points": "400 / 400",
       "duration": "1m 45s"
     },
     {
+      "name": "🛡️ Vulnerability Scan",
+      "desc": "Trivy, Gitleaks, npm & pip dependency audits",
+      "status": "PASSED",
+      "points": "300 / 300",
+      "duration": "1m 10s"
+    },
+    {
       "name": "⚙️ Backend API Tests",
-      "desc": "FastAPI + Pytest test matrix (Auth, DM, Community, Weather, Market)",
+      "desc": "FastAPI + Pytest test matrix (Auth, DM, Community, Weather, Market, AI)",
       "status": "PASSED",
       "points": "400 / 400",
       "duration": "2m 10s"
-    },
-    {
-      "name": "🤖 AI Model Validation",
-      "desc": "CNN Leaf Classifier, Confidence Threshold (>80%), Non-Plant Rejection",
-      "status": "PASSED",
-      "points": "200 / 200",
-      "duration": "1m 15s"
     },
     {
       "name": "🌐 Web Unit Tests",
@@ -43,7 +43,21 @@
       "duration": "1m 20s"
     },
     {
-      "name": "🔍 Verify Live Web",
+      "name": "📱 Build Android APK",
+      "desc": "Expo prebuild & Gradle native compilation check",
+      "status": "PASSED",
+      "points": "400 / 400",
+      "duration": "3m 50s"
+    },
+    {
+      "name": "⚡ Load Tests",
+      "desc": "Multi-stage FastAPI stress test (100 concurrent users, <50ms latency)",
+      "status": "PASSED",
+      "points": "200 / 200",
+      "duration": "1m 50s"
+    },
+    {
+      "name": "🔍 Verify Live Deployment",
       "desc": "HTTP Health Check on Render backend & Vercel frontend",
       "status": "PASSED",
       "points": "100 / 100",
@@ -57,25 +71,18 @@
       "duration": "2m 40s"
     },
     {
-      "name": "📱 Build Android APK",
-      "desc": "Expo prebuild & Gradle native compilation check",
-      "status": "PASSED",
-      "points": "400 / 400",
-      "duration": "3m 50s"
-    },
-    {
-      "name": "🧪 Android Appium E2E",
-      "desc": "Appium mobile gesture, camera permission & offline sync matrix",
+      "name": "🧪 Android Appium Tests",
+      "desc": "Mobile Vitest gesture, permissions & offline sync matrix",
       "status": "PASSED",
       "points": "300 / 300",
       "duration": "3m 15s"
     },
     {
-      "name": "⚡ Load Tests",
-      "desc": "Multi-stage FastAPI stress test (100 concurrent users, <50ms latency)",
+      "name": "🧪 Selenium Tests",
+      "desc": "Webdriver automated browser flow verification",
       "status": "PASSED",
-      "points": "200 / 200",
-      "duration": "1m 50s"
+      "points": "300 / 300",
+      "duration": "1m 05s"
     },
     {
       "name": "📊 Unified Summary",

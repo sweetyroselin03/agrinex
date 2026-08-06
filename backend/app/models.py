@@ -19,6 +19,7 @@ class User(Base):
     crop_specialization = Column(String, nullable=True, index=True) # Added
     crop_types = Column(String, nullable=True)
     profile_picture = Column(String, nullable=True)
+    cover_photo = Column(String, nullable=True)
     bio = Column(String, nullable=True)
     website = Column(String, nullable=True)
     is_verified = Column(Boolean, default=True)
@@ -205,6 +206,7 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     content = Column(Text, nullable=True)
+    client_msg_id = Column(String, nullable=True, unique=True, index=True)
     reply_to_id = Column(Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True)
     is_edited = Column(Boolean, default=False)
     is_deleted_everyone = Column(Boolean, default=False)

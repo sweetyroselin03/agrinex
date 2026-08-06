@@ -17,6 +17,7 @@ interface User {
   experience?: string;
   crop_specialization?: string;
   profile_picture?: string;
+  cover_photo?: string;
   bio?: string;
   is_verified: boolean;
   followers_count?: number;

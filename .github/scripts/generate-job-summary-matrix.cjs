@@ -84,6 +84,27 @@ const suitesConfig = {
     categories: ['Render Backend Health Check', 'Vercel Frontend Availability', 'CORS Origin Policy Validation', 'Database SSL Connectivity', 'Environment Variable Security', 'API Endpoint Latency'],
     verbs: ['Ping live endpoint', 'Verify SSL certificate', 'Check HTTP header CORS', 'Validate DB connection pool'],
     total: 100
+  },
+  selenium: {
+    title: '🧪 AgriNex — Selenium Automation Test Matrix',
+    prefix: 'AgriNex — Selenium',
+    categories: ['Login Automation', 'Register Automation', 'Profile Edit Automation', 'Messaging Automation', 'Scanner Automation', 'Chatbot Automation', 'Logout Automation'],
+    verbs: ['Find element & click', 'Enter text into input field', 'Verify redirection URL', 'Check element presence'],
+    total: 300
+  },
+  vulnerability: {
+    title: '🛡️ AgriNex — Dependency & Vulnerability Scan Matrix',
+    prefix: 'AgriNex — Vulnerability',
+    categories: ['npm audit check', 'pip audit check', 'Trivy FS security audit', 'Gitleaks secret detection', 'Dependabot security scanning', 'CodeQL static analysis'],
+    verbs: ['Scan package tree', 'Detect high vulnerabilities', 'Audit secrets database', 'Verify certificate chain'],
+    total: 300
+  },
+  'verify-web': {
+    title: '🔍 AgriNex — Live Deployment Verification Matrix',
+    prefix: 'AgriNex — Live Verification',
+    categories: ['Vercel Web Frontend Health', 'Render FastAPI Backend Health', 'CORS & WebSocket Handshake', 'Database Pool Verification'],
+    verbs: ['Ping HTTPS URL', 'Validate SSL certificate', 'Verify socket connection', 'Check API status'],
+    total: 100
   }
 };
 

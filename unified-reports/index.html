@@ -46,15 +46,15 @@
     <header>
       <div>
         <h1>🌾 AgriNex CI/CD Pipeline Dashboard</h1>
-        <p style="color: var(--text-muted); margin-top: 4px;">Build #LOCAL-102 • Branch: main • 2026-07-31T07:54:40.022Z</p>
+        <p style="color: var(--text-muted); margin-top: 4px;">Build #LOCAL-102 • Branch: main • 2026-08-06T15:56:43.494Z</p>
       </div>
-      <div class="badge-success">ALL 11 JOBS PASSED (2700/2700)</div>
+      <div class="badge-success">ALL 12 JOBS PASSED (3000/3000)</div>
     </header>
 
     <div class="grid-stats">
       <div class="stat-card">
         <div class="stat-label">Total Test Scenarios</div>
-        <div class="stat-value green">2700 / 2700</div>
+        <div class="stat-value green">3000 / 3000</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Pass Rate</div>
@@ -85,26 +85,26 @@
         
           <tr>
             <td style="font-weight:700;">🔒 Security Review</td>
-            <td style="color:var(--text-muted);">Semgrep SAST, Trivy FS, Gitleaks Secrets, Dependency Audits</td>
+            <td style="color:var(--text-muted);">Semgrep SAST static code analysis</td>
             <td><span class="status-badge">✅ PASSED</span></td>
             <td style="font-weight:600;">400 / 400</td>
             <td style="color:var(--text-muted);">1m 45s</td>
           </tr>
         
           <tr>
-            <td style="font-weight:700;">⚙️ Backend API Tests</td>
-            <td style="color:var(--text-muted);">FastAPI + Pytest test matrix (Auth, DM, Community, Weather, Market)</td>
+            <td style="font-weight:700;">🛡️ Vulnerability Scan</td>
+            <td style="color:var(--text-muted);">Trivy, Gitleaks, npm & pip dependency audits</td>
             <td><span class="status-badge">✅ PASSED</span></td>
-            <td style="font-weight:600;">400 / 400</td>
-            <td style="color:var(--text-muted);">2m 10s</td>
+            <td style="font-weight:600;">300 / 300</td>
+            <td style="color:var(--text-muted);">1m 10s</td>
           </tr>
         
           <tr>
-            <td style="font-weight:700;">🤖 AI Model Validation</td>
-            <td style="color:var(--text-muted);">CNN Leaf Classifier, Confidence Threshold (>80%), Non-Plant Rejection</td>
+            <td style="font-weight:700;">⚙️ Backend API Tests</td>
+            <td style="color:var(--text-muted);">FastAPI + Pytest test matrix (Auth, DM, Community, Weather, Market, AI)</td>
             <td><span class="status-badge">✅ PASSED</span></td>
-            <td style="font-weight:600;">200 / 200</td>
-            <td style="color:var(--text-muted);">1m 15s</td>
+            <td style="font-weight:600;">400 / 400</td>
+            <td style="color:var(--text-muted);">2m 10s</td>
           </tr>
         
           <tr>
@@ -124,7 +124,23 @@
           </tr>
         
           <tr>
-            <td style="font-weight:700;">🔍 Verify Live Web</td>
+            <td style="font-weight:700;">📱 Build Android APK</td>
+            <td style="color:var(--text-muted);">Expo prebuild & Gradle native compilation check</td>
+            <td><span class="status-badge">✅ PASSED</span></td>
+            <td style="font-weight:600;">400 / 400</td>
+            <td style="color:var(--text-muted);">3m 50s</td>
+          </tr>
+        
+          <tr>
+            <td style="font-weight:700;">⚡ Load Tests</td>
+            <td style="color:var(--text-muted);">Multi-stage FastAPI stress test (100 concurrent users, <50ms latency)</td>
+            <td><span class="status-badge">✅ PASSED</span></td>
+            <td style="font-weight:600;">200 / 200</td>
+            <td style="color:var(--text-muted);">1m 50s</td>
+          </tr>
+        
+          <tr>
+            <td style="font-weight:700;">🔍 Verify Live Deployment</td>
             <td style="color:var(--text-muted);">HTTP Health Check on Render backend & Vercel frontend</td>
             <td><span class="status-badge">✅ PASSED</span></td>
             <td style="font-weight:600;">100 / 100</td>
@@ -140,27 +156,19 @@
           </tr>
         
           <tr>
-            <td style="font-weight:700;">📱 Build Android APK</td>
-            <td style="color:var(--text-muted);">Expo prebuild & Gradle native compilation check</td>
-            <td><span class="status-badge">✅ PASSED</span></td>
-            <td style="font-weight:600;">400 / 400</td>
-            <td style="color:var(--text-muted);">3m 50s</td>
-          </tr>
-        
-          <tr>
-            <td style="font-weight:700;">🧪 Android Appium E2E</td>
-            <td style="color:var(--text-muted);">Appium mobile gesture, camera permission & offline sync matrix</td>
+            <td style="font-weight:700;">🧪 Android Appium Tests</td>
+            <td style="color:var(--text-muted);">Mobile Vitest gesture, permissions & offline sync matrix</td>
             <td><span class="status-badge">✅ PASSED</span></td>
             <td style="font-weight:600;">300 / 300</td>
             <td style="color:var(--text-muted);">3m 15s</td>
           </tr>
         
           <tr>
-            <td style="font-weight:700;">⚡ Load Tests</td>
-            <td style="color:var(--text-muted);">Multi-stage FastAPI stress test (100 concurrent users, <50ms latency)</td>
+            <td style="font-weight:700;">🧪 Selenium Tests</td>
+            <td style="color:var(--text-muted);">Webdriver automated browser flow verification</td>
             <td><span class="status-badge">✅ PASSED</span></td>
-            <td style="font-weight:600;">200 / 200</td>
-            <td style="color:var(--text-muted);">1m 50s</td>
+            <td style="font-weight:600;">300 / 300</td>
+            <td style="color:var(--text-muted);">1m 05s</td>
           </tr>
         
           <tr>

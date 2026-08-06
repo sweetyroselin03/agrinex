@@ -106,6 +106,8 @@ export default function Profile() {
   const [experience, setExperience] = useState('');
   const [cropSpecialization, setCropSpecialization] = useState('');
   const [website, setWebsite] = useState('');
+  const [profilePhoto, setProfilePhoto] = useState('');
+  const [coverPhoto, setCoverPhoto] = useState('');
 
   useEffect(() => {
     if (userToUse) {
@@ -119,6 +121,8 @@ export default function Profile() {
       setExperience(userToUse.experience || '');
       setCropSpecialization(userToUse.crop_specialization || '');
       setWebsite(userToUse.website || '');
+      setProfilePhoto(userToUse.profile_picture || userToUse.profile_photo || '');
+      setCoverPhoto(userToUse.cover_photo || '');
     }
   }, [userToUse]);
 
@@ -161,6 +165,8 @@ export default function Profile() {
         experience: experience.trim() || undefined,
         crop_specialization: cropSpecialization.trim() || undefined,
         website: website.trim() || undefined,
+        profile_picture: profilePhoto || undefined,
+        cover_photo: coverPhoto || undefined,
       });
 
       queryClient.invalidateQueries({ queryKey: ['user_profile', targetId] });
@@ -265,10 +271,20 @@ export default function Profile() {
         className="glass-card overflow-hidden p-0 relative border-slate-200 shadow-sm"
       >
         
-        {/* Banner Gradient */}
+        {/* Banner Gradient / Image */}
         <div className="h-44 sm:h-56 w-full relative bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/30 via-emerald-800/60 to-slate-950" />
-          <div className="absolute inset-0 bg-black/20" />
+          {profile?.cover_photo ? (
+            <img
+              src={profile.cover_photo}
+              alt="Profile Cover"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/30 via-emerald-800/60 to-slate-950" />
+              <div className="absolute inset-0 bg-black/20" />
+            </>
+          )}
         </div>
 
         {/* Profile Card Body */}
@@ -447,19 +463,6 @@ export default function Profile() {
           <>
             <button
               type="button"
-              onClick={() => setActiveTab('settings')}
-              className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
-                activeTab === 'settings'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>Edit Profile</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setActiveTab('security')}
               className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
                 activeTab === 'security'
@@ -624,6 +627,77 @@ export default function Profile() {
             )}
             
             <form onSubmit={handleUpdateProfileSubmit} className="space-y-6">
+              {/* Media Uploads */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
+                {/* Profile Photo Uploader */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Profile Photo</label>
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={profilePhoto || `https://api.dicebear.com/7.x/adventurer/svg?seed=${currentUser?.email || 'farmer'}`}
+                      alt="Profile preview"
+                      className="w-16 h-16 rounded-full object-cover border border-slate-200"
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            const res = await api.post('/api/media/upload', formData, {
+                              headers: { 'Content-Type': 'multipart/form-data' },
+                            });
+                            setProfilePhoto(res.data.url);
+                          } catch (err) {
+                            setLocalErr('Failed to upload profile photo.');
+                          }
+                        }
+                      }}
+                      className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Cover Photo Uploader */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cover Photo</label>
+                  <div className="flex items-center gap-4">
+                    {coverPhoto ? (
+                      <img
+                        src={coverPhoto}
+                        alt="Cover preview"
+                        className="w-24 h-16 rounded-xl object-cover border border-slate-200"
+                      />
+                    ) : (
+                      <div className="w-24 h-16 rounded-xl bg-gradient-to-r from-emerald-800 to-slate-900 border border-slate-200" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            const res = await api.post('/api/media/upload', formData, {
+                              headers: { 'Content-Type': 'multipart/form-data' },
+                            });
+                            setCoverPhoto(res.data.url);
+                          } catch (err) {
+                            setLocalErr('Failed to upload cover photo.');
+                          }
+                        }
+                      }}
+                      className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* Full Name */}
@@ -755,7 +829,14 @@ export default function Profile() {
 
               </div>
 
-              <div className="flex justify-end pt-4 border-t border-slate-100">
+              <div className="flex justify-end items-center gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('posts')}
+                  className="px-6 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={authLoading || isSubmitting}

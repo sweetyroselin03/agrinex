@@ -8,6 +8,8 @@ import {
   Loader2,
   CornerDownRight,
   Ban,
+  Mic,
+  Square,
 } from 'lucide-react';
 import type { Message } from '../../store/useChatStore';
 
@@ -41,6 +43,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +78,68 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [text]);
+
+  // Clean up recording timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const remaining = secs % 60;
+    return `${mins}:${remaining < 10 ? '0' : ''}${remaining}`;
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        stream.getTracks().forEach((track) => track.stop());
+
+        try {
+          const audioFile = new File([audioBlob], `voice_note_${Date.now()}.wav`, { type: 'audio/wav' });
+          await onSendMessage('', audioFile);
+        } catch (err) {
+          console.error('Failed to send voice note:', err);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Mic access denied:', err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -224,53 +294,107 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors shrink-0 mb-0.5"
-          title="Attach Image"
-          aria-label="Attach Image"
-        >
-          <Paperclip className="w-5 h-5" />
-        </button>
+        {!isRecording && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors shrink-0 mb-0.5"
+              title="Attach Image"
+              aria-label="Attach Image"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
 
-        <button
-          type="button"
-          onClick={() => setShowEmojiPicker((prev) => !prev)}
-          className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-amber-500 transition-colors shrink-0 mb-0.5"
-          title="Add Emoji"
-          aria-label="Add Emoji"
-        >
-          <Smile className="w-5 h-5" />
-        </button>
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-amber-500 transition-colors shrink-0 mb-0.5"
+              title="Add Emoji"
+              aria-label="Add Emoji"
+            >
+              <Smile className="w-5 h-5" />
+            </button>
+          </>
+        )}
 
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={text}
-          onChange={handleTextChange}
-          onKeyDown={handleKeyDown}
-          placeholder={editingMessage ? 'Edit message...' : 'Write a message...'}
-          className="flex-1 px-4 py-2.5 rounded-[20px] bg-[#F1F5F9] border border-slate-200 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#16A34A] focus:bg-white focus:ring-1 focus:ring-[#16A34A] transition-all resize-none max-h-32 min-h-[42px] leading-relaxed font-sans"
-        />
+        {isRecording ? (
+          <div className="flex-1 flex items-center justify-between px-4 py-2 bg-rose-50 border border-rose-200 rounded-[20px] h-[42px] mb-0.5">
+            <span className="flex items-center gap-2 text-xs font-bold text-rose-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-600 block animate-ping" />
+              Recording Voice Note ({formatTime(recordingTime)})...
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (mediaRecorderRef.current && isRecording) {
+                    mediaRecorderRef.current.onstop = null; // discard
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                    if (timerRef.current) {
+                      clearInterval(timerRef.current);
+                      timerRef.current = null;
+                    }
+                  }
+                }}
+                className="text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="p-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-sm flex items-center justify-center cursor-pointer transition-all active:scale-90"
+                title="Stop and Send"
+              >
+                <Square className="w-3 h-3 fill-current" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={text}
+            onChange={handleTextChange}
+            onKeyDown={handleKeyDown}
+            placeholder={editingMessage ? 'Edit message...' : 'Write a message...'}
+            className="flex-1 px-4 py-2.5 rounded-[20px] bg-[#F1F5F9] border border-slate-200 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#16A34A] focus:bg-white focus:ring-1 focus:ring-[#16A34A] transition-all resize-none max-h-32 min-h-[42px] leading-relaxed font-sans"
+          />
+        )}
 
-        <button
-          type="submit"
-          disabled={(!text.trim() && !selectedFile) || isSending}
-          className={`p-3 rounded-full font-bold transition-all shadow-sm flex items-center justify-center shrink-0 mb-0.5 ${
-            (!text.trim() && !selectedFile) || isSending
-              ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              : 'bg-[#16A34A] hover:bg-[#22C55E] text-white shadow-emerald-600/20 hover:scale-105 active:scale-95'
-          }`}
-          title="Send Message"
-          aria-label="Send Message"
-        >
-          {isSending ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <Send className="w-5 h-5" />
-          )}
-        </button>
+        {!isRecording && (
+          <>
+            <button
+              type="button"
+              onClick={startRecording}
+              className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-rose-600 transition-colors shrink-0 mb-0.5"
+              title="Record Voice Note"
+              aria-label="Record Voice Note"
+            >
+              <Mic className="w-5 h-5" />
+            </button>
+
+            <button
+              type="submit"
+              disabled={(!text.trim() && !selectedFile) || isSending}
+              className={`p-3 rounded-full font-bold transition-all shadow-sm flex items-center justify-center shrink-0 mb-0.5 ${
+                (!text.trim() && !selectedFile) || isSending
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-[#16A34A] hover:bg-[#22C55E] text-white shadow-emerald-600/20 hover:scale-105 active:scale-95'
+              }`}
+              title="Send Message"
+              aria-label="Send Message"
+            >
+              {isSending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
+          </>
+        )}
       </form>
     </div>
   );

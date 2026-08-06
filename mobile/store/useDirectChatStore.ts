@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from '../api/client';
+import { useAuthStore } from './useAuthStore';
 
 export interface Participant {
   id: number;
@@ -69,6 +70,13 @@ interface DirectChatState {
   blockStatusMap: Record<number, BlockStatus>;
   isLoadingConversations: boolean;
   isLoadingMessages: boolean;
+  offlineQueue: {
+    conversationId: number;
+    content?: string;
+    attachments: string[];
+    replyToId?: number;
+    clientMsgId: string;
+  }[];
   
   // WebSockets
   socket: WebSocket | null;
@@ -77,7 +85,7 @@ interface DirectChatState {
   fetchConversations: () => Promise<void>;
   startConversation: (targetUserId: number) => Promise<number | null>;
   selectConversation: (conversationId: number) => Promise<void>;
-  sendMessage: (conversationId: number, content?: string, attachments?: string[], replyToId?: number) => Promise<void>;
+  sendMessage: (conversationId: number, content?: string, attachments?: string[], replyToId?: number, clientMsgId?: string) => Promise<void>;
   editMessage: (messageId: number, newContent: string) => Promise<void>;
   deleteMessage: (messageId: number, deleteType: 'for_me' | 'everyone') => Promise<void>;
   toggleReaction: (messageId: number, emoji: string) => Promise<void>;
@@ -93,6 +101,11 @@ interface DirectChatState {
   sendTypingSignal: (conversationId: number, isTyping: boolean, username: string) => void;
 }
 
+let heartbeatInterval: any = null;
+let reconnectTimer: any = null;
+let isExplicitDisconnect = false;
+let reconnectAttemptsCount = 0;
+
 export const useDirectChatStore = create<DirectChatState>()(
   persist(
     (set, get) => ({
@@ -103,6 +116,7 @@ export const useDirectChatStore = create<DirectChatState>()(
       blockStatusMap: {},
       isLoadingConversations: false,
       isLoadingMessages: false,
+      offlineQueue: [],
       socket: null,
 
       fetchConversations: async () => {
@@ -191,11 +205,60 @@ export const useDirectChatStore = create<DirectChatState>()(
         set({ isLoadingMessages: false });
       },
 
-      sendMessage: async (conversationId: number, content?: string, attachments?: string[], replyToId?: number) => {
+      sendMessage: async (conversationId: number, content?: string, attachments: string[] = [], replyToId?: number, clientMsgId?: string) => {
+        const tempClientMsgId = clientMsgId || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const currentUserId = useAuthStore?.getState()?.user?.id || 0;
+        
+        // Construct optimistic message
+        const tempId = -Date.now();
+        const tempMsg: DirectMessage = {
+          id: tempId,
+          conversation_id: conversationId,
+          sender_id: currentUserId,
+          content: content?.trim() || undefined,
+          status: 'sent',
+          created_at: new Date().toISOString(),
+          reply_to_id: replyToId,
+          attachments: attachments.map((url, idx) => ({
+            id: -Date.now() - idx,
+            url,
+            file_type: url.includes('data:audio/') || url.includes('.wav') ? 'audio' : 'image',
+          })),
+          reactions: [],
+        };
+
+        // Optimistically add to state if not already present
+        set((state) => {
+          const existing = state.messages[conversationId] || [];
+          const alreadyExists = existing.some(m => m.id === tempId || (tempClientMsgId && m.id < 0 && m.content === content));
+          if (alreadyExists) return {};
+          
+          const updatedConvs = state.conversations.map((c) => {
+            if (c.id === conversationId) {
+              return {
+                ...c,
+                last_message: tempMsg,
+                updated_at: tempMsg.created_at || new Date().toISOString(),
+              };
+            }
+            return c;
+          });
+          updatedConvs.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+          return {
+            messages: {
+              ...state.messages,
+              [conversationId]: [...existing, tempMsg],
+            },
+            conversations: updatedConvs,
+          };
+        });
+
         const payload = {
-          content,
+          content: content?.trim() || null,
           attachments: attachments || [],
           reply_to_id: replyToId,
+          client_msg_id: tempClientMsgId,
         };
 
         const attempts = [
@@ -205,37 +268,53 @@ export const useDirectChatStore = create<DirectChatState>()(
           () => client.post('/api/messages/send', { conversation_id: conversationId, ...payload }),
         ];
 
+        let success = false;
+        let newMsg: DirectMessage | null = null;
         for (const attempt of attempts) {
           try {
             const res = await attempt();
-            const newMsg = res.data;
-
-            set((state) => {
-              const currentMsgs = state.messages[conversationId] || [];
-              const updatedConvs = state.conversations.map((c) => {
-                if (c.id === conversationId) {
-                  return {
-                    ...c,
-                    last_message: newMsg,
-                    updated_at: newMsg.created_at || new Date().toISOString(),
-                  };
-                }
-                return c;
-              });
-              updatedConvs.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-              return {
-                messages: {
-                  ...state.messages,
-                  [conversationId]: [...currentMsgs, newMsg],
-                },
-                conversations: updatedConvs,
-              };
-            });
-
-            return;
+            newMsg = res.data;
+            if (newMsg) {
+              success = true;
+              break;
+            }
           } catch (err: any) {
             console.log('[DirectChatStore] sendMessage attempt failed:', err?.response?.status || err?.message);
           }
+        }
+
+        if (success && newMsg) {
+          set((state) => {
+            const list = state.messages[conversationId] || [];
+            const updatedList = list.map((m) =>
+              m.id === tempId ? newMsg! : m
+            );
+            
+            const updatedConvs = state.conversations.map((c) => {
+              if (c.id === conversationId) {
+                return {
+                  ...c,
+                  last_message: newMsg,
+                  updated_at: newMsg!.created_at || new Date().toISOString(),
+                };
+              }
+              return c;
+            });
+            updatedConvs.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+            return {
+              messages: { ...state.messages, [conversationId]: updatedList },
+              conversations: updatedConvs,
+            };
+          });
+        } else {
+          // If all attempts failed (likely network/offline), queue it
+          const queueItem = { conversationId, content, attachments, replyToId, clientMsgId: tempClientMsgId };
+          set((state) => {
+            const existsInQueue = state.offlineQueue.some(item => item.clientMsgId === tempClientMsgId);
+            if (existsInQueue) return {};
+            return { offlineQueue: [...state.offlineQueue, queueItem] };
+          });
         }
       },
 
@@ -468,28 +547,59 @@ export const useDirectChatStore = create<DirectChatState>()(
         const existingSocket = get().socket;
         if (existingSocket && existingSocket.readyState === WebSocket.OPEN) return;
 
+        isExplicitDisconnect = false;
         try {
           const baseUrl = client.defaults.baseURL || '';
           const wsHost = baseUrl.replace(/^http/, 'ws').replace(/\/api\/?$/, '');
           const wsUrl = `${wsHost}/ws/chat/${userId}`;
 
+          console.log('[DirectChatStore] Connecting to WebSocket:', wsUrl);
           const ws = new WebSocket(wsUrl);
 
           ws.onopen = () => {
             console.log('[DirectChatStore] WebSocket Connected');
+            reconnectAttemptsCount = 0;
+            if (reconnectTimer) {
+              clearTimeout(reconnectTimer);
+              reconnectTimer = null;
+            }
+
+            // Start heartbeat ping-pong
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            heartbeatInterval = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+              }
+            }, 30000);
+
+            // Process offline queue messages sequentially
+            const queue = get().offlineQueue;
+            if (queue.length > 0) {
+              set({ offlineQueue: [] });
+              queue.forEach((item) => {
+                get().sendMessage(item.conversationId, item.content, item.attachments, item.replyToId, item.clientMsgId)
+                  .catch(() => {});
+              });
+            }
           };
 
           ws.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data);
-              if (data.type === 'new_message') {
-                const msg = data.message;
+              if (data.type === 'new_message' && data.message) {
+                const msg: DirectMessage = data.message;
                 set((state) => {
-                  const convMsgs = state.messages[msg.conversation_id] || [];
+                  const cid = msg.conversation_id;
+                  const existingMsgs = state.messages[cid] || [];
+                  
+                  // Deduplicate by ID or clientMsgId
+                  const alreadyHas = existingMsgs.some((m) => m.id === msg.id);
+                  if (alreadyHas) return {};
+
                   return {
                     messages: {
                       ...state.messages,
-                      [msg.conversation_id]: [...convMsgs, msg],
+                      [cid]: [...existingMsgs, msg],
                     },
                   };
                 });
@@ -518,6 +628,19 @@ export const useDirectChatStore = create<DirectChatState>()(
 
           ws.onclose = () => {
             console.log('[DirectChatStore] WS closed');
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval);
+              heartbeatInterval = null;
+            }
+
+            // Exponential backoff reconnection
+            if (!isExplicitDisconnect) {
+              const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsCount), 16000);
+              reconnectAttemptsCount++;
+              reconnectTimer = setTimeout(() => {
+                get().connectWebSocket(userId);
+              }, delay);
+            }
           };
 
           set({ socket: ws });
@@ -527,11 +650,20 @@ export const useDirectChatStore = create<DirectChatState>()(
       },
 
       disconnectWebSocket: () => {
+        isExplicitDisconnect = true;
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = null;
+        }
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
         const ws = get().socket;
         if (ws) {
           ws.close();
-          set({ socket: null });
         }
+        set({ socket: null });
       },
 
       sendTypingSignal: (conversationId: number, isTyping: boolean, username: string) => {
@@ -551,7 +683,7 @@ export const useDirectChatStore = create<DirectChatState>()(
     {
       name: 'agrinex-direct-chat-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ conversations: state.conversations }),
+      partialize: (state) => ({ conversations: state.conversations, offlineQueue: state.offlineQueue }),
     }
   )
 );

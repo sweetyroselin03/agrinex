@@ -1848,6 +1848,11 @@ def send_message(
                 raise HTTPException(status_code=403, detail="You cannot send messages because this user has blocked you.")
 
 
+    if msg_in.client_msg_id:
+        existing = db.query(models.Message).filter(models.Message.client_msg_id == msg_in.client_msg_id).first()
+        if existing:
+            return prepare_message_out(existing, current_user.id, db)
+
     if not msg_in.content and not msg_in.attachments:
         raise HTTPException(status_code=400, detail="Message content or image attachment required")
 
@@ -1855,7 +1860,8 @@ def send_message(
         conversation_id=conv_id,
         sender_id=current_user.id,
         content=msg_in.content.strip() if msg_in.content else None,
-        reply_to_id=msg_in.reply_to_id
+        reply_to_id=msg_in.reply_to_id,
+        client_msg_id=msg_in.client_msg_id
     )
     db.add(message)
     db.commit()
@@ -1863,7 +1869,10 @@ def send_message(
 
     for att_url in msg_in.attachments:
         if att_url.strip():
-            db.add(models.MessageAttachment(message_id=message.id, url=att_url.strip(), file_type="image"))
+            f_type = "image"
+            if "data:audio/" in att_url or ".wav" in att_url or ".mp3" in att_url or ".webm" in att_url or ".ogg" in att_url:
+                f_type = "audio"
+            db.add(models.MessageAttachment(message_id=message.id, url=att_url.strip(), file_type=f_type))
     db.commit()
     db.refresh(message)
 
@@ -2225,9 +2234,17 @@ def unblock_user(user_id: int, current_user: models.User = Depends(get_current_u
 async def upload_media_file(file: UploadFile = File(...), current_user: models.User = Depends(get_current_user)):
     try:
         contents = await file.read()
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
+
+        mime_type = file.content_type
+        if not mime_type or not (mime_type.startswith("image/") or mime_type.startswith("audio/") or mime_type.startswith("video/")):
+            raise HTTPException(status_code=400, detail="Invalid file type. Only image, audio, and video formats are allowed.")
+
         import base64
         ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
-        mime_type = file.content_type or f"image/{ext}"
+        if not mime_type:
+            mime_type = f"image/{ext}"
         base64_str = base64.b64encode(contents).decode("utf-8")
         data_url = f"data:{mime_type};base64,{base64_str}"
         return {"url": data_url, "filename": file.filename}

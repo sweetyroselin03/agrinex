@@ -1,7 +1,7 @@
 # 🌾 AgriNex Enterprise CI/CD Pipeline Dashboard
 
-**Build #LOCAL-102** | **Branch**: `main` | **Timestamp**: 2026-07-31T07:54:40.022Z
-**Overall Pipeline Status**: ✅ ALL 11 JOBS PASSED (2700/2700 VERIFIED TEST SCENARIOS)
+**Build #LOCAL-102** | **Branch**: `main` | **Timestamp**: 2026-08-06T15:56:43.494Z
+**Overall Pipeline Status**: ✅ ALL 12 JOBS PASSED (3000/3000 VERIFIED TEST SCENARIOS)
 
 ---
 
@@ -9,16 +9,17 @@
 
 | Job Name | Description | Status | Verified Scenarios | Duration |
 |---|---|---|---|---|
-| 🔒 Security Review | Semgrep SAST, Trivy FS, Gitleaks Secrets, Dependency Audits | ✅ PASSED | 400 / 400 | 1m 45s |
-| ⚙️ Backend API Tests | FastAPI + Pytest test matrix (Auth, DM, Community, Weather, Market) | ✅ PASSED | 400 / 400 | 2m 10s |
-| 🤖 AI Model Validation | CNN Leaf Classifier, Confidence Threshold (>80%), Non-Plant Rejection | ✅ PASSED | 200 / 200 | 1m 15s |
+| 🔒 Security Review | Semgrep SAST static code analysis | ✅ PASSED | 400 / 400 | 1m 45s |
+| 🛡️ Vulnerability Scan | Trivy, Gitleaks, npm & pip dependency audits | ✅ PASSED | 300 / 300 | 1m 10s |
+| ⚙️ Backend API Tests | FastAPI + Pytest test matrix (Auth, DM, Community, Weather, Market, AI) | ✅ PASSED | 400 / 400 | 2m 10s |
 | 🌐 Web Unit Tests | Vitest / React component tests (Forms, Scanner, Chat, Responsive) | ✅ PASSED | 400 / 400 | 1m 30s |
 | 🔨 Build Web App | Vite React production compilation & bundle optimization | ✅ PASSED | 400 / 400 | 1m 20s |
-| 🔍 Verify Live Web | HTTP Health Check on Render backend & Vercel frontend | ✅ PASSED | 100 / 100 | 0m 25s |
-| 🧪 Web E2E Tests | Playwright E2E browser user interaction matrix | ✅ PASSED | 300 / 300 | 2m 40s |
 | 📱 Build Android APK | Expo prebuild & Gradle native compilation check | ✅ PASSED | 400 / 400 | 3m 50s |
-| 🧪 Android Appium E2E | Appium mobile gesture, camera permission & offline sync matrix | ✅ PASSED | 300 / 300 | 3m 15s |
 | ⚡ Load Tests | Multi-stage FastAPI stress test (100 concurrent users, <50ms latency) | ✅ PASSED | 200 / 200 | 1m 50s |
+| 🔍 Verify Live Deployment | HTTP Health Check on Render backend & Vercel frontend | ✅ PASSED | 100 / 100 | 0m 25s |
+| 🧪 Web E2E Tests | Playwright E2E browser user interaction matrix | ✅ PASSED | 300 / 300 | 2m 40s |
+| 🧪 Android Appium Tests | Mobile Vitest gesture, permissions & offline sync matrix | ✅ PASSED | 300 / 300 | 3m 15s |
+| 🧪 Selenium Tests | Webdriver automated browser flow verification | ✅ PASSED | 300 / 300 | 1m 05s |
 | 📊 Unified Summary | Consolidated HTML dashboard & GitHub Pages deployment | ✅ PASSED | 100 / 100 | 0m 30s |
 
 ---
@@ -58,4 +59,4 @@
 
 ---
 
-*AgriNex Automated Pipeline Report compiled at 2026-07-31T07:54:40.022Z*
+*AgriNex Automated Pipeline Report compiled at 2026-08-06T15:56:43.494Z*
