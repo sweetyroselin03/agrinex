@@ -36,10 +36,11 @@ const getLocalToken = (): string | null => {
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 60000, // 60s timeout for Render spin-ups
+  timeout: 30000, // Reduced from 60s to 30s as requested
   headers: {
     'Content-Type': 'application/json',
   },
+  // withCredentials: false (Omitted/disabled as cookies are not used; auth relies on Bearer headers)
 });
 
 // Request Interceptor: Inject JWT Token

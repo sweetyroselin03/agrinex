@@ -1,0 +1,48 @@
+<testsuites id="" name="" tests="18" failures="0" skipped="0" errors="0" time="20.456035">
+<testsuite name="auth.spec.ts" timestamp="2026-08-06T14:12:08.638Z" hostname="chromium" tests="5" failures="0" skipped="0" time="47.773" errors="0">
+<testcase name="AgriNex Auth E2E Test Suite › AUTH-001: User registration flow with field validation" classname="auth.spec.ts" time="9.532">
+</testcase>
+<testcase name="AgriNex Auth E2E Test Suite › AUTH-002: OTP verification step" classname="auth.spec.ts" time="9.987">
+</testcase>
+<testcase name="AgriNex Auth E2E Test Suite › AUTH-003: User login with valid credentials" classname="auth.spec.ts" time="9.475">
+</testcase>
+<testcase name="AgriNex Auth E2E Test Suite › AUTH-004: User logout flow clears session" classname="auth.spec.ts" time="9.308">
+</testcase>
+<testcase name="AgriNex Auth E2E Test Suite › AUTH-005: Forgot password email recovery request" classname="auth.spec.ts" time="9.471">
+</testcase>
+</testsuite>
+<testsuite name="chatbot.spec.ts" timestamp="2026-08-06T14:12:08.638Z" hostname="chromium" tests="4" failures="0" skipped="0" time="13.302" errors="0">
+<testcase name="AgriNex Chatbot &amp; AI Advisory E2E Test Suite › CHAT-001: Start new conversation thread" classname="chatbot.spec.ts" time="9.267">
+</testcase>
+<testcase name="AgriNex Chatbot &amp; AI Advisory E2E Test Suite › CHAT-002: Send advisory question to AgriGPT LLM" classname="chatbot.spec.ts" time="1.186">
+</testcase>
+<testcase name="AgriNex Chatbot &amp; AI Advisory E2E Test Suite › CHAT-003: Verify chat history isolation between authenticated user sessions" classname="chatbot.spec.ts" time="1.202">
+</testcase>
+<testcase name="AgriNex Chatbot &amp; AI Advisory E2E Test Suite › CHAT-004: Clear chat history" classname="chatbot.spec.ts" time="1.647">
+</testcase>
+</testsuite>
+<testsuite name="community.spec.ts" timestamp="2026-08-06T14:12:08.638Z" hostname="chromium" tests="4" failures="0" skipped="0" time="6.397" errors="0">
+<testcase name="AgriNex Community E2E Test Suite › COMMUNITY-001: Search registered users with live debounce filtering" classname="community.spec.ts" time="1.76">
+</testcase>
+<testcase name="AgriNex Community E2E Test Suite › COMMUNITY-002: Follow and Unfollow farmer user action" classname="community.spec.ts" time="1.768">
+</testcase>
+<testcase name="AgriNex Community E2E Test Suite › COMMUNITY-003: Create community post with content" classname="community.spec.ts" time="1.402">
+</testcase>
+<testcase name="AgriNex Community E2E Test Suite › COMMUNITY-004: Like and Comment on community feed posts" classname="community.spec.ts" time="1.467">
+</testcase>
+</testsuite>
+<testsuite name="profile.spec.ts" timestamp="2026-08-06T14:12:08.638Z" hostname="chromium" tests="2" failures="0" skipped="0" time="2.893" errors="0">
+<testcase name="AgriNex Profile E2E Test Suite › PROFILE-001: Edit user full name and bio profile fields" classname="profile.spec.ts" time="1.433">
+</testcase>
+<testcase name="AgriNex Profile E2E Test Suite › PROFILE-002: Upload avatar profile image" classname="profile.spec.ts" time="1.46">
+</testcase>
+</testsuite>
+<testsuite name="scanner.spec.ts" timestamp="2026-08-06T14:12:08.638Z" hostname="chromium" tests="3" failures="0" skipped="0" time="4.746" errors="0">
+<testcase name="AgriNex AI Scanner E2E Test Suite › SCAN-001: Upload and diagnose Healthy Leaf sample" classname="scanner.spec.ts" time="1.695">
+</testcase>
+<testcase name="AgriNex AI Scanner E2E Test Suite › SCAN-002: Upload and diagnose Diseased Leaf sample" classname="scanner.spec.ts" time="1.436">
+</testcase>
+<testcase name="AgriNex AI Scanner E2E Test Suite › SCAN-003: Non-plant image rejection verification" classname="scanner.spec.ts" time="1.615">
+</testcase>
+</testsuite>
+</testsuites>

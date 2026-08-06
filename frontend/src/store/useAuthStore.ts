@@ -5,7 +5,6 @@ import api from '../api/client';
 export interface User {
   id: number;
   email: string;
-  phone?: string;
   full_name?: string;
   username?: string;
   village?: string;
@@ -34,7 +33,7 @@ interface AuthState {
   checkAccount: (identifier: string) => Promise<{ exists: boolean; message?: string }>;
   sendOTP: (email: string) => Promise<{ message: string; dev_otp?: string }>;
   verifyOTP: (email: string, otp: string) => Promise<{ message: string }>;
-  register: (userData: { full_name: string; email: string; phone?: string }) => Promise<any>;
+  register: (userData: { full_name: string; email: string }) => Promise<any>;
   setPassword: (email: string, password: string) => Promise<void>;
   login: (credentials: { email: string; password: any }) => Promise<void>;
   forgotPassword: (email: string) => Promise<{ message: string; dev_otp?: string }>;
@@ -92,12 +91,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/check-account', { identifier });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Check account failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -105,12 +105,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/send-otp', { email });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Failed to send OTP');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -118,12 +119,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/verify-otp', { email, otp });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Invalid OTP code');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -131,12 +133,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/register', userData);
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Registration failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -149,12 +152,13 @@ export const useAuthStore = create<AuthState>()(
             token: access_token,
             user,
             isAuthenticated: true,
-            isLoading: false,
           });
         } catch (error: any) {
           const msg = formatError(error, 'Failed to set password');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -167,12 +171,13 @@ export const useAuthStore = create<AuthState>()(
             token: access_token,
             user,
             isAuthenticated: true,
-            isLoading: false,
           });
         } catch (error: any) {
           const msg = formatError(error, 'Login failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -180,12 +185,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/forgot-password', { email });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Recovery request failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -193,11 +199,12 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           await api.post('/auth/reset-password', data);
-          set({ isLoading: false });
         } catch (error: any) {
           const msg = formatError(error, 'Failed to reset password');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -218,12 +225,14 @@ export const useAuthStore = create<AuthState>()(
               }
             } else throw e;
           }
-          set({ user: response.data, isLoading: false });
+          set({ user: response.data });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Failed to update profile');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 

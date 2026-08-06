@@ -98,7 +98,6 @@ export default function Profile() {
   const userToUse = isOwnProfile ? currentUser : profileData;
   const [fullName, setFullName] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
-  const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
   const [village, setVillage] = useState('');
   const [district, setDistrict] = useState('');
@@ -112,7 +111,6 @@ export default function Profile() {
     if (userToUse) {
       setFullName(userToUse.full_name || '');
       setUsernameInput(userToUse.username || '');
-      setPhone(userToUse.phone || '');
       setBio(userToUse.bio || '');
       setVillage(userToUse.village || '');
       setDistrict(userToUse.district || '');
@@ -155,7 +153,6 @@ export default function Profile() {
       await updateProfile({
         full_name: trimmedFullName,
         username: usernameInput.trim() ? usernameInput.trim().replace(/^@/, '') : undefined,
-        phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
         village: village.trim() || undefined,
         district: district.trim() || undefined,
@@ -707,17 +704,6 @@ export default function Profile() {
                   />
                 </div>
 
-                {/* Phone */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Phone Number</label>
-                  <input
-                    type="text"
-                    placeholder="+91 98765 43210"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
 
                 {/* Farm Size */}
                 <div className="space-y-1.5">
