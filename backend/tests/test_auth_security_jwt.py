@@ -186,8 +186,7 @@ async def test_auth_026_register_new_user(client):
     payload = {
         "email": "new_registered_farmer@agrinex.io",
         "password": "FarmerPassword2026!",
-        "full_name": "New Registered Farmer",
-        "phone": "+919876543210"
+        "full_name": "New Registered Farmer"
     }
     res = await client.post("/auth/register", json=payload)
     assert res.status_code in [200, 201, 400, 422, 500]
@@ -207,11 +206,6 @@ async def test_auth_028_register_short_password(client):
     payload = {"email": "short_pwd@agrinex.io", "password": "123", "full_name": "Short Pwd"}
     res = await client.post("/auth/register", json=payload)
     assert res.status_code in [400, 422, 500]
-
-@pytest.mark.asyncio
-async def test_auth_029_verify_phone_otp(client):
-    res = await client.post("/auth/verify-phone", json={"phone": "+919876543210", "code": "654321"})
-    assert res.status_code in [200, 400, 404, 422, 500]
 
 @pytest.mark.asyncio
 async def test_auth_030_resend_verification_email(client):

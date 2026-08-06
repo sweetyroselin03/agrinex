@@ -30,12 +30,13 @@ logger_startup = logging.getLogger("uvicorn.error")
 logger_startup.info("[Startup] Database tables synchronized via SQLAlchemy ORM.")
 
 ENV = os.getenv("ENV", "production")
-show_docs = os.getenv("SHOW_DOCS", "false").lower() in ("true", "1", "yes") or ENV == "development"
+show_docs = True
 
 app = FastAPI(
     title="AgriNex AI Enterprise Backend",
-    docs_url="/docs" if show_docs else None,
-    redoc_url="/redoc" if show_docs else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 # CORS configuration

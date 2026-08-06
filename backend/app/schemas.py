@@ -7,7 +7,6 @@ from datetime import datetime
 # ─── User ────────────────────────────────────────────────────────────────────
 class UserBase(BaseModel):
     email: str
-    phone: Optional[str] = None
 
 class UserCreate(UserBase):
     pass
@@ -15,7 +14,6 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     username: Optional[str] = None
-    phone: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
     state: Optional[str] = None
@@ -30,7 +28,6 @@ class UserUpdate(BaseModel):
 class UserOut(BaseModel):
     id: int
     email: str
-    phone: Optional[str] = None
     full_name: Optional[str] = None
     display_name: Optional[str] = None
     username: Optional[str] = None
@@ -87,7 +84,6 @@ class UserSearchOut(BaseModel):
 class RegisterRequest(BaseModel):
     full_name: str
     email: str
-    phone: Optional[str] = None
 
 class PasswordSetRequest(BaseModel):
     email: str

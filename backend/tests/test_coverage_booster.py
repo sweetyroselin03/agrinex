@@ -307,3 +307,106 @@ async def test_booster_direct_messaging_and_blocking(client, auth_headers):
     res = await client.delete(f"/api/users/{recipient_id}/block", headers=auth_headers)  # Unblock
     assert res.status_code == 200, res.json()
 
+
+@pytest.mark.asyncio
+async def test_booster_otp_expiration_and_replay(client):
+    email = f"exp_otp_{int(asyncio.get_event_loop().time())}@agrinex.io"
+    # 1. Request OTP
+    res = await client.post("/auth/send-otp", json={"email": email})
+    assert res.status_code == 200
+    
+    # Let's find the OTP from DB to simulate expiration/replay
+    from app.database import SessionLocal
+    from app.models import OTPCode
+    from datetime import datetime, timezone, timedelta
+    
+    db = SessionLocal()
+    otp_code = None
+    try:
+        db_otp = db.query(OTPCode).filter(OTPCode.email_or_phone == email).first()
+        assert db_otp is not None
+        otp_code = db_otp.otp_code
+        # Simulate expired OTP
+        db_otp.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1)
+        db.commit()
+    finally:
+        db.close()
+        
+    # Verify expired OTP fails verification
+    res = await client.post("/auth/verify-otp", json={"email": email, "otp": otp_code})
+    assert res.status_code == 400
+    assert "expired" in res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_booster_otp_rate_limiting(client):
+    email = f"rate_otp_{int(asyncio.get_event_loop().time())}@agrinex.io"
+    # First request should succeed
+    res = await client.post("/auth/send-otp", json={"email": email})
+    assert res.status_code == 200
+    
+    # Second request immediately after must trigger 429 cooldown limit
+    res = await client.post("/auth/send-otp", json={"email": email})
+    assert res.status_code == 429
+    assert "wait" in res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_booster_jwt_token_expiry(client):
+    # Try requesting protected resource with an expired token
+    # Create token with -5 min expiration
+    from datetime import timedelta
+    expired_token = create_access_token({"sub": "expired_user@agrinex.io"}, expires_delta=timedelta(minutes=-5))
+    res = await client.get("/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
+    assert res.status_code in [401, 403]
+
+
+@pytest.mark.asyncio
+async def test_booster_refresh_token_rotation(client):
+    # Register/login a user to get valid refresh token
+    email = f"refresh_user_{int(asyncio.get_event_loop().time())}@agrinex.io"
+    google_payload = {
+        "id_token": "mock_google_oauth_token",
+        "profile": {
+            "email": email,
+            "name": "Refresh Tester",
+            "picture": "https://agrinex.io/avatars/refresh.jpg"
+        }
+    }
+    res = await client.post("/auth/google", json=google_payload)
+    assert res.status_code == 200
+    data = res.json()
+    access_token = data["access_token"]
+    
+    # Obtain a fresh refresh token
+    refresh_token = create_refresh_token(data={"sub": email})
+    
+    # Call refresh endpoint
+    res = await client.post("/auth/refresh", json={"refresh_token": refresh_token})
+    assert res.status_code == 200
+    res_data = res.json()
+    assert "access_token" in res_data
+    assert "refresh_token" in res_data
+
+
+@pytest.mark.asyncio
+async def test_booster_db_session_exception(client):
+    from app.database import get_db
+    
+    def mock_get_db():
+        mock_session = MagicMock()
+        # Make database execution throw an error
+        mock_session.execute.side_effect = Exception("Operational database crash")
+        yield mock_session
+
+    app.dependency_overrides[get_db] = mock_get_db
+    try:
+        # Trigger an endpoint that queries database health
+        res = await client.get("/health")
+        # Ensure it handles the database error gracefully (200, status: error)
+        assert res.status_code == 200
+        assert res.json()["status"] == "error"
+        assert "database crash" in res.json()["database"].lower()
+    finally:
+        app.dependency_overrides.clear()
+

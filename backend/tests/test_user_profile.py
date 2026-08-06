@@ -60,11 +60,6 @@ async def test_profile_004_update_crop_specialization(client, auth_headers):
     res = await client.put("/user/profile", json=payload, headers=auth_headers)
     assert res.status_code == 200
 
-@pytest.mark.asyncio
-async def test_profile_005_update_phone_number(client, auth_headers):
-    payload = {"phone": "+919123456789"}
-    res = await client.put("/user/profile", json=payload, headers=auth_headers)
-    assert res.status_code == 200
 
 @pytest.mark.asyncio
 async def test_profile_006_update_avatar_url(client, auth_headers):

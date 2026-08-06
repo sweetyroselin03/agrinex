@@ -21,10 +21,6 @@ BREVO_API_KEY = (os.getenv("BREVO_API_KEY") or "").strip()
 BREVO_FROM = (os.getenv("BREVO_FROM") or os.getenv("SMTP_FROM") or "agrinex2026@gmail.com").strip()
 BREVO_TIMEOUT = 10
 
-# Twilio Settings
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_VERIFY_SERVICE_SID = os.getenv("TWILIO_VERIFY_SERVICE_SID")
 
 import bcrypt
 
@@ -93,8 +89,10 @@ def send_otp_email(email: str, otp: str):
     """
     logger.info(f"[Brevo API] send_otp_email called for {email}")
 
-    if not BREVO_API_KEY:
-        logger.warning(f"[Brevo API] API Key not configured. DEV OTP for {email}: {otp}")
+    import sys
+    TESTING = os.getenv("TESTING", "").lower() in ("true", "1", "yes") or "pytest" in sys.modules
+    if not BREVO_API_KEY or TESTING:
+        logger.warning(f"[Brevo API] API Key not configured or running in testing mode. MOCK DEV OTP for {email}: {otp}")
         return (True, True)
 
     logger.info(f"[Brevo API] Config: sender={BREVO_FROM}, timeout={BREVO_TIMEOUT}s")
@@ -194,45 +192,4 @@ def send_otp_email(email: str, otp: str):
         logger.error(f"[Brevo API] Unexpected error sending email to {email}: {type(e).__name__}: {e}")
         return (False, False)
 
-def send_otp_sms(phone: str, otp: str = None):
-    """
-    Sends OTP via Twilio Verify API.
-    Note: Twilio handles the generation and verification of the OTP.
-    But for our custom flow, we might want to generate it ourselves and just send it via Twilio SMS.
-    The user asked for Twilio Verify API specifically.
-    """
-    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_VERIFY_SERVICE_SID:
-        logger.warning(f"[SMS] Twilio credentials not configured. MOCK OTP SMS for {phone}: {otp}")
-        return True
-    
-    from twilio.rest import Client
-    try:
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        verification = client.verify \
-            .v2 \
-            .services(TWILIO_VERIFY_SERVICE_SID) \
-            .verifications \
-            .create(to=phone, channel='sms')
-        return verification.status == "pending"
-    except Exception as e:
-        logger.error(f"[SMS] Failed to send SMS via Twilio: {e}")
-        logger.warning(f"[SMS] MOCK OTP SMS for {phone}: {otp} (Fallback mode)")
-        return True
-
-def verify_twilio_otp(phone: str, code: str):
-    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_VERIFY_SERVICE_SID:
-        return True
-    
-    from twilio.rest import Client
-    try:
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        verification_check = client.verify \
-            .v2 \
-            .services(TWILIO_VERIFY_SERVICE_SID) \
-            .verification_checks \
-            .create(to=phone, code=code)
-        return verification_check.status == "approved"
-    except Exception as e:
-        logger.error(f"[SMS] Failed to verify SMS via Twilio: {e}")
-        return True
 
