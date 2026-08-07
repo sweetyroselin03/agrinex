@@ -18,8 +18,9 @@ class AgriGPTReasoningEngine:
         from dotenv import load_dotenv
         load_dotenv()
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        self.configured_model = os.getenv("GEMINI_MODEL")
         self.client = None
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-3.5-flash"  # Default fallback if discovery fails entirely
 
         if self.gemini_api_key:
             try:
@@ -27,20 +28,106 @@ class AgriGPTReasoningEngine:
                 self.client = genai.Client(api_key=self.gemini_api_key)
                 logger.info("[AgriGPT] Gemini client initialized successfully")
                 
-                # Check model availability and set active model name
-                try:
-                    from google.genai import types
-                    self.client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents="test",
-                        config=types.GenerateContentConfig(max_output_tokens=1)
-                    )
-                    logger.info("[AgriGPT] Using Gemini model: gemini-2.5-flash")
-                except Exception as e:
-                    logger.warning(f"[AgriGPT] gemini-2.5-flash not available ({e}). Falling back to gemini-3.5-flash.")
-                    self.model_name = "gemini-3.5-flash"
+                # Model discovery process
+                selected_model = self.configured_model
+                if selected_model:
+                    # Test if the configured model is available
+                    try:
+                        logger.info(f"[AgriGPT] Testing configured GEMINI_MODEL: {selected_model}")
+                        model_id = selected_model if selected_model.startswith("models/") else f"models/{selected_model}"
+                        self.client.models.get(model=model_id)
+                        logger.info(f"[AgriGPT] Configured model '{selected_model}' is available.")
+                        self.model_name = selected_model
+                    except Exception as e:
+                        logger.warning(f"[AgriGPT] Configured model '{selected_model}' is unavailable: {e}. Starting auto-discovery.")
+                        selected_model = None
+
+                if not selected_model:
+                    try:
+                        logger.info("[AgriGPT] Listing available Gemini models...")
+                        models = list(self.client.models.list())
+                        
+                        # Print all available models to logs
+                        all_names = [m.name for m in models]
+                        logger.info(f"[AgriGPT] Available Gemini API models: {all_names}")
+                        
+                        # Filter for supported vision-capable Gemini models
+                        supported_models = []
+                        for m in models:
+                            actions = getattr(m, "supported_actions", [])
+                            name_lower = m.name.lower()
+                            if "generatecontent" in [a.lower() for a in actions] and "gemini" in name_lower:
+                                # Exclude robotics, embedding, computer-use, and other non-standard text/image models
+                                if not any(ex in name_lower for ex in ["robotics", "embedding", "aqa", "computer-use"]):
+                                    supported_models.append(m.name)
+                        
+                        logger.info(f"[AgriGPT] Discovered supported Gemini models: {supported_models}")
+                        
+                        # Active validation of candidate models to avoid 429/Resource Exhausted models
+                        priority_list = [
+                            "gemini-3.5-flash",
+                            "gemini-3.5-flash-lite",
+                            "gemini-3.1-flash-lite",
+                            "gemini-3.1-flash",
+                            "gemini-3.6-flash",
+                            "gemini-2.0-flash",
+                            "gemini-2.0-flash-lite",
+                            "gemini-2.5-flash-lite",
+                            "gemini-2.5-flash",
+                            "gemini-2.5-pro",
+                            "gemini-3.1-pro-preview"
+                        ]
+                        
+                        chosen = None
+                        from google.genai import types
+                        
+                        # 1. Try testing priority models
+                        for priority_kw in priority_list:
+                            matches = [m for m in supported_models if priority_kw in m.lower()]
+                            for name in matches:
+                                logger.info(f"[AgriGPT] Testing model quota for '{name}'...")
+                                try:
+                                    self.client.models.generate_content(
+                                        model=name,
+                                        contents="test",
+                                        config=types.GenerateContentConfig(max_output_tokens=1)
+                                    )
+                                    logger.info(f"[AgriGPT] Test succeeded! Selected: {name}")
+                                    chosen = name
+                                    break
+                                except Exception as test_err:
+                                    logger.warning(f"[AgriGPT] Test failed for model '{name}': {test_err}")
+                            if chosen:
+                                break
+                                
+                        # 2. If no priority model succeeded, test any flash or pro model in supported list
+                        if not chosen:
+                            logger.info("[AgriGPT] No priority model succeeded. Testing other available models in supported list...")
+                            for name in supported_models:
+                                logger.info(f"[AgriGPT] Testing model quota for fallback: '{name}'...")
+                                try:
+                                    self.client.models.generate_content(
+                                        model=name,
+                                        contents="test",
+                                        config=types.GenerateContentConfig(max_output_tokens=1)
+                                    )
+                                    logger.info(f"[AgriGPT] Fallback test succeeded! Selected: {name}")
+                                    chosen = name
+                                    break
+                                except Exception as test_err:
+                                    logger.warning(f"[AgriGPT] Fallback test failed for model '{name}': {test_err}")
+                                    
+                        if chosen:
+                            self.model_name = chosen
+                            logger.info(f"[AgriGPT] Auto-discovered and selected working Gemini model: {self.model_name}")
+                        else:
+                            logger.warning("[AgriGPT] No supported Gemini model successfully passed the quota test. Using default fallback: gemini-3.5-flash-lite")
+                            self.model_name = "gemini-3.5-flash-lite"
+                    except Exception as list_err:
+                        logger.error(f"[AgriGPT] Failed to auto-discover model: {list_err}. Defaulting to gemini-3.5-flash-lite")
+                        self.model_name = "gemini-3.5-flash-lite"
             except Exception as e:
-                logger.warning(f"[AgriGPT] Failed to initialize Gemini: {e}")
+                logger.error(f"[AgriGPT] Failed to initialize Gemini: {e}")
 
     def generate_domain_reasoning(self, message: str, scan_context: str = "") -> str:
         """
@@ -268,6 +355,12 @@ class AgriGPTReasoningEngine:
             "parts": [{"text": message}]
         })
 
+        # Structured Logs: selected model & prompt
+        logger.info(f"[AgriGPT Chat] Selected Model: {self.model_name}")
+        logger.info(f"[AgriGPT Chat] User Message: {message}")
+        logger.info(f"[AgriGPT Chat] System Prompt: {system_prompt}")
+        logger.info(f"[AgriGPT Chat] History count: {len(history)}")
+
         import asyncio
         from google.genai import types
 
@@ -298,17 +391,22 @@ class AgriGPTReasoningEngine:
                         full_text += chunk.text
 
                 if full_text.strip():
+                    # Structured Logs: Gemini response & final API response
+                    logger.info(f"[AgriGPT Chat] Gemini Response: {full_text}")
+                    logger.info(f"[AgriGPT Chat] Final API Response: {full_text}")
                     return full_text
                 else:
                     raise ValueError("Empty response received from Gemini.")
 
             except Exception as e:
-                logger.warning(f"[AgriGPT Attempt {attempt + 1} Failed] {e}")
+                logger.error(f"[AgriGPT Chat Attempt {attempt + 1} Failed] Error: {e}")
                 if attempt < retries - 1:
                     await asyncio.sleep(0.5)
 
-        logger.error("[AgriGPT Error] All Gemini attempts failed. Fallback reasoning activated.")
-        return self.generate_domain_reasoning(message, scan_context=scan_context)
+        logger.error("[AgriGPT Chat Error] All Gemini attempts failed. Fallback reasoning activated.")
+        fallback_text = self.generate_domain_reasoning(message, scan_context=scan_context)
+        logger.info(f"[AgriGPT Chat] Fallback Response: {fallback_text}")
+        return fallback_text
 
 
 agri_gpt_engine = AgriGPTReasoningEngine()

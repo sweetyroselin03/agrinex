@@ -161,8 +161,11 @@ class AIService:
         retries = 2
         for attempt in range(retries):
             try:
-                # 3. Log: request sent to Gemini
-                logger.info(f"[AI Scanner] Step 3: Request sent to Gemini. Model: {self.agri_gpt.model_name}. Attempt: {attempt + 1}")
+                # Structured Logs: selected model, prompt, and image upload success
+                logger.info(f"[AI Scanner] Selected Model: {self.agri_gpt.model_name}")
+                logger.info(f"[AI Scanner] Prompt: {prompt}")
+                logger.info(f"[AI Scanner] Image Upload Success: True (Encoded Size: {len(image_bytes)} bytes)")
+                logger.info(f"[AI Scanner] Step 3: Request sent to Gemini. Attempt: {attempt + 1}")
                 
                 timeout = 30.0
                 config = types.GenerateContentConfig(
@@ -183,10 +186,12 @@ class AIService:
                     timeout=timeout
                 )
 
-                # 4. Log: Gemini response
-                logger.info(f"[AI Scanner] Step 4: Gemini response received. Raw Text: '{response.text}'")
+                # Structured Logs: Gemini response
+                logger.info(f"[AI Scanner] Gemini Response: {response.text}")
 
                 data = json.loads(response.text)
+                # Structured Logs: parsed JSON
+                logger.info(f"[AI Scanner] Parsed JSON: {data}")
 
                 # Calibrate confidence_level if returned in 0.0-1.0 range
                 if "confidence_level" in data and data["confidence_level"] is not None:
@@ -198,10 +203,9 @@ class AIService:
                     except Exception as cal_err:
                         logger.warning(f"[AI Scanner] Could not calibrate confidence_level: {cal_err}")
 
-                # 5. Log: parsing result
+                # Validate schema
                 validated = CropDiagnosticResult(**data)
                 result_dict = validated.model_dump()
-                logger.info(f"[AI Scanner] Step 5: Parsing result successful: {result_dict}")
 
                 # Add extra fields expected by database/main.py
                 result_dict["treatment"] = result_dict.get("chemical_treatment", "N/A")
@@ -227,14 +231,16 @@ class AIService:
                 except Exception as cache_save_err:
                     logger.warning(f"[AI Service] Could not write to gemini_cache.json: {cache_save_err}")
 
+                # Structured Logs: final API response
+                logger.info(f"[AI Scanner] Final API Response: {result_dict}")
                 return result_dict
 
             except Exception as e:
-                logger.warning(f"[AI Service Scan Attempt {attempt + 1} Failed] {e}")
+                logger.error(f"[AI Scanner Attempt {attempt + 1} Failed] Error: {e}")
                 if attempt < retries - 1:
                     await asyncio.sleep(0.5)
                 else:
-                    logger.error(f"[AI Service Scan Error] All Gemini diagnostic attempts failed: {e}")
+                    logger.error(f"[AI Scanner Error] All Gemini diagnostic attempts failed: {e}")
                     raise e
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

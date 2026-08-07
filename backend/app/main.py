@@ -788,6 +788,7 @@ def save_post(post_id: int, current_user: models.User = Depends(get_current_user
 
 # ─── Notifications ───
 @app.get("/notifications", response_model=List[schemas.NotificationOut])
+@app.get("/api/notifications", response_model=List[schemas.NotificationOut])
 def get_notifications(
     skip: int = 0,
     limit: int = 50,
@@ -809,6 +810,7 @@ def get_notifications(
     return result
 
 @app.get("/notifications/unread-count")
+@app.get("/api/notifications/unread-count")
 def get_unread_count(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     count = db.query(models.Notification).filter(
         models.Notification.user_id == current_user.id,
@@ -817,6 +819,7 @@ def get_unread_count(current_user: models.User = Depends(get_current_user), db: 
     return {"count": count}
 
 @app.post("/notifications/read-all")
+@app.post("/api/notifications/read-all")
 def mark_all_read(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     db.query(models.Notification).filter(
         models.Notification.user_id == current_user.id,
@@ -826,6 +829,7 @@ def mark_all_read(current_user: models.User = Depends(get_current_user), db: Ses
     return {"message": "All notifications marked as read"}
 
 @app.post("/notifications/{notif_id}/read")
+@app.post("/api/notifications/{notif_id}/read")
 def mark_one_read(notif_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     notif = db.query(models.Notification).filter(
         models.Notification.id == notif_id,
@@ -837,6 +841,7 @@ def mark_one_read(notif_id: int, current_user: models.User = Depends(get_current
     return {"message": "Notification marked as read"}
 
 @app.delete("/notifications")
+@app.delete("/api/notifications")
 def clear_notifications(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     db.query(models.Notification).filter(
         models.Notification.user_id == current_user.id
