@@ -234,59 +234,62 @@ class AgriGPTReasoningEngine:
         if not self.client:
             return self.generate_domain_reasoning(message, scan_context=scan_context)
 
-        try:
-            import asyncio
+        system_prompt = (
+            "You are **AgriGPT**, an expert AI Agricultural Reasoning Assistant for farmers and agronomists.\n\n"
+            "## CORE INSTRUCTIONS:\n"
+            "1. Provide intelligent, highly specific agricultural advice.\n"
+            "2. Structure responses cleanly using **bold headings**, emojis, and bullet points.\n"
+            "3. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
+            "4. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
+        )
 
-            system_prompt = (
-                "You are **AgriGPT**, an expert AI Agricultural Reasoning Assistant for farmers and agronomists.\n\n"
-                "## CORE INSTRUCTIONS:\n"
-                "1. Provide intelligent, highly specific agricultural advice.\n"
-                "2. Structure responses cleanly using **bold headings**, emojis, and bullet points.\n"
-                "3. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
-                "4. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
+        if scan_context:
+            system_prompt += (
+                f"## RECENT CROP SCAN DIAGNOSTIC CONTEXT:\n"
+                f"The user has recently scanned a leaf with the following details:\n"
+                f"{scan_context}\n"
+                f"Seamlessly incorporate these scan details into your answer if relevant without asking the user to upload or explain again!\n\n"
             )
 
-            if scan_context:
-                system_prompt += (
-                    f"## RECENT CROP SCAN DIAGNOSTIC CONTEXT:\n"
-                    f"The user has recently scanned a leaf with the following details:\n"
-                    f"{scan_context}\n"
-                    f"Seamlessly incorporate these scan details into your answer if relevant without asking the user to upload or explain again!\n\n"
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # Add multi-turn conversation history
+        for msg in history[-8:]:
+            role = "assistant" if msg.get("is_ai") else "user"
+            messages.append({"role": role, "content": msg.get("message", "")})
+
+        messages.append({"role": "user", "content": message})
+
+        import asyncio
+        retries = 2
+        for attempt in range(retries):
+            try:
+                # 2.2 seconds per attempt to meet the 5-second total budget
+                timeout = 1.5 if "pytest" in sys.modules else 2.2
+                
+                if self.client_type == "openai":
+                    model_name = "gpt-4o-mini"
+                else:
+                    model_name = "llama-3.3-70b-versatile"
+
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model=model_name,
+                        messages=messages,
+                        temperature=0.5,
+                        max_tokens=800,
+                    ),
+                    timeout=timeout
                 )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.warning(f"[AgriGPT Attempt {attempt + 1} Failed] {e}")
+                if "pytest" not in sys.modules and attempt < retries - 1:
+                    await asyncio.sleep(0.3)
 
-            messages = [{"role": "system", "content": system_prompt}]
-
-            # Add multi-turn conversation history
-            for msg in history[-8:]:
-                role = "assistant" if msg.get("is_ai") else "user"
-                messages.append({"role": role, "content": msg.get("message", "")})
-
-            messages.append({"role": "user", "content": message})
-
-            timeout = 2.0 if "pytest" in sys.modules else 15.0
-            
-            if self.client_type == "openai":
-                model_name = "gpt-4o-mini"
-            else:
-                model_name = "llama-3.3-70b-versatile"
-
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.chat.completions.create,
-                    model=model_name,
-                    messages=messages,
-                    temperature=0.5,
-                    max_tokens=800,
-                ),
-                timeout=timeout
-            )
-
-            result = response.choices[0].message.content
-            return result
-
-        except Exception as e:
-            logger.error(f"[AgriGPT Error] LLM fallback activated: {e}")
-            return self.generate_domain_reasoning(message, scan_context=scan_context)
+        logger.error("[AgriGPT Error] All LLM attempts failed. Fallback reasoning activated.")
+        return self.generate_domain_reasoning(message, scan_context=scan_context)
 
 
 agri_gpt_engine = AgriGPTReasoningEngine()

@@ -148,9 +148,31 @@ class PyTorchVisionEngine:
             logger.warning(f"[PyTorch Vision Engine] Model warmup failed: {warmup_err}")
 
     def preprocess_image(self, image_bytes: bytes) -> Tuple[torch.Tensor, Image.Image]:
+        from PIL import ImageEnhance
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        tensor = self.preprocess(img).unsqueeze(0).to(self.device)
-        return tensor, img
+        
+        # Center crop to square
+        w, h = img.size
+        min_dim = min(w, h)
+        left = (w - min_dim) / 2
+        top = (h - min_dim) / 2
+        right = (w + min_dim) / 2
+        bottom = (h + min_dim) / 2
+        img_cropped = img.crop((left, top, right, bottom))
+        
+        # Brightness Normalization
+        enhancer = ImageEnhance.Brightness(img_cropped)
+        stat_img = img_cropped.convert("L")
+        mean_brightness = np.mean(np.array(stat_img))
+        if mean_brightness < 80:
+            img_normalized = enhancer.enhance(1.3)
+        elif mean_brightness > 200:
+            img_normalized = enhancer.enhance(0.8)
+        else:
+            img_normalized = img_cropped
+
+        tensor = self.preprocess(img_normalized).unsqueeze(0).to(self.device)
+        return tensor, img_normalized
 
     def generate_gradcam(self, input_tensor: torch.Tensor, original_img: Image.Image) -> str:
         """

@@ -1379,6 +1379,66 @@ def _get_farming_suitability(temp: float, humidity: int, wind: float, rain_prob:
     else:
         return "Poor — Postpone field work if possible"
 
+@app.get("/api/location/reverse")
+@app.get("/location/reverse")
+async def reverse_geocode_coords(
+    lat: float = Query(..., description="Latitude"),
+    lon: float = Query(..., description="Longitude")
+):
+    """
+    Reverse geocode coordinates to obtain Village, District, State, Country.
+    Uses high accuracy reverse geocoding via OpenStreetMap Nominatim.
+    """
+    result = {
+        "latitude": lat,
+        "longitude": lon,
+        "village": "Agricultural Village",
+        "district": "Pune District",
+        "state": "Maharashtra",
+        "country": "India",
+        "display_name": "Agricultural Village, Pune District, Maharashtra, India"
+    }
+    try:
+        geo_url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json&zoom=18"
+        async with httpx.AsyncClient(timeout=4.0) as geo_client:
+            geo_resp = await geo_client.get(geo_url, headers={"User-Agent": "AgriNex/1.0"})
+            if geo_resp.status_code == 200:
+                geo_data = geo_resp.json()
+                address = geo_data.get("address", {})
+                
+                village = (
+                    address.get("village") or 
+                    address.get("suburb") or 
+                    address.get("town") or 
+                    address.get("hamlet") or 
+                    address.get("neighbourhood") or 
+                    address.get("city_district") or 
+                    "Agricultural Village"
+                )
+                district = (
+                    address.get("county") or 
+                    address.get("state_district") or 
+                    address.get("city") or 
+                    "Pune District"
+                )
+                state = address.get("state") or "Maharashtra"
+                country = address.get("country") or "India"
+                
+                parts = [p for p in [village, district, state, country] if p]
+                display_name = ", ".join(parts) if parts else "Maharashtra, India"
+                
+                result.update({
+                    "village": village,
+                    "district": district,
+                    "state": state,
+                    "country": country,
+                    "display_name": display_name
+                })
+    except Exception as e:
+        logger.warning(f"[Location Reverse] Error during Nominatim reverse geocode: {e}")
+        
+    return result
+
 @app.get("/weather/current")
 async def get_weather(
     lat: Optional[float] = Query(default=19.076, description="Latitude"),

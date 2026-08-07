@@ -26,6 +26,8 @@ import api from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import UserSearchBar from '../components/UserSearchBar';
 import FollowButton from '../components/FollowButton';
+import ImageLightbox from '../components/chat/ImageLightbox';
+import { getCurrentGPSLocation } from '../utils/gps';
 
 export default function Community() {
   const navigate = useNavigate();
@@ -60,6 +62,31 @@ export default function Community() {
   const [newCommentVal, setNewCommentVal] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
+
+  // Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const openLightbox = (images: string[], index: number) => {
+    setLightboxImages(images);
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+
+  const autoAttachLocation = async () => {
+    setFetchingLocation(true);
+    try {
+      const gps = await getCurrentGPSLocation();
+      setNewLocation(gps.display_name);
+    } catch (err) {
+      console.warn("Failed to auto-detect GPS location:", err);
+    } finally {
+      setFetchingLocation(false);
+    }
+  };
 
   // React Query for Suggested Farmers
   const { data: suggestedFarmers = [], isLoading: loadingSuggested } = useQuery({
@@ -374,7 +401,13 @@ export default function Community() {
             </div>
             
             <button
-              onClick={() => setShowPublisher(!showPublisher)}
+              onClick={() => {
+                const nextVal = !showPublisher;
+                setShowPublisher(nextVal);
+                if (nextVal) {
+                  autoAttachLocation();
+                }
+              }}
               className="px-4 py-2.5 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm transition-all shrink-0"
             >
               <Plus className="w-4 h-4" />
@@ -485,17 +518,29 @@ export default function Community() {
                     />
                   </div>
 
-                  <div className="relative flex-1 min-w-[200px]">
+                  <div className="relative flex-1 min-w-[200px] flex items-center">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <MapPin className="w-4 h-4" />
+                      {fetchingLocation ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      ) : (
+                        <MapPin className="w-4 h-4" />
+                      )}
                     </div>
                     <input
                       type="text"
-                      placeholder="Location (optional)"
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
+                      placeholder={fetchingLocation ? "Detecting GPS..." : "Location (optional)"}
+                      className="w-full pl-9 pr-20 py-2.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
                     />
+                    <button
+                      type="button"
+                      onClick={autoAttachLocation}
+                      disabled={fetchingLocation}
+                      className="absolute right-2 text-[10px] bg-slate-100 hover:bg-slate-250 text-brandDark px-2 py-1.5 rounded-lg font-bold transition-all"
+                    >
+                      GPS Detect
+                    </button>
                   </div>
                 </div>
 
@@ -658,6 +703,7 @@ export default function Community() {
                               src={imgUrl}
                               alt={`Post media ${idx + 1}`}
                               className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                              onClick={() => openLightbox(parsedImages, idx)}
                             />
                             {isLast && (
                               <div className="absolute inset-0 bg-brandDark/60 backdrop-blur-xs flex items-center justify-center text-white text-lg font-black pointer-events-none">
@@ -673,7 +719,8 @@ export default function Community() {
                       <img
                         src={post.image_url}
                         alt="Post media"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => openLightbox([post.image_url], 0)}
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -985,6 +1032,14 @@ export default function Community() {
           </div>
         )}
       </AnimatePresence>
+
+      <ImageLightbox
+        isOpen={lightboxOpen}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onClose={() => setLightboxOpen(false)}
+        onNavigate={(idx) => setLightboxIndex(idx)}
+      />
 
     </div>
   );
