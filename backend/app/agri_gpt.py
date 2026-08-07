@@ -15,12 +15,27 @@ logger = logging.getLogger("uvicorn.error")
 
 class AgriGPTReasoningEngine:
     def __init__(self):
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.client = None
-        if self.groq_api_key:
+        self.client_type = None
+
+        # 1. Try OpenAI client
+        if self.openai_api_key:
+            try:
+                from openai import OpenAI
+                self.client = OpenAI(api_key=self.openai_api_key)
+                self.client_type = "openai"
+                logger.info("[AgriGPT] OpenAI client initialized successfully")
+            except Exception as e:
+                logger.warning(f"[AgriGPT] Failed to initialize OpenAI: {e}")
+
+        # 2. Try Groq client as fallback
+        if not self.client and self.groq_api_key:
             try:
                 from groq import Groq
                 self.client = Groq(api_key=self.groq_api_key)
+                self.client_type = "groq"
                 logger.info("[AgriGPT] Groq client initialized successfully")
             except Exception as e:
                 logger.warning(f"[AgriGPT] Failed to initialize Groq: {e}")
@@ -31,7 +46,52 @@ class AgriGPTReasoningEngine:
         """
         msg_lower = message.lower()
 
-        # 1. Scanner Context Query ("I uploaded a leaf", "What disease", "How do I treat my scan")
+        # 1. Multilingual Support
+        if any(kw in msg_lower for kw in ["hindi", "हिंदी", "namaste"]):
+            return (
+                "🌱 **AgriGPT कृषक सहायक (Hindi)**\n\n"
+                "नमस्ते! मैं आपका एग्रीजीपीटी सहायक हूं। मैं निम्नलिखित विषयों में सहायता कर सकता हूं:\n"
+                "• 🔬 **फसल रोग निदान**: पत्तियों की तस्वीर अपलोड करें।\n"
+                "• 🧪 **एनपीके (NPK) खाद**: प्रति एकड़ सही मात्रा की गणना।\n"
+                "• 💧 **सिंचाई और मौसम**: मौसम के अनुसार पानी देने का समय।\n"
+                "• 🏛️ **सरकारी योजनाएं और मंडी भाव**: पीएम-किसान, फसल बीमा, और मंडी की जानकारी।\n\n"
+                "कृपया अपनी समस्या विस्तार से बताएं!"
+            )
+
+        if any(kw in msg_lower for kw in ["tamil", "தமிழ்", "vanakkam"]):
+            return (
+                "🌱 **AgriGPT உழவர் உதவியாளர் (Tamil)**\n\n"
+                "வணக்கம்! நான் அக்ரிஜிபிடி. உங்களுக்கு பின்வரும் வழிகளில் நான் உதவ முடியும்:\n"
+                "• 🔬 **பயிர் நோய் கண்டறிதல்**: பாதிக்கப்பட்ட இலையின் புகைப்படத்தை பதிவேற்றவும்.\n"
+                "• 🧪 **NPK உர மேலாண்மை**: ஏக்கருக்கு தேவையான உர அளவுகள்.\n"
+                "• 💧 **நீர்ப்பாசனம் மற்றும் வானிலை**: பயிர்களுக்கான நீர் மேலாண்மை.\n"
+                "• 🏛️ **அரசு திட்டங்கள் & மண்டி விலை**: விவசாய மானியங்கள் மற்றும் சந்தை நிலவரங்கள்.\n\n"
+                "உங்கள் கேள்வியை தமிழிலோ அல்லது ஆங்கிலத்திலோ கேட்கலாம்!"
+            )
+
+        if any(kw in msg_lower for kw in ["telugu", "తెలుగు", "namaste"]):
+            return (
+                "🌱 **AgriGPT రైతు సహాయకుడు (Telugu)**\n\n"
+                "నమస్తే! నేను అగ్రిజిపిటి. మీకు ఈ క్రింది అంశాలలో సహాయం చేయగలను:\n"
+                "• 🔬 **పంట తెగుళ్ల నిర్ధారణ**: ఆకుల ఫోటోను అప్‌లోడ్ చేయండి.\n"
+                "• 🧪 **NPK ఎరువుల యాజమాన్యం**: ఎకరానికి ఎరువుల మోతాదు లెక్కింపు.\n"
+                "• 💧 **నీటి పారుదల & వాతావరణం**: వాతావरण సూచనలు.\n"
+                "• 🏛️ **ప్రభుత్వ పథకాలు & మార్కెట్ ధరలు**: పీఎం-కిసాన్ మరియు పంట ఇన్సూరెన్స్ సమాచారం.\n\n"
+                "దయచేసి మీ ప్రశ్నను అడగండి!"
+            )
+
+        if any(kw in msg_lower for kw in ["spanish", "español", "hola"]):
+            return (
+                "🌱 **AgriGPT Asistente Agrónomo (Spanish)**\n\n"
+                "¡Hola! Soy su asistente AgriGPT. Le puedo ayudar con:\n"
+                "• 🔬 **Diagnóstico de enfermedades**: Suba fotos de hojas afectadas.\n"
+                "• 🧪 **Fertilizantes NPK**: Cálculo de dosis por hectárea.\n"
+                "• 💧 **Riego y Clima**: Programación y cuidado del suelo.\n"
+                "• 🏛️ **Mercados y Precios**: Tendencias de precios locales.\n\n"
+                "¡Escriba su consulta para comenzar!"
+            )
+
+        # 2. Scanner Context Query ("I uploaded a leaf", "What disease", "How do I treat my scan")
         if scan_context and any(kw in msg_lower for kw in ["uploaded", "scan", "leaf", "disease", "treatment", "this", "my crop", "result"]):
             return (
                 f"🌱 **AgriGPT Diagnostic Analysis & Action Plan**\n\n"
@@ -42,10 +102,56 @@ class AgriGPTReasoningEngine:
                 f"• **Organic Spray**: Apply 5ml/L Neem Oil solution or Copper Hydroxide early morning.\n"
                 f"• **Chemical Option**: If infection exceeds 20% of foliage, apply Mancozeb 75% WP @ 2.5g/L water.\n"
                 f"• **Irrigation Hygiene**: Drip irrigate at plant base. Avoid splashing water onto foliage.\n\n"
-                f" Would you like dosage calculations per acre or fertilizer adjustments for your soil type?"
+                f"Would you like dosage calculations per acre or fertilizer adjustments for your soil type?"
             )
 
-        # 2. Specific Symptom Reasoning (Tomato yellow spots, Rice brown lesions, Potato spots)
+        # 3. Organic Farming
+        if any(kw in msg_lower for kw in ["organic", "bio", "compost", "natural farming", "manure", "panchagavya"]):
+            return (
+                "🌿 **AgriGPT Organic & Natural Farming Guide**\n\n"
+                "**1. Soil Enrichment**:\n"
+                "• **Vermicompost**: Apply 2-3 tonnes per acre during land preparation.\n"
+                "• **Panchagavya**: Spray 3% solution (300ml in 10L water) for growth promotion & immunity.\n"
+                "• **Green Manuring**: Sow Sunnhemp or Dhaincha and incorporate into soil at 45 days before main crop.\n\n"
+                "**2. Bio-Pest Control**:\n"
+                "• **Neem Oil (Azadirachtin)**: Mix 10,000 ppm @ 3ml/L water + mild soap emulsifier for sucking pests.\n"
+                "• **Trichoderma viride**: Soil application @ 1kg mixed with 100kg farmyard manure for root rot diseases.\n"
+                "• **Beauchamp Spray**: Dilute fermented cow urine and ginger-garlic-chilli extract to manage caterpillars.\n\n"
+                "💡 **Pro Tip**: Use yellow sticky traps (15-20 traps/acre) to monitor whiteflies and thrips organically."
+            )
+
+        # 4. Crop Recommendation
+        if any(kw in msg_lower for kw in ["recommendation", "recommend", "which crop", "what to grow", "suitability"]):
+            return (
+                "🌾 **AgriGPT Crop Selection & Recommendation Advisor**\n\n"
+                "**1. Clayey/Black Cotton Soil (Retains moisture)**:\n"
+                "• **Best Crops**: Cotton, Soybean, Wheat, Gram, and Sugarcane.\n"
+                "• **Climate**: Warm temperate with moderate rainfall.\n\n"
+                "**2. Sandy/Loamy Soil (Well-drained)**:\n"
+                "• **Best Crops**: Maize, Groundnut, Mustard, Vegetables, and Millets.\n"
+                "• **Climate**: Low moisture, requires moderate organic manure.\n\n"
+                "**3. Clayey Loam (Alluvial - High fertility)**:\n"
+                "• **Best Crops**: Rice (Paddy), Banana, Sugarcane, and Jute.\n"
+                "• **Climate**: High water availability or heavy rainfall.\n\n"
+                "💡 **Pro Tip**: Rotate deep-rooted crops (e.g. pulses) with shallow-rooted crops (e.g. cereals) to restore soil structure."
+            )
+
+        # 5. Irrigation & Water Management
+        if any(kw in msg_lower for kw in ["irrigation", "water", "drip", "sprinkler", "watering"]):
+            return (
+                "💧 **AgriGPT Irrigation & Water Conservation Guide**\n\n"
+                "**1. Drip Irrigation (Efficiency >90%)**:\n"
+                "• Highly recommended for Row Crops (Banana, Tomato, Sugarcane, Cotton).\n"
+                "• **Operation**: Run drip line for 1-2 hours daily depending on evapotranspiration.\n\n"
+                "**2. Sprinkler Irrigation (Efficiency 75-80%)**:\n"
+                "• Ideal for Close-Spaced Crops (Groundnut, Wheat, Leafy Greens, Potato).\n"
+                "• Avoid spraying during afternoon hours to reduce evaporative losses.\n\n"
+                "**3. Soil Moisture Assessment**:\n"
+                "• Perform the 'squeeze test' at 4-inch depth: if soil forms a ball but doesn't crumble, moisture is adequate.\n\n"
+                "💡 **Pro Tip**: Mulch beds with plastic sheet or crop residue to reduce evaporation by up to 40%."
+            )
+
+        # 6. Specific Symptom Reasoning (Tomato yellow spots, Rice brown lesions, Potato spots)
         if "tomato" in msg_lower and ("yellow" in msg_lower or "spot" in msg_lower or "blight" in msg_lower):
             return (
                 "🍅 **AgriGPT Diagnosis: Tomato Early / Late Blight Alert**\n\n"
@@ -69,7 +175,7 @@ class AgriGPTReasoningEngine:
                 "💡 **Pro Tip**: Maintain 2-5cm water level in paddy fields to regulate root temperature."
             )
 
-        # 3. Fertilizer Calculation Reasoning
+        # 7. Fertilizer Calculation Reasoning
         if "fertilizer" in msg_lower or "npk" in msg_lower or "dosage" in msg_lower or "urea" in msg_lower:
             return (
                 "🧪 **AgriGPT Smart NPK Fertilizer Advisory**\n\n"
@@ -82,8 +188,8 @@ class AgriGPTReasoningEngine:
                 "💡 **Pro Tip**: Conduct a Soil Health Card test before heavy fertilizer application to prevent soil acidification."
             )
 
-        # 4. Weather & Irrigation Reasoning
-        if "weather" in msg_lower or "rain" in msg_lower or "irrigation" in msg_lower or "water" in msg_lower:
+        # 8. Weather & Irrigation Reasoning
+        if "weather" in msg_lower or "rain" in msg_lower or "temp" in msg_lower:
             return (
                 "🌤️ **AgriGPT Weather-Driven Farming Guide**\n\n"
                 "• **High Humidity Alert (>80%)**: Postpone chemical spraying until dry weather to prevent wash-off.\n"
@@ -92,7 +198,7 @@ class AgriGPTReasoningEngine:
                 "💡 **Pro Tip**: Soil moisture should be checked at 4-inch depth before starting pumps."
             )
 
-        # 5. Government Schemes & Mandi Prices
+        # 9. Government Schemes & Mandi Prices
         if "scheme" in msg_lower or "pm-kisan" in msg_lower or "subsidy" in msg_lower or "mandi" in msg_lower or "price" in msg_lower:
             return (
                 "🏛️ **AgriGPT Welfare & Mandi Market Intelligence**\n\n"
@@ -103,13 +209,15 @@ class AgriGPTReasoningEngine:
                 "📊 **Mandi Price Strategy**: Check daily e-NAM prices across adjacent mandis before harvesting to maximize profit margins."
             )
 
-        # 6. Default Comprehensive Agricultural Response
+        # 10. Default Comprehensive Agricultural Response
         return (
             "🌱 **AgriGPT Intelligent Agronomist Assistant**\n\n"
             "I'm ready to assist with your agricultural decisions:\n"
             "• 🔬 **Crop Disease Pathology**: Describe leaf symptoms or upload a scan photo\n"
             "• 🧪 **NPK & Organic Fertilizer**: Precise dosage calculations per acre\n"
-            "• 🌤️ **Weather & Irrigation**: Optimal watering schedules and risk warnings\n"
+            "• 🌾 **Crop Recommendation**: Soil-based crop selection\n"
+            "• 💧 **Irrigation & Water**: Schedule optimization\n"
+            "• 🌿 **Organic Farming**: Biopesticide and compost recipes\n"
             "• 🏛️ **Government Schemes & Mandi Prices**: Subsidy advice and market trends\n\n"
             "💡 **Pro Tip**: Mention your crop type, location, and soil condition for tailored recommendations!"
         )
@@ -156,10 +264,16 @@ class AgriGPTReasoningEngine:
             messages.append({"role": "user", "content": message})
 
             timeout = 2.0 if "pytest" in sys.modules else 15.0
+            
+            if self.client_type == "openai":
+                model_name = "gpt-4o-mini"
+            else:
+                model_name = "llama-3.3-70b-versatile"
+
             response = await asyncio.wait_for(
                 asyncio.to_thread(
                     self.client.chat.completions.create,
-                    model="llama-3.3-70b-versatile",
+                    model=model_name,
                     messages=messages,
                     temperature=0.5,
                     max_tokens=800,

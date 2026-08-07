@@ -141,6 +141,7 @@ class CropScan(Base):
     is_valid_crop = Column(Boolean, default=True)
     detected_object = Column(String, nullable=True)
     rejection_reason = Column(String, nullable=True)
+    scientific_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

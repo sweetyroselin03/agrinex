@@ -24,7 +24,6 @@ export interface UserSearchItem {
 export interface UserProfileItem {
   id: number;
   email: string;
-  phone?: string;
   full_name?: string;
   display_name?: string;
   username?: string;

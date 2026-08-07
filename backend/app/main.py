@@ -19,12 +19,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 # Create tables and sync schema
 models.Base.metadata.create_all(bind=engine)
-if "pytest" not in sys.modules and not os.getenv("TESTING"):
-    try:
-        import sync_db
-        sync_db.sync_db()
-    except Exception as sync_err:
-        logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
+try:
+    import sync_db
+    sync_db.sync_db()
+except Exception as sync_err:
+    logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
 
 logger_startup = logging.getLogger("uvicorn.error")
 logger_startup.info("[Startup] Database tables synchronized via SQLAlchemy ORM.")
@@ -1145,9 +1144,9 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             "prevention_tips": "Regular monitoring recommended",
         }
 
-    # Confidence & Validity threshold check (>= 70.0%)
+    # Confidence & Validity threshold check (>= 50.0%)
     confidence = analysis.get("confidence_level", 0.0)
-    if confidence < 70.0 or not analysis.get("is_valid_crop", True):
+    if confidence < 50.0 or not analysis.get("is_valid_crop", True):
         return schemas.CropScanOut(
             id=-1,
             user_id=current_user.id,
@@ -1161,6 +1160,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             prevention="Make sure the leaf is in focus and there is adequate lighting.",
             detected_object=analysis.get("crop_type", "non-crop object"),
             rejection_reason="Unable to identify a crop. Please upload a clear image of a plant leaf.",
+            scientific_name="N/A",
             created_at=datetime.now(timezone.utc)
         )
     
@@ -1185,7 +1185,8 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
         prevention_tips=analysis.get("prevention_tips"),
         is_valid_crop=True,
         detected_object=analysis.get("crop_type", "Unknown"),
-        rejection_reason=""
+        rejection_reason="",
+        scientific_name=analysis.get("scientific_name")
     )
     db.add(db_scan)
     db.commit()

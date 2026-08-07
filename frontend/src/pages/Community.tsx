@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -17,7 +17,10 @@ import {
   X,
   Sparkles,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  Pencil,
+  Video,
+  Search
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
@@ -27,15 +30,29 @@ import FollowButton from '../components/FollowButton';
 export default function Community() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  
+  // Feed states
   const [posts, setPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [activeTab, setActiveTab] = useState<'farmers' | 'posts'>('posts');
+  const [postSearchQuery, setPostSearchQuery] = useState('');
   
   // Post publisher states
   const [newContent, setNewContent] = useState('');
-  const [newImage, setNewImage] = useState('');
   const [newLocation, setNewLocation] = useState('');
+  const [selectedMedia, setSelectedMedia] = useState<{ file: File; preview: string; type: 'image' | 'video' }[]>([]);
+  const [mediaCompressing, setMediaCompressing] = useState(false);
   const [showPublisher, setShowPublisher] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit Post modal states
+  const [editingPost, setEditingPost] = useState<any | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [updatingPost, setUpdatingPost] = useState(false);
 
   // Comment Thread drawer states
   const [activePostForComments, setActivePostForComments] = useState<any | null>(null);
@@ -64,9 +81,11 @@ export default function Community() {
 
   const fetchFeed = async () => {
     setLoadingPosts(true);
+    setPostSearchQuery('');
     try {
-      const res = await api.get('/posts');
+      const res = await api.get('/posts?limit=10&skip=0');
       setPosts(res.data);
+      setHasMore(res.data.length >= 10);
     } catch (e) {
       console.warn('Failed to load posts');
     } finally {
@@ -74,26 +93,199 @@ export default function Community() {
     }
   };
 
+  const handlePostSearch = async (val: string) => {
+    setPostSearchQuery(val);
+    if (!val.trim()) {
+      fetchFeed();
+      return;
+    }
+    setLoadingPosts(true);
+    try {
+      const res = await api.get(`/posts/search?q=${encodeURIComponent(val)}`);
+      setPosts(res.data);
+      setHasMore(false); // Search returns full results
+    } catch {
+      console.warn("Search posts failed");
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await api.get(`/posts?skip=${posts.length}&limit=10`);
+      if (res.data.length === 0) {
+        setHasMore(false);
+      } else {
+        setPosts(prev => [...prev, ...res.data]);
+        setHasMore(res.data.length >= 10);
+      }
+    } catch (e) {
+      console.warn('Failed to load more posts');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Image compressor using canvas
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(dataUrl);
+        };
+        img.onerror = () => {
+          resolve(event.target?.result as string);
+        };
+      };
+      reader.onerror = () => {
+        resolve('');
+      };
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setMediaCompressing(true);
+    const newMedia = [...selectedMedia];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const isVideo = file.type.startsWith('video/');
+      const isImage = file.type.startsWith('image/');
+      
+      if (!isImage && !isVideo) continue;
+      
+      if (isVideo) {
+        if (file.size > 8 * 1024 * 1024) {
+          alert("Video files must be under 8MB to preserve platform performance.");
+          continue;
+        }
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        await new Promise<void>((resolve) => {
+          reader.onload = () => {
+            // Video is exclusive, replace all previous files
+            newMedia.length = 0;
+            newMedia.push({
+              file,
+              preview: reader.result as string,
+              type: 'video'
+            });
+            resolve();
+          };
+        });
+        break; // Stop processing since video is exclusive
+      } else {
+        // Image
+        // If there was a video, clear it
+        const imageMedia = newMedia.filter(m => m.type === 'image');
+        if (imageMedia.length >= 5) {
+          alert("You can upload a maximum of 5 images.");
+          break;
+        }
+        const compressed = await compressImage(file);
+        if (compressed) {
+          // Remove any existing video
+          const cleaned = newMedia.filter(m => m.type === 'image');
+          cleaned.push({
+            file,
+            preview: compressed,
+            type: 'image'
+          });
+          newMedia.length = 0;
+          newMedia.push(...cleaned);
+        }
+      }
+    }
+    
+    setSelectedMedia(newMedia);
+    setMediaCompressing(false);
+    e.target.value = '';
+  };
+
+  const handleRemoveMedia = (index: number) => {
+    setSelectedMedia(prev => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newContent.trim() || publishing) return;
+    if (!newContent.trim() || publishing || mediaCompressing) return;
     setPublishing(true);
+
+    const imagesList = selectedMedia.filter(m => m.type === 'image').map(m => m.preview);
+    const videoUrl = selectedMedia.find(m => m.type === 'video')?.preview || null;
+    const finalImageUrl = videoUrl || (imagesList.length > 0 ? imagesList[0] : null);
 
     try {
       await api.post('/posts', {
         content: newContent.trim(),
-        image_url: newImage.trim() || null,
+        image_url: finalImageUrl,
+        images: imagesList,
         location: newLocation.trim() || null
       });
       setNewContent('');
-      setNewImage('');
       setNewLocation('');
+      setSelectedMedia([]);
       setShowPublisher(false);
       fetchFeed();
     } catch (err) {
       alert('Post creation failed.');
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleEditClick = (post: any) => {
+    setEditingPost(post);
+    setEditContent(post.content || '');
+    setEditLocation(post.location || '');
+  };
+
+  const handleUpdatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editContent.trim() || updatingPost || !editingPost) return;
+    setUpdatingPost(true);
+
+    try {
+      const res = await api.put(`/posts/${editingPost.id}`, {
+        content: editContent.trim(),
+        location: editLocation.trim() || null
+      });
+      setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, ...res.data } : p));
+      setEditingPost(null);
+    } catch (err) {
+      alert('Failed to update post.');
+    } finally {
+      setUpdatingPost(false);
     }
   };
 
@@ -129,7 +321,6 @@ export default function Community() {
     }
   };
 
-  // Comments Loading
   const openCommentsDrawer = async (post: any) => {
     setActivePostForComments(post);
     setNewCommentVal('');
@@ -175,7 +366,7 @@ export default function Community() {
       <div className="lg:col-span-8 space-y-6">
         
         {/* Global Farmer Search Bar Header */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-extrabold text-brandDark tracking-tight">AgriNex Social Community</h1>
@@ -191,7 +382,42 @@ export default function Community() {
             </button>
           </div>
 
-          <UserSearchBar placeholder="Search farmers by name, username, village, or crops..." />
+          {/* Tabbed search selector */}
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl w-fit">
+            <button
+              onClick={() => setActiveTab('posts')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'posts' ? 'bg-white text-brandDark shadow-xs' : 'text-textSec hover:text-brandDark'
+              }`}
+            >
+              Search Posts
+            </button>
+            <button
+              onClick={() => setActiveTab('farmers')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'farmers' ? 'bg-white text-brandDark shadow-xs' : 'text-textSec hover:text-brandDark'
+              }`}
+            >
+              Search Farmers
+            </button>
+          </div>
+
+          {activeTab === 'farmers' ? (
+            <UserSearchBar placeholder="Search farmers by name, username, village, or crops..." />
+          ) : (
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search feed updates, pest alerts, or keywords..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl text-xs text-brandDark outline-none transition-all placeholder:text-slate-400"
+                value={postSearchQuery}
+                onChange={(e) => handlePostSearch(e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         {/* Dynamic Post Publisher Card */}
@@ -207,51 +433,93 @@ export default function Community() {
                 <textarea
                   required
                   rows={3}
-                  placeholder="Share a farming warning or yield report with your peers..."
+                  placeholder="Share a farming warning, crop query, or yield report with your peers..."
                   className="w-full border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-4 text-xs text-brandDark placeholder-slate-400 outline-none resize-none transition-all leading-normal"
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
                 />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                {/* Media Previews */}
+                {selectedMedia.length > 0 && (
+                  <div className="flex flex-wrap gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    {selectedMedia.map((m, idx) => (
+                      <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0 group">
+                        {m.type === 'video' ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white p-1">
+                            <Video className="w-6 h-6 text-primary" />
+                            <span className="text-[8px] truncate max-w-full">Video file</span>
+                          </div>
+                        ) : (
+                          <img src={m.preview} alt="upload preview" className="w-full h-full object-cover" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedia(idx)}
+                          className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={mediaCompressing}
+                      className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-textSec hover:text-primary transition-all flex items-center gap-1.5 text-xs font-bold"
+                    >
                       <ImageIcon className="w-4 h-4" />
-                    </div>
+                      <span>Attach Media</span>
+                    </button>
                     <input
-                      type="url"
-                      placeholder="Image URL (optional)"
-                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
-                      value={newImage}
-                      onChange={(e) => setNewImage(e.target.value)}
+                      type="file"
+                      ref={fileInputRef}
+                      multiple
+                      accept="image/*,video/*"
+                      className="hidden"
+                      onChange={handleFileChange}
                     />
                   </div>
 
-                  <div className="relative">
+                  <div className="relative flex-1 min-w-[200px]">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <MapPin className="w-4 h-4" />
                     </div>
                     <input
                       type="text"
                       placeholder="Location (optional)"
-                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-2">
+                {mediaCompressing && (
+                  <div className="flex items-center gap-2 text-xs text-primary font-bold">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Compressing media attachments...</span>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setShowPublisher(false)}
+                    onClick={() => {
+                      setShowPublisher(false);
+                      setSelectedMedia([]);
+                    }}
                     className="px-4 py-2 rounded-xl border border-slate-200 text-textSec text-xs font-bold hover:bg-slate-50 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={publishing || !newContent.trim()}
+                    disabled={publishing || mediaCompressing || !newContent.trim()}
                     className="px-6 py-2 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all"
                   >
                     {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Publish Update'}
@@ -271,13 +539,27 @@ export default function Community() {
         ) : posts.length === 0 ? (
           <div className="glass-card p-12 text-center text-textSec text-xs space-y-3">
             <Sparkles className="w-8 h-8 text-primary mx-auto opacity-70" />
-            <h3 className="font-extrabold text-brandDark text-sm">No community posts yet</h3>
+            <h3 className="font-extrabold text-brandDark text-sm">No community posts found</h3>
             <p className="text-slate-400 max-w-sm mx-auto">Be the first farmer to share a field update or pest warning with your network.</p>
           </div>
         ) : (
           <div className="space-y-6">
             {posts.map((post) => {
               const isOwner = user && user.id === post.user_id;
+              
+              // Handle images list parse safely
+              let parsedImages: string[] = [];
+              if (post.images) {
+                if (Array.isArray(post.images)) {
+                  parsedImages = post.images;
+                } else if (typeof post.images === 'string') {
+                  try {
+                    parsedImages = JSON.parse(post.images);
+                  } catch {
+                    parsedImages = [];
+                  }
+                }
+              }
 
               return (
                 <div key={post.id} className="glass-card p-6 space-y-4 hover:border-slate-300 transition-all">
@@ -319,22 +601,31 @@ export default function Community() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {isOwner && (
+                        <>
+                          <button
+                            onClick={() => handleEditClick(post)}
+                            className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
+                            title="Edit post"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePost(post.id)}
+                            className="p-2 text-slate-400 hover:text-rose hover:bg-rose/10 rounded-xl transition-all"
+                            title="Delete post"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
                       {!isOwner && (
                         <FollowButton
                           userId={post.user_id}
                           userName={post.author_name}
                           size="sm"
                         />
-                      )}
-                      {isOwner && (
-                        <button
-                          onClick={() => handleDeletePost(post.id)}
-                          className="p-2 text-slate-400 hover:text-rose hover:bg-rose/10 rounded-xl transition-all"
-                          title="Delete post"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       )}
                     </div>
                   </div>
@@ -344,8 +635,40 @@ export default function Community() {
                     {post.content}
                   </p>
 
-                  {/* Optional Image */}
-                  {post.image_url && (
+                  {/* Optional Image or Video Attachment */}
+                  {post.image_url && (post.image_url.startsWith('data:video/') || post.image_url.includes('.mp4') || post.image_url.startsWith('blob:')) ? (
+                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-950 max-h-96">
+                      <video
+                        src={post.image_url}
+                        controls
+                        className="w-full h-full max-h-96 object-contain"
+                      />
+                    </div>
+                  ) : parsedImages.length > 0 ? (
+                    <div className={`grid gap-2 rounded-2xl overflow-hidden ${
+                      parsedImages.length === 1 ? 'grid-cols-1' :
+                      parsedImages.length === 2 ? 'grid-cols-2' :
+                      parsedImages.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+                    }`}>
+                      {parsedImages.slice(0, 4).map((imgUrl: string, idx: number) => {
+                        const isLast = idx === 3 && parsedImages.length > 4;
+                        return (
+                          <div key={idx} className="relative aspect-video bg-slate-50 border border-slate-100/50 max-h-80 overflow-hidden">
+                            <img
+                              src={imgUrl}
+                              alt={`Post media ${idx + 1}`}
+                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                            />
+                            {isLast && (
+                              <div className="absolute inset-0 bg-brandDark/60 backdrop-blur-xs flex items-center justify-center text-white text-lg font-black pointer-events-none">
+                                +{parsedImages.length - 4} More
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : post.image_url ? (
                     <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96">
                       <img
                         src={post.image_url}
@@ -356,7 +679,7 @@ export default function Community() {
                         }}
                       />
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Post Actions Bar */}
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold text-textSec">
@@ -394,6 +717,20 @@ export default function Community() {
                 </div>
               );
             })}
+
+            {/* Pagination Load More */}
+            {hasMore && (
+              <div className="text-center pt-2">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-brandDark hover:border-slate-300 disabled:opacity-50 transition-all inline-flex items-center gap-2"
+                >
+                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                  <span>Load More Posts</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -497,6 +834,70 @@ export default function Community() {
         </section>
 
       </div>
+
+      {/* ─── MODAL OVERLAY: EDIT POST ─── */}
+      <AnimatePresence>
+        {editingPost && (
+          <div className="fixed inset-0 z-50 bg-brandDark/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl p-6 border border-slate-100 overflow-hidden"
+            >
+              <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
+                <h3 className="text-md font-extrabold text-brandDark">Edit Community Post</h3>
+                <button
+                  onClick={() => setEditingPost(null)}
+                  className="p-1.5 text-textSec hover:text-brandDark hover:bg-slate-100 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdatePost} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-textSec mb-2">Content</label>
+                  <textarea
+                    required
+                    rows={4}
+                    className="w-full border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl p-3 text-xs text-brandDark outline-none resize-none"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-textSec mb-2">Location</label>
+                  <input
+                    type="text"
+                    className="w-full border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-3 py-2.5 text-xs text-brandDark outline-none"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setEditingPost(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-textSec text-xs font-bold hover:bg-slate-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingPost || !editContent.trim()}
+                    className="px-6 py-2 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all"
+                  >
+                    {updatingPost ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ─── SLIDING DRAWER OVERLAY: COMMENT THREADS ─── */}
       <AnimatePresence>

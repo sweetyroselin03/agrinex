@@ -44,6 +44,26 @@ CROP_SPECIES_MAP = {
     "Strawberry": "Strawberry", "Tomato": "Tomato"
 }
 
+SCIENTIFIC_NAME_MAP = {
+    "Apple": "Malus domestica",
+    "Blueberry": "Vaccinium corymbosum",
+    "Cherry": "Prunus avium",
+    "Corn": "Zea mays",
+    "Grape": "Vitis vinifera",
+    "Citrus / Orange": "Citrus sinensis",
+    "Orange": "Citrus sinensis",
+    "Peach": "Prunus persica",
+    "Bell Pepper": "Capsicum annuum",
+    "Pepper": "Capsicum annuum",
+    "Potato": "Solanum tuberosum",
+    "Raspberry": "Rubus idaeus",
+    "Soybean": "Glycine max",
+    "Squash": "Cucurbita pepo",
+    "Strawberry": "Fragaria x ananassa",
+    "Tomato": "Solanum lycopersicum",
+    "Unknown Crop Species": "Plantae"
+}
+
 class TwoStageCropClassifier(nn.Module):
     """
     Two-stage PyTorch model architecture:
@@ -222,13 +242,15 @@ class PyTorchVisionEngine:
             has_plant_color = True
 
         # Non-plant threshold calibrated: Only reject if definitely not plant color AND very low probability
-        if not has_plant_color and is_plant_prob < 0.10 and confidence_pct < 30.0:
+        # Relaxed to prevent false rejection of yellow/brown/withered diseased leaves.
+        if not has_plant_color and is_plant_prob < 0.05 and confidence_pct < 25.0:
             return {
                 "is_valid_crop": False,
                 "is_plant": False,
                 "confidence_level": round((1.0 - is_plant_prob) * 100.0, 1),
                 "detected_object": "Non-Agricultural Object",
                 "rejection_reason": "Unable to identify a plant leaf. Please align a clear crop leaf in the frame.",
+                "scientific_name": "N/A",
                 "latency_ms": latency_ms
             }
 
@@ -268,10 +290,12 @@ class PyTorchVisionEngine:
                 "prevention_tips": "• Keep plant leaves dry\n• Prune lower yellowing stems\n• Monitor for insect activity",
                 "yield_impact": "Minimal impact expected with prompt general care.",
                 "pro_tips": "Upload a close-up photo of a single leaf under bright natural daylight for optimal species matching.",
+                "scientific_name": "Plantae",
                 "latency_ms": latency_ms
             }
 
         # Healthy crop case
+        crop_scientific = SCIENTIFIC_NAME_MAP.get(crop_display, SCIENTIFIC_NAME_MAP.get(raw_crop_name, "N/A"))
         if "healthy" in disease_display.lower():
             return {
                 "is_valid_crop": True,
@@ -294,6 +318,7 @@ class PyTorchVisionEngine:
                 "prevention_tips": f"• Inspect {crop_display} weekly\n• Avoid water stagnation around roots\n• Maintain clean weed-free soil",
                 "yield_impact": "Optimal potential yield expected.",
                 "pro_tips": f"Keep recording weekly leaf scans to track overall {crop_display} crop vigor.",
+                "scientific_name": crop_scientific,
                 "latency_ms": latency_ms
             }
 
@@ -319,6 +344,7 @@ class PyTorchVisionEngine:
             "prevention_tips": f"• Rotate {crop_display} crops every season\n• Sanitize pruning shears\n• Mulch soil beds",
             "yield_impact": "15-30% potential yield loss if left untreated.",
             "pro_tips": "Apply spray early morning before direct sunlight to prevent leaf scorch.",
+            "scientific_name": crop_scientific,
             "latency_ms": latency_ms
         }
 

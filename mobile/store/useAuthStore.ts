@@ -7,7 +7,6 @@ import client from '../api/client';
 interface User {
   id: number;
   email: string;
-  phone?: string;
   full_name?: string;
   username?: string;
   village?: string;

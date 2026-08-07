@@ -308,6 +308,7 @@ class CropScanOut(BaseModel):
     health_score: Optional[int] = None
     yield_impact: Optional[str] = None
     pro_tips: Optional[str] = None
+    scientific_name: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -90,10 +90,10 @@ describe('AgriNex Mobile Expo Unit Suite (30 Tests)', () => {
   });
 
   describe('4. Mobile UI Hooks & Form Validation', () => {
-    it('16. validates mobile phone number 10-digit format regex', () => {
-      const isValidPhone = (p: string) => /^[6-9]\d{9}$/.test(p);
-      expect(isValidPhone('9876543210')).toBe(true);
-      expect(isValidPhone('12345')).toBe(false);
+    it('16. validates username length constraint (>3 chars)', () => {
+      const isValidUsername = (u: string) => u.length > 3;
+      expect(isValidUsername('farmer_roselin')).toBe(true);
+      expect(isValidUsername('abc')).toBe(false);
     });
 
     it('17. validates email address input string using Zod schema', () => {
