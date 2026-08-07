@@ -1,0 +1,17 @@
+{
+  "name": "agrinex-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "mobile"
+  ],
+  "scripts": {
+    "web:build": "node scripts/build-vercel.js",
+    "web:test": "npm run test --workspace=frontend",
+    "web:lint": "npm run lint --workspace=frontend"
+  },
+  "devDependencies": {
+    "exceljs": "^4.4.0"
+  }
+}

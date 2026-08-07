@@ -208,6 +208,8 @@ jobs:
     name: "🔨 Build Web App"
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      deploy_url: ${{ steps.vercel-deploy.outputs.deploy_url }}
 
     steps:
       - name: "📥 Checkout repository"
@@ -229,6 +231,25 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://agrinex-backend-c1ig.onrender.com' }}
         run: npm run build
+
+      - name: "🚀 Deploy to Vercel"
+        id: vercel-deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN is not set. Skipping Vercel deployment step."
+            echo "deploy_url=https://agrinex-backend-c1ig.onrender.com" >> $GITHUB_OUTPUT
+          else
+            npm install -g vercel@latest
+            vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+            vercel build --prod --token=$VERCEL_TOKEN
+            DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN --yes)
+            echo "Deployed successfully to Vercel!"
+            echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          fi
 
       - name: "📋 Publish Build Summary"
         if: always()
@@ -362,7 +383,7 @@ jobs:
     steps:
       - name: "✅ Verify Health of Web URL"
         run: |
-          URL="${{ secrets.LIVE_WEB_URL || 'https://agrinex-backend-c1ig.onrender.com' }}"
+          URL="${{ needs.build-web-app.outputs.deploy_url || secrets.LIVE_WEB_URL || 'https://agrinex-backend-c1ig.onrender.com' }}"
           echo "Verifying live web deployment at $URL..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
           echo "Live HTTP Status Code: $STATUS"
@@ -447,6 +468,7 @@ jobs:
         working-directory: frontend
         env:
           CI: "true"
+          PLAYWRIGHT_TEST_BASE_URL: ${{ needs.build-web-app.outputs.deploy_url }}
         run: npx playwright test --project=chromium || echo "Playwright suite completed"
 
       - name: "📋 Publish E2E Summary"
