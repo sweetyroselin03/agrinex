@@ -105,6 +105,8 @@ export default function Login() {
                 </div>
                 <input
                   id="email"
+                  name="email"
+                  autoComplete="username"
                   type="email"
                   placeholder="name@farm.com"
                   className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
@@ -129,6 +131,8 @@ export default function Login() {
                 </div>
                 <input
                   id="password"
+                  name="password"
+                  autoComplete="current-password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"

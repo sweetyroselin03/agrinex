@@ -274,9 +274,9 @@ class AIService:
         Stage 1 Gate: Determines whether image contains a valid plant/crop leaf vs non-plant.
         Returns: { is_valid: bool, confidence: float, detected_object: str, rejection_reason: str }
         """
-        # Quick non-plant keyword scan to prevent unnecessary API overhead
+        # Quick non-plant keyword scan to prevent unnecessary API overhead (only for non-data URLs)
         url_lower = image_url.lower()
-        if any(term in url_lower for term in ['laptop', 'keyboard', 'phone', 'wall', 'room', 'car', 'person', 'computer', 'non_plant']):
+        if not image_url.startswith("data:image") and any(term in url_lower for term in ['laptop', 'keyboard', 'phone', 'wall', 'room', 'car', 'person', 'computer', 'non_plant']):
             return {
                 "is_valid": False,
                 "confidence": 99.0,

@@ -314,6 +314,8 @@ export default function Signup() {
                         </div>
                         <input
                           id="fullName"
+                          name="name"
+                          autoComplete="name"
                           type="text"
                           required
                           placeholder="Jane Doe"
@@ -351,6 +353,8 @@ export default function Signup() {
                         </div>
                         <input
                           id="email"
+                          name="email"
+                          autoComplete="email"
                           type="email"
                           required
                           placeholder="jane@example.com"
@@ -448,6 +452,8 @@ export default function Signup() {
                         </div>
                         <input
                           id="password"
+                          name="password"
+                          autoComplete="new-password"
                           type={showPassword ? 'text' : 'password'}
                           required
                           placeholder="Enter new password"
@@ -516,9 +522,11 @@ export default function Signup() {
                         </div>
                         <input
                           id="confirmPassword"
+                          name="confirmPassword"
+                          autoComplete="new-password"
                           type={showPassword ? 'text' : 'password'}
                           required
-                          placeholder="Retype password"
+                          placeholder="Confirm your password"
                           className={`w-full pl-11 pr-10 py-3 rounded-xl border ${
                             touchedConfirm && !confirmPassword
                               ? 'border-rose text-rose bg-rose/5'

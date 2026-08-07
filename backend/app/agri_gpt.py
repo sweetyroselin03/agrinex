@@ -180,6 +180,17 @@ class AgriGPTReasoningEngine:
                 "¡Escriba su consulta para comenzar!"
             )
 
+        if any(kw in msg_lower for kw in ["malayalam", "മലയാളം", "namaskaram"]):
+            return (
+                "🌱 **AgriGPT കർഷക സഹായി (Malayalam)**\n\n"
+                "നമസ്കാരം! ഞാൻ അഗ്രിജിപിറ്റി സഹായി ആണ്. എനിക്ക് താഴെ പറയുന്ന കാര്യങ്ങളിൽ സഹായിക്കാൻ കഴിയും:\n"
+                "• 🔬 **വിള രോഗ നിർണ്ണയം**: രോഗം ബാധിച്ച ഇലയുടെ ചിത്രം അപ്‌ലോഡ് ചെയ്യുക.\n"
+                "• 🧪 **NPK വളങ്ങൾ**: ഏക്കറിന് ആവശ്യമുള്ള വളത്തിന്റെ കൃത്യമായ അളവ്.\n"
+                "• 💧 **ജലസേചനവും കാലാവസ്ഥയും**: കാലാവസ്ഥയ്ക്ക് അനുയോജ്യമായ നനയ്ക്കൽ സമയം.\n"
+                "• 🏛️ **സർക്കാർ പദ്ധതികളും വിപണി വിലയും**: കൃഷി ആനുകൂല്യങ്ങളും വിപണി നിരക്കുകളും.\n\n"
+                "ദയവായി നിങ്ങളുടെ സംശയം വിശദമായി ചോദിക്കുക!"
+            )
+
         # 2. Scanner Context Query ("I uploaded a leaf", "What disease", "How do I treat my scan")
         if scan_context and any(kw in msg_lower for kw in ["uploaded", "scan", "leaf", "disease", "treatment", "this", "my crop", "result"]):
             return (
@@ -327,9 +338,11 @@ class AgriGPTReasoningEngine:
             "You are **AgriGPT**, an expert AI Agricultural Reasoning Assistant for farmers and agronomists.\n\n"
             "## CORE INSTRUCTIONS:\n"
             "1. Provide intelligent, highly specific agricultural advice.\n"
-            "2. Structure responses cleanly using **bold headings**, emojis, and bullet points.\n"
-            "3. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
-            "4. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
+            "2. Structure responses cleanly using **bold headings** (e.g. **Heading Name**), emojis, and bullet points.\n"
+            "3. DO NOT use `#` or `##` markdown tags for headings; instead use double asterisks for bold headings to ensure a clean visual flow.\n"
+            "4. Detect the user's language and respond naturally in the same language. Fully support Tamil, Hindi, Malayalam, Telugu, and English.\n"
+            "5. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
+            "6. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
             "## MARKDOWN PRESERVATION:\n"
             "You MUST preserve and output proper Markdown formatting including markdown tables, numbered lists, code blocks, and bullet points. Never truncate or omit them.\n\n"
         )
@@ -430,9 +443,11 @@ class AgriGPTReasoningEngine:
             "You are **AgriGPT**, an expert AI Agricultural Reasoning Assistant for farmers and agronomists.\n\n"
             "## CORE INSTRUCTIONS:\n"
             "1. Provide intelligent, highly specific agricultural advice.\n"
-            "2. Structure responses cleanly using **bold headings**, emojis, and bullet points.\n"
-            "3. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
-            "4. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
+            "2. Structure responses cleanly using **bold headings** (e.g. **Heading Name**), emojis, and bullet points.\n"
+            "3. DO NOT use `#` or `##` markdown tags for headings; instead use double asterisks for bold headings to ensure a clean visual flow.\n"
+            "4. Detect the user's language and respond naturally in the same language. Fully support Tamil, Hindi, Malayalam, Telugu, and English.\n"
+            "5. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
+            "6. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
             "## MARKDOWN PRESERVATION:\n"
             "You MUST preserve and output proper Markdown formatting including markdown tables, numbered lists, code blocks, and bullet points. Never truncate or omit them.\n\n"
         )

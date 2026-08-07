@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   UploadCloud, 
@@ -22,6 +22,24 @@ export default function Scanner() {
   const [result, setResult] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('symptoms');
   const [dragOver, setDragOver] = useState(false);
+  const [historyScans, setHistoryScans] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const fetchScanHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const res = await api.get('/ai/scan-history', { params: { limit: 10 } });
+      setHistoryScans(res.data);
+    } catch (e) {
+      console.warn('Failed to load scan history in Scanner', e);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScanHistory();
+  }, []);
 
   // File selected handler
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,6 +93,7 @@ export default function Scanner() {
     try {
       const response = await api.post('/ai/detect-disease', { image_url: image });
       setResult(response.data);
+      fetchScanHistory();
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Foliage diagnosis failed. Please check network and try again.');
     } finally {
@@ -425,6 +444,85 @@ export default function Scanner() {
         </div>
 
       </div>
+
+      {/* ─── SAVED SCANS HISTORY PANEL ─── */}
+      <section className="glass-card p-6 border border-slate-100 bg-white/50 backdrop-blur-md rounded-3xl mt-8">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="font-extrabold text-brandDark text-md flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary animate-pulse" />
+              Saved Scan Reports History
+            </h3>
+            <p className="text-textSec text-xs">Access and review all previous crop health analyses</p>
+          </div>
+          <button 
+            onClick={fetchScanHistory}
+            disabled={loadingHistory}
+            className="text-xs font-bold text-primary hover:underline flex items-center gap-1.5 cursor-pointer bg-transparent border-0 outline-none"
+          >
+            {loadingHistory ? 'Refreshing...' : '🔄 Refresh History'}
+          </button>
+        </div>
+
+        {loadingHistory && historyScans.length === 0 ? (
+          <div className="py-8 flex justify-center items-center text-textSec text-xs">
+            <span className="animate-spin text-primary mr-2">🌱</span>
+            Loading history...
+          </div>
+        ) : historyScans.length === 0 ? (
+          <div className="py-8 text-center text-textSec text-xs bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+            No scanned reports found. Upload your first crop photo above to start building your history!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {historyScans.map((scan) => (
+              <div 
+                key={scan.id} 
+                onClick={() => {
+                  setResult(scan);
+                  if (scan.image_url) {
+                    setImage(scan.image_url);
+                  }
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="p-4 rounded-2xl border border-slate-100 bg-white hover:border-primary/40 hover:shadow-md cursor-pointer transition-all flex gap-3 group relative overflow-hidden"
+              >
+                {scan.image_url && (
+                  <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden shrink-0">
+                    <img src={scan.image_url} alt={scan.disease_name} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-[9px] font-black text-primary uppercase tracking-wider truncate">
+                      {scan.detected_object || 'Crop'}
+                    </span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                      scan.severity_level === 'Critical' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'
+                    }`}>
+                      {scan.severity_level || 'Normal'}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-brandDark text-xs truncate group-hover:text-primary transition-colors">
+                    {scan.disease_name}
+                  </h4>
+                  <p className="text-[10px] text-textSec mt-1 truncate">
+                    Confidence: {Math.round(scan.confidence)}%
+                  </p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">
+                    {new Date(scan.created_at || scan.timestamp).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
     </motion.div>
   );

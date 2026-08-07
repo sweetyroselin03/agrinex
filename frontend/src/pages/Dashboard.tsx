@@ -57,6 +57,7 @@ export default function Dashboard() {
       setWeather(res.data);
     } catch (err) {
       console.warn("Failed to get current GPS location, using Pune fallback", err);
+      setGpsLocation(null);
       try {
         const res = await api.get('/weather/current', { params: { lat, lon } });
         setWeather(res.data);
@@ -181,10 +182,20 @@ export default function Dashboard() {
           
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h3 className="font-extrabold text-brandDark text-md">Agri Weather Intelligence</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-brandDark text-md">Agri Weather Intelligence</h3>
+                <button
+                  onClick={() => fetchWeatherData()}
+                  disabled={loadingWeather}
+                  className="p-1 rounded-md text-slate-400 hover:text-primary hover:bg-slate-100 transition-colors disabled:opacity-50 flex items-center justify-center cursor-pointer"
+                  title="Refresh Location & Weather"
+                >
+                  🔄
+                </button>
+              </div>
               <p className="text-textSec text-xs flex items-center gap-1 mt-0.5">
                 <Clock className="w-3.5 h-3.5" />
-                {weather?.location || 'Maharashtra, India'}
+                {gpsLocation?.display_name || weather?.location || 'Pune District, Maharashtra, India'}
               </p>
             </div>
             <span className="text-3xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.05)]">

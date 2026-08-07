@@ -147,6 +147,9 @@ export default function ForgotPassword() {
                       <Mail className="w-5 h-5" />
                     </div>
                     <input
+                      id="email"
+                      name="email"
+                      autoComplete="email"
                       type="email"
                       placeholder="name@farm.com"
                       className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
@@ -222,6 +225,9 @@ export default function ForgotPassword() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">6-Digit Code</label>
                   <input
+                    id="otp"
+                    name="otp"
+                    autoComplete="one-time-code"
                     type="text"
                     maxLength={6}
                     placeholder="123456"
@@ -240,6 +246,9 @@ export default function ForgotPassword() {
                       <Lock className="w-5 h-5" />
                     </div>
                     <input
+                      id="password"
+                      name="password"
+                      autoComplete="new-password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
@@ -265,6 +274,9 @@ export default function ForgotPassword() {
                       <Lock className="w-5 h-5" />
                     </div>
                     <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      autoComplete="new-password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
