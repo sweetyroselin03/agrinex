@@ -55,9 +55,34 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Auto-logout on 401 & Exponential Backoff
+// Response Interceptor: Auto-logout on 401 & Exponential Backoff & Envelope Unwrapping
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data && typeof response.data === 'object' && 'success' in response.data && 'data' in response.data) {
+      const envelope = response.data;
+      const innerData = envelope.data;
+      if (innerData !== undefined && innerData !== null) {
+        if (Array.isArray(innerData)) {
+          Object.defineProperty(innerData, 'success', { value: envelope.success, writable: true, enumerable: false });
+          Object.defineProperty(innerData, 'message', { value: envelope.message, writable: true, enumerable: false });
+          Object.defineProperty(innerData, 'errors', { value: envelope.errors, writable: true, enumerable: false });
+          Object.defineProperty(innerData, 'data', { value: innerData, writable: true, enumerable: false });
+          response.data = innerData;
+        } else if (typeof innerData === 'object') {
+          response.data = {
+            ...innerData,
+            success: envelope.success,
+            message: envelope.message,
+            errors: envelope.errors,
+            data: innerData
+          };
+        } else {
+          response.data = innerData;
+        }
+      }
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const config = error.config as InternalAxiosRequestConfig & {
       _retryCount?: number;

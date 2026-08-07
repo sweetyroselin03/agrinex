@@ -305,24 +305,95 @@ export default function Chatbot() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const res = await api.post('/chat', {
-        message: messageText || 'Please analyze this crop leaf image.',
-        image_url: imagePayload,
-        conversation_id: activeConvId
-      });
-
-      if (!selectedConvId) {
-        setSelectedConvId(activeConvId);
-        fetchConversations();
+      const raw = localStorage.getItem('agrinex-web-auth');
+      let token = '';
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        token = parsed?.state?.token || '';
       }
 
-      const aiMsg = {
-        id: res.data.id || Date.now() + 1,
-        message: res.data.message || res.data.response,
-        is_ai: true,
-        created_at: new Date()
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+      const baseUrl = (import.meta.env.VITE_API_URL || 'https://agrinex-backend-c1ig.onrender.com').replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({
+          message: messageText || 'Please analyze this crop leaf image.',
+          image_url: imagePayload,
+          conversation_id: activeConvId,
+          stream: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      if (!response.body) throw new Error("No response body");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let aiMessageContent = "";
+      
+      const aiMsgId = Date.now() + 1;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aiMsgId,
+          message: "",
+          is_ai: true,
+          created_at: new Date()
+        }
+      ]);
+
+      let buffer = "";
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || "";
+          
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (cleanLine.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(cleanLine.substring(6));
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+                if (data.text) {
+                  aiMessageContent += data.text;
+                  setMessages((prev) => 
+                    prev.map((msg) => 
+                      msg.id === aiMsgId ? { ...msg, message: aiMessageContent } : msg
+                    )
+                  );
+                }
+                if (data.done) {
+                  if (data.id) {
+                    setMessages((prev) => 
+                      prev.map((msg) => 
+                        msg.id === aiMsgId ? { ...msg, id: data.id } : msg
+                      )
+                    );
+                  }
+                  if (!selectedConvId) {
+                    setSelectedConvId(activeConvId);
+                    fetchConversations();
+                  }
+                }
+              } catch (parseErr) {
+                console.warn("Failed to parse SSE line", parseErr);
+              }
+            }
+          }
+        }
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,

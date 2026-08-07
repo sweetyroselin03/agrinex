@@ -330,6 +330,8 @@ class AgriGPTReasoningEngine:
             "2. Structure responses cleanly using **bold headings**, emojis, and bullet points.\n"
             "3. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
             "4. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
+            "## MARKDOWN PRESERVATION:\n"
+            "You MUST preserve and output proper Markdown formatting including markdown tables, numbered lists, code blocks, and bullet points. Never truncate or omit them.\n\n"
         )
 
         if scan_context:
@@ -372,7 +374,7 @@ class AgriGPTReasoningEngine:
 
                 config = types.GenerateContentConfig(
                     temperature=0.5,
-                    max_output_tokens=800,
+                    max_output_tokens=4000,
                     system_instruction=system_prompt,
                 )
 
@@ -408,5 +410,95 @@ class AgriGPTReasoningEngine:
         logger.info(f"[AgriGPT Chat] Fallback Response: {fallback_text}")
         return fallback_text
 
+    async def get_response_stream(
+        self,
+        message: str,
+        history: List[Dict[str, Any]] = [],
+        scan_context: str = ""
+    ):
+        """
+        Yields text chunks of the AI response in real-time.
+        """
+        if not self.client:
+            fallback_text = self.generate_domain_reasoning(message, scan_context=scan_context)
+            for i in range(0, len(fallback_text), 20):
+                yield fallback_text[i:i+20]
+                await asyncio.sleep(0.01)
+            return
+
+        system_prompt = (
+            "You are **AgriGPT**, an expert AI Agricultural Reasoning Assistant for farmers and agronomists.\n\n"
+            "## CORE INSTRUCTIONS:\n"
+            "1. Provide intelligent, highly specific agricultural advice.\n"
+            "2. Structure responses cleanly using **bold headings**, emojis, and bullet points.\n"
+            "3. Give exact dosages (e.g. 2g/L water, 45kg/acre Urea) and clear step-by-step solutions.\n"
+            "4. Distinguish clearly between Organic Remedies and Chemical Treatments.\n\n"
+            "## MARKDOWN PRESERVATION:\n"
+            "You MUST preserve and output proper Markdown formatting including markdown tables, numbered lists, code blocks, and bullet points. Never truncate or omit them.\n\n"
+        )
+
+        if scan_context:
+            system_prompt += (
+                f"## RECENT CROP SCAN DIAGNOSTIC CONTEXT:\n"
+                f"The user has recently scanned a leaf with the following details:\n"
+                f"{scan_context}\n"
+                f"Seamlessly incorporate these scan details into your answer if relevant without asking the user to upload or explain again!\n\n"
+            )
+
+        contents = []
+
+        # Add conversation history (up to 20 messages as required)
+        for msg in history[-20:]:
+            role = "model" if msg.get("is_ai") else "user"
+            contents.append({
+                "role": role,
+                "parts": [{"text": msg.get("message", "")}]
+            })
+
+        contents.append({
+            "role": "user",
+            "parts": [{"text": message}]
+        })
+
+        logger.info(f"[AgriGPT Stream] Selected Model: {self.model_name}")
+
+        import asyncio
+        from google.genai import types
+
+        retries = 2
+        for attempt in range(retries):
+            try:
+                timeout = 15.0 if "pytest" in sys.modules else 30.0
+                config = types.GenerateContentConfig(
+                    temperature=0.5,
+                    max_output_tokens=4000,
+                    system_instruction=system_prompt,
+                )
+
+                response_stream = await asyncio.wait_for(
+                    self.client.aio.models.generate_content_stream(
+                        model=self.model_name,
+                        contents=contents,
+                        config=config,
+                    ),
+                    timeout=timeout
+                )
+
+                async for chunk in response_stream:
+                    if chunk.text:
+                        yield chunk.text
+                return
+
+            except Exception as e:
+                logger.error(f"[AgriGPT Stream Attempt {attempt + 1} Failed] Error: {e}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(0.5)
+
+        fallback_text = self.generate_domain_reasoning(message, scan_context=scan_context)
+        for i in range(0, len(fallback_text), 20):
+            yield fallback_text[i:i+20]
+            await asyncio.sleep(0.01)
+
 
 agri_gpt_engine = AgriGPTReasoningEngine()
+

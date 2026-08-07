@@ -257,6 +257,7 @@ class ChatMessageCreate(BaseModel):
     message: str
     conversation_id: Optional[str] = None
     language: Optional[str] = None
+    stream: Optional[bool] = False
 
 class ChatMessage(BaseModel):
     id: int

@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Video,
 } from 'lucide-react';
 
 interface ImageLightboxProps {
@@ -227,7 +228,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           </button>
         )}
 
-        {/* Main Image Container */}
+        {/* Main Image/Video Container */}
         <div
           className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center overflow-hidden"
           onClick={(e) => e.stopPropagation()}
@@ -239,17 +240,28 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
             </div>
           )}
-          <motion.img
-            key={currentUrl}
-            src={currentUrl}
-            alt="Full size preview"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale, opacity: isLoading ? 0 : 1, rotate: rotation }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            onLoad={() => setIsLoading(false)}
-            className="max-w-[85vw] max-h-[80vh] object-contain rounded-2xl shadow-2xl cursor-grab active:cursor-grabbing border border-white/10"
-            draggable={false}
-          />
+          {currentUrl && (currentUrl.startsWith('data:video/') || currentUrl.includes('.mp4') || currentUrl.startsWith('blob:video/') || (currentUrl.startsWith('blob:') && currentUrl.includes('video'))) ? (
+            <motion.video
+              key={currentUrl}
+              src={currentUrl}
+              controls
+              autoPlay
+              onLoadedData={() => setIsLoading(false)}
+              className="max-w-[85vw] max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
+          ) : (
+            <motion.img
+              key={currentUrl}
+              src={currentUrl}
+              alt="Full size preview"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale, opacity: isLoading ? 0 : 1, rotate: rotation }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onLoad={() => setIsLoading(false)}
+              className="max-w-[85vw] max-h-[80vh] object-contain rounded-2xl shadow-2xl cursor-grab active:cursor-grabbing border border-white/10"
+              draggable={false}
+            />
+          )}
         </div>
 
         {/* Bottom Thumbnail Navigation Bar */}
@@ -258,22 +270,34 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             className="absolute bottom-6 left-1/2 -translate-x-1/2 p-2 rounded-2xl bg-black/60 backdrop-blur-md flex items-center gap-2 max-w-[90vw] overflow-x-auto z-10 border border-white/10 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {images.map((url, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setIndex(i);
-                  setScale(1);
-                  setIsLoading(true);
-                  if (onNavigate) onNavigate(i);
-                }}
-                className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 ${
-                  i === index ? 'border-emerald-500 scale-105 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'
-                }`}
-              >
-                <img src={url} alt={`Thumbnail ${i}`} className="w-full h-full object-cover" />
-              </button>
-            ))}
+            {images.map((url, i) => {
+              const isVid = url && (url.startsWith('data:video/') || url.includes('.mp4') || url.startsWith('blob:video/') || (url.startsWith('blob:') && url.includes('video')));
+              return (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setIndex(i);
+                    setScale(1);
+                    setIsLoading(true);
+                    if (onNavigate) onNavigate(i);
+                  }}
+                  className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 relative ${
+                    i === index ? 'border-emerald-500 scale-105 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  {isVid ? (
+                    <div className="w-full h-full bg-slate-900 flex items-center justify-center relative">
+                      <video src={url} className="w-full h-full object-cover opacity-55 pointer-events-none" muted playsInline />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Video className="w-4 h-4 text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <img src={url} alt={`Thumbnail ${i}`} className="w-full h-full object-cover" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </motion.div>

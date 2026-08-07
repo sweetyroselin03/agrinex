@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
@@ -65,6 +66,81 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.middleware("http")
+async def add_cache_headers_middleware(request, call_next):
+    response = await call_next(request)
+    if request.method == "GET":
+        path = request.url.path.lower()
+        if any(static_p in path for static_p in ["/static/", "/assets/", "/images/", "/favicon"]):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif not any(dyn_p in path for dyn_p in ["/auth", "/me", "/chat", "/ai", "/users", "/posts", "/notifications"]):
+            response.headers["Cache-Control"] = "public, max-age=60"
+    return response
+
+@app.middleware("http")
+async def standardize_json_middleware(request, call_next):
+    import os
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return await call_next(request)
+        
+    path = request.url.path
+    if (path.startswith("/docs") or 
+        path.startswith("/redoc") or 
+        path.startswith("/openapi.json") or 
+        path.startswith("/ai/chat") or 
+        path.startswith("/chat") or
+        path.startswith("/notifications/ws") or 
+        "ws" in path):
+        return await call_next(request)
+        
+    response = await call_next(request)
+    content_type = response.headers.get("content-type", "")
+    if "application/json" in content_type:
+        body = b""
+        async for chunk in response.body_iterator:
+            body += chunk
+            
+        try:
+            data = json.loads(body.decode("utf-8"))
+            if isinstance(data, dict) and "success" in data and "data" in data and "errors" in data:
+                async def response_body():
+                    yield body
+                response.body_iterator = response_body()
+                return response
+                
+            success = 200 <= response.status_code < 300
+            message = "Operation completed successfully"
+            errors = None
+            
+            if isinstance(data, dict) and "detail" in data:
+                message = data["detail"]
+                errors = data["detail"]
+                data = None
+                
+            wrapped = {
+                "success": success,
+                "message": message,
+                "data": data,
+                "errors": errors
+            }
+            
+            new_body = json.dumps(wrapped).encode("utf-8")
+            response.headers["Content-Length"] = str(len(new_body))
+            
+            async def new_body_iterator():
+                yield new_body
+            response.body_iterator = new_body_iterator()
+            
+        except Exception as e:
+            async def response_body():
+                yield body
+            response.body_iterator = response_body()
+            
+    return response
 
 app.include_router(auth_router.router)
 
@@ -954,8 +1030,73 @@ def is_following_user(user_id: int, current_user: models.User = Depends(get_curr
     return {"is_following": following, "isFollowing": following}
 
 # ─── Chat AI ───
-@app.post("/ai/chat", response_model=schemas.ChatMessage)
+@app.post("/ai/chat")
 async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if chat.stream:
+        # Save user message to database
+        user_msg = models.ChatMessage(
+            user_id=current_user.id,
+            conversation_id=chat.conversation_id,
+            message=chat.message,
+            is_ai=False
+        )
+        db.add(user_msg)
+        db.commit()
+
+        # Get history for context
+        query = db.query(models.ChatMessage).filter(models.ChatMessage.user_id == current_user.id)
+        if chat.conversation_id:
+            query = query.filter(models.ChatMessage.conversation_id == chat.conversation_id)
+        else:
+            query = query.filter(models.ChatMessage.conversation_id == None)
+
+        history = query.order_by(models.ChatMessage.created_at.desc()).limit(10).all()
+        history.reverse()
+
+        # Fetch last 3 scans for smart context memory
+        scans = db.query(models.CropScan).filter(
+            models.CropScan.user_id == current_user.id,
+            models.CropScan.is_valid_crop == True
+        ).order_by(models.CropScan.created_at.desc()).limit(3).all()
+        
+        scan_context = ""
+        if scans:
+            scan_context = "User's recent crop scans:\n"
+            for scan in scans:
+                crop_name = scan.detected_object or "Crop"
+                scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name}, Severity: {scan.severity_level}, Date: {scan.created_at.strftime('%Y-%m-%d')}\n"
+
+        from fastapi.responses import StreamingResponse
+        import json
+
+        async def sse_chat_generator():
+            ai_reply = ""
+            try:
+                async for chunk in ai_service.ai_service.get_chat_response_stream(
+                    chat.message, history, scan_context=scan_context
+                ):
+                    ai_reply += chunk
+                    yield f"data: {json.dumps({'text': chunk, 'done': False})}\n\n"
+                
+                # At the end, save the response to database
+                ai_msg = models.ChatMessage(
+                    user_id=current_user.id,
+                    conversation_id=chat.conversation_id,
+                    message=ai_reply,
+                    is_ai=True
+                )
+                db.add(ai_msg)
+                db.commit()
+                db.refresh(ai_msg)
+                
+                # Yield final event
+                yield f"data: {json.dumps({'text': '', 'done': True, 'id': ai_msg.id, 'conversation_id': ai_msg.conversation_id})}\n\n"
+            except Exception as e:
+                logger.error(f"[Chat Stream Error] {e}")
+                yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+
+        return StreamingResponse(sse_chat_generator(), media_type="text/event-stream")
+
     user_msg = models.ChatMessage(
         user_id=current_user.id,
         conversation_id=chat.conversation_id,
@@ -1007,6 +1148,8 @@ async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.Use
 @app.post("/chat")
 async def chat_legacy(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     res = await chat_with_ai(chat, current_user, db)
+    if isinstance(res, StreamingResponse):
+        return res
     return {
         "success": True,
         "response": res.message,

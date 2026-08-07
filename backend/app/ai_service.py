@@ -59,11 +59,18 @@ class AIService:
                 logger.warning(f"[AI Service] Could not load gemini_cache.json: {e}")
 
     def _get_image_bytes(self, image_url: str) -> bytes:
-        """Helper to extract bytes from base64 data URI, HTTP URL, or generate mock bytes."""
+        """Helper to extract, resize, and compress image bytes (supporting HEIC, PNG, WEBP, JPEG up to 15MB)."""
+        try:
+            from pillow_heif import register_heif_opener
+            register_heif_opener()
+        except ImportError:
+            pass
+
+        raw_bytes = None
         try:
             if image_url.startswith("data:image"):
                 base64_data = image_url.split(",")[1]
-                return base64.b64decode(base64_data)
+                raw_bytes = base64.b64decode(base64_data)
             elif image_url.startswith("http"):
                 # Mock or fetch URL bytes
                 url_lower = image_url.lower()
@@ -75,14 +82,34 @@ class AIService:
                     img = Image.new("RGB", (224, 224), color=(40, 160, 40))
                 buf = io.BytesIO()
                 img.save(buf, format="JPEG")
-                return buf.getvalue()
+                raw_bytes = buf.getvalue()
         except Exception as e:
-            logger.warning(f"[AI Service] Error parsing image bytes: {e}")
+            logger.warning(f"[AI Service] Error parsing raw image bytes: {e}")
 
-        img = Image.new("RGB", (224, 224), color=(34, 139, 34))
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG")
-        return buf.getvalue()
+        if not raw_bytes:
+            img = Image.new("RGB", (224, 224), color=(34, 139, 34))
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG")
+            raw_bytes = buf.getvalue()
+
+        # Auto resize large images & compress
+        try:
+            img = Image.open(io.BytesIO(raw_bytes))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            
+            max_dim = 1200
+            if img.width > max_dim or img.height > max_dim or len(raw_bytes) > 1 * 1024 * 1024:
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                
+            out_buf = io.BytesIO()
+            img.save(out_buf, format="JPEG", quality=85)
+            compressed_bytes = out_buf.getvalue()
+            logger.info(f"[AI Service] Image processed. Original size: {len(raw_bytes)} bytes. Compressed size: {len(compressed_bytes)} bytes.")
+            return compressed_bytes
+        except Exception as e:
+            logger.warning(f"[AI Service] Compression/HEIC processing failed, returning raw bytes: {e}")
+            return raw_bytes
 
     async def _run_gemini_diagnostic(self, image_url: str) -> dict:
         """Performs image analysis via Google Gemini Vision, logging every step."""
@@ -127,21 +154,17 @@ class AIService:
             logger.error("[AI Service] Gemini client is not configured. GEMINI_API_KEY may be missing.")
             raise RuntimeError("Gemini client is not configured. Please set the GEMINI_API_KEY environment variable.")
 
-        # Handle web page or file metadata detection
+        # Since _get_image_bytes always encodes to JPEG, the MIME type is image/jpeg
         mime_type = "image/jpeg"
-        if image_url.startswith("data:image/png;base64"):
-            mime_type = "image/png"
-        elif image_url.startswith("data:image/webp;base64"):
-            mime_type = "image/webp"
 
         from google.genai import types
 
         prompt = (
             "Analyze this crop leaf/plant image. You must output a JSON response matching the schema.\n"
-            "First, verify if the image clearly depicts a plant, leaf, tree, crop, or any agricultural vegetation.\n"
-            "If it is clearly NOT a plant (e.g. it is a laptop, keyboard, wall, car, person, or arbitrary non-plant object), "
-            "set `is_valid_crop` to False, and set `symptoms` to a polite rejection message explaining that a valid crop leaf photo is required.\n"
-            "If it is a plant, set `is_valid_crop` to True and identify the following details:\n"
+            "CRITICAL: Do NOT reject leaves or crops because they are not perfectly centered or if they are close-ups or zoomed out. "
+            "Set `is_valid_crop` to True as long as there is any plant, crop, tree, leaf, fruit, flower, or agricultural vegetation visible in the image. "
+            "Set `is_valid_crop` to False ONLY when the image is clearly NOT a plant (e.g. it is just a laptop, keyboard, wall, car, person, or arbitrary non-plant object).\n\n"
+            "If it is a plant, identify the following details:\n"
             "- crop_type: Name of the crop (e.g. Tomato, Rice, Potato)\n"
             "- scientific_name: Scientific/botanical name of the crop\n"
             "- disease_name: Specific disease name, or 'Healthy' if the leaf has no disease/is healthy\n"
@@ -150,10 +173,10 @@ class AIService:
             "- symptoms: Clear description of symptoms\n"
             "- causes: Causes/pathogen details\n"
             "- prevention: Prevention steps\n"
-            "- organic_treatment: Organic treatment options\n"
+            "- organic_treatment: Organic remedy or treatment options\n"
             "- chemical_treatment: Chemical fungicide/pesticide options\n"
             "- fertilizer_recommendations: Any recommended fertilizer adjustments (NPK, etc.)\n"
-            "- irrigation_recommendations: Water scheduling/adjustments\n"
+            "- irrigation_recommendations: Water scheduling/adjustments/advice\n"
             "- yield_impact: Potential impact on harvest yield\n"
             "- pro_tips: A professional advice/tip for growers"
         )
@@ -303,5 +326,18 @@ class AIService:
 
         return await self.agri_gpt.get_response(message, history=formatted_history, scan_context=scan_context)
 
+    async def get_chat_response_stream(self, message: str, history: list = [], scan_context: str = ""):
+        """Delegates streaming chat response to AgriGPT Reasoning Assistant Engine."""
+        formatted_history = []
+        for msg in history:
+            if hasattr(msg, "is_ai"):
+                formatted_history.append({"is_ai": msg.is_ai, "message": msg.message})
+            elif isinstance(msg, dict):
+                formatted_history.append(msg)
+
+        async for chunk in self.agri_gpt.get_response_stream(message, history=formatted_history, scan_context=scan_context):
+            yield chunk
+
 
 ai_service = AIService()
+

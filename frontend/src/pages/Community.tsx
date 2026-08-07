@@ -197,6 +197,10 @@ export default function Community() {
     });
   };
 
+  const isVideoUrl = (url: string) => {
+    return url && (url.startsWith('data:video/') || url.includes('.mp4') || url.startsWith('blob:video/') || (url.startsWith('blob:') && url.includes('video')));
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -211,17 +215,20 @@ export default function Community() {
       
       if (!isImage && !isVideo) continue;
       
+      if (newMedia.length >= 5) {
+        alert("You can upload a maximum of 5 media items (images or videos).");
+        break;
+      }
+      
       if (isVideo) {
-        if (file.size > 8 * 1024 * 1024) {
-          alert("Video files must be under 8MB to preserve platform performance.");
+        if (file.size > 15 * 1024 * 1024) {
+          alert("Video files must be under 15MB to preserve platform performance.");
           continue;
         }
         const reader = new FileReader();
         reader.readAsDataURL(file);
         await new Promise<void>((resolve) => {
           reader.onload = () => {
-            // Video is exclusive, replace all previous files
-            newMedia.length = 0;
             newMedia.push({
               file,
               preview: reader.result as string,
@@ -230,26 +237,14 @@ export default function Community() {
             resolve();
           };
         });
-        break; // Stop processing since video is exclusive
       } else {
-        // Image
-        // If there was a video, clear it
-        const imageMedia = newMedia.filter(m => m.type === 'image');
-        if (imageMedia.length >= 5) {
-          alert("You can upload a maximum of 5 images.");
-          break;
-        }
         const compressed = await compressImage(file);
         if (compressed) {
-          // Remove any existing video
-          const cleaned = newMedia.filter(m => m.type === 'image');
-          cleaned.push({
+          newMedia.push({
             file,
             preview: compressed,
             type: 'image'
           });
-          newMedia.length = 0;
-          newMedia.push(...cleaned);
         }
       }
     }
@@ -268,9 +263,8 @@ export default function Community() {
     if (!newContent.trim() || publishing || mediaCompressing) return;
     setPublishing(true);
 
-    const imagesList = selectedMedia.filter(m => m.type === 'image').map(m => m.preview);
-    const videoUrl = selectedMedia.find(m => m.type === 'video')?.preview || null;
-    const finalImageUrl = videoUrl || (imagesList.length > 0 ? imagesList[0] : null);
+    const imagesList = selectedMedia.map(m => m.preview);
+    const finalImageUrl = imagesList.length > 0 ? imagesList[0] : null;
 
     try {
       await api.post('/posts', {
@@ -478,9 +472,11 @@ export default function Community() {
                     {selectedMedia.map((m, idx) => (
                       <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0 group">
                         {m.type === 'video' ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white p-1">
-                            <Video className="w-6 h-6 text-primary" />
-                            <span className="text-[8px] truncate max-w-full">Video file</span>
+                          <div className="w-full h-full relative bg-slate-900">
+                            <video src={m.preview} className="w-full h-full object-cover pointer-events-none" muted playsInline />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                              <Video className="w-4 h-4 text-white" />
+                            </div>
                           </div>
                         ) : (
                           <img src={m.preview} alt="upload preview" className="w-full h-full object-cover" />
@@ -681,30 +677,37 @@ export default function Community() {
                   </p>
 
                   {/* Optional Image or Video Attachment */}
-                  {post.image_url && (post.image_url.startsWith('data:video/') || post.image_url.includes('.mp4') || post.image_url.startsWith('blob:')) ? (
-                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-950 max-h-96">
-                      <video
-                        src={post.image_url}
-                        controls
-                        className="w-full h-full max-h-96 object-contain"
-                      />
-                    </div>
-                  ) : parsedImages.length > 0 ? (
+                  {parsedImages.length > 0 ? (
                     <div className={`grid gap-2 rounded-2xl overflow-hidden ${
                       parsedImages.length === 1 ? 'grid-cols-1' :
                       parsedImages.length === 2 ? 'grid-cols-2' :
                       parsedImages.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
                     }`}>
-                      {parsedImages.slice(0, 4).map((imgUrl: string, idx: number) => {
+                      {parsedImages.slice(0, 4).map((mediaUrl: string, idx: number) => {
                         const isLast = idx === 3 && parsedImages.length > 4;
+                        const isVid = isVideoUrl(mediaUrl);
                         return (
-                          <div key={idx} className="relative aspect-video bg-slate-50 border border-slate-100/50 max-h-80 overflow-hidden">
-                            <img
-                              src={imgUrl}
-                              alt={`Post media ${idx + 1}`}
-                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
-                              onClick={() => openLightbox(parsedImages, idx)}
-                            />
+                          <div key={idx} className="relative aspect-video bg-slate-50 border border-slate-100/50 max-h-80 overflow-hidden cursor-pointer" onClick={() => openLightbox(parsedImages, idx)}>
+                            {isVid ? (
+                              <div className="w-full h-full relative bg-slate-900">
+                                <video
+                                  src={mediaUrl}
+                                  className="w-full h-full object-cover pointer-events-none"
+                                  muted
+                                  playsInline
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                  <Video className="w-8 h-8 text-white drop-shadow-md" />
+                                </div>
+                              </div>
+                            ) : (
+                              <img
+                                src={mediaUrl}
+                                alt={`Post media ${idx + 1}`}
+                                loading="lazy"
+                                className="w-full h-full object-cover hover:scale-105 transition-transform"
+                              />
+                            )}
                             {isLast && (
                               <div className="absolute inset-0 bg-brandDark/60 backdrop-blur-xs flex items-center justify-center text-white text-lg font-black pointer-events-none">
                                 +{parsedImages.length - 4} More
@@ -715,16 +718,30 @@ export default function Community() {
                       })}
                     </div>
                   ) : post.image_url ? (
-                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96">
-                      <img
-                        src={post.image_url}
-                        alt="Post media"
-                        className="w-full h-full object-cover cursor-pointer"
-                        onClick={() => openLightbox([post.image_url], 0)}
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
+                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96 cursor-pointer" onClick={() => openLightbox([post.image_url], 0)}>
+                      {isVideoUrl(post.image_url) ? (
+                        <div className="w-full h-full relative bg-slate-900">
+                          <video
+                            src={post.image_url}
+                            className="w-full h-full max-h-96 object-contain pointer-events-none"
+                            muted
+                            playsInline
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                            <Video className="w-10 h-10 text-white drop-shadow-md" />
+                          </div>
+                        </div>
+                      ) : (
+                        <img
+                          src={post.image_url}
+                          alt="Post media"
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      )}
                     </div>
                   ) : null}
 

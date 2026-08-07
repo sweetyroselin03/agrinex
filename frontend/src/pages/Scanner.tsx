@@ -32,9 +32,9 @@ export default function Scanner() {
   };
 
   const processFile = (file: File) => {
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size exceeds 5MB limit.');
+    // Check file size (max 15MB)
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size exceeds 15MB limit.');
       return;
     }
 
@@ -154,11 +154,11 @@ export default function Scanner() {
                 </div>
                 <h3 className="font-extrabold text-brandDark text-sm">Upload crop photograph</h3>
                 <p className="text-textSec text-xs max-w-xs mt-2 leading-relaxed">
-                  Drag and drop your JPEG/PNG leaf image here, or browse files on your computer. Max file size 5MB.
+                  Drag and drop your JPEG/PNG leaf image here, or browse files on your computer. Max file size 15MB.
                 </p>
                 <label className="mt-6 px-6 py-2.5 rounded-xl bg-brandDark text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer">
                   Browse Files
-                  <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                  <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleFileChange} />
                 </label>
               </div>
             )}
