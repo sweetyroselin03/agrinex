@@ -313,6 +313,7 @@ export default function Signup() {
                           <User className="w-5 h-5" />
                         </div>
                         <input
+                          id="fullName"
                           type="text"
                           required
                           placeholder="Jane Doe"
@@ -349,6 +350,7 @@ export default function Signup() {
                           <Mail className="w-5 h-5" />
                         </div>
                         <input
+                          id="email"
                           type="email"
                           required
                           placeholder="jane@example.com"
@@ -376,6 +378,7 @@ export default function Signup() {
                     </div>
 
                     <button
+                      id="send-otp"
                       type="submit"
                       className="w-full py-3.5 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer"
                       disabled={isLoading || !fullNameValid || !emailValid}
@@ -397,6 +400,7 @@ export default function Signup() {
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Verification OTP Code</label>
                       <input
+                        id="otp"
                         type="text"
                         required
                         placeholder="Enter 6-digit code"
@@ -408,6 +412,7 @@ export default function Signup() {
                     </div>
 
                     <button
+                      id="verify-otp"
                       type="submit"
                       className="w-full py-3.5 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer"
                       disabled={isLoading || otp.trim().length < 6}
@@ -442,6 +447,7 @@ export default function Signup() {
                           <Lock className="w-5 h-5" />
                         </div>
                         <input
+                          id="password"
                           type={showPassword ? 'text' : 'password'}
                           required
                           placeholder="Enter new password"
@@ -509,6 +515,7 @@ export default function Signup() {
                           <Lock className="w-5 h-5" />
                         </div>
                         <input
+                          id="confirmPassword"
                           type={showPassword ? 'text' : 'password'}
                           required
                           placeholder="Retype password"
@@ -538,6 +545,7 @@ export default function Signup() {
                     </div>
 
                     <button
+                      id="submit-register"
                       type="submit"
                       className="w-full py-3.5 rounded-xl bg-brandDark text-white font-extrabold text-sm hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2 transition-all cursor-pointer"
                       disabled={isLoading || isSubmitting || !isPasswordValid || !passwordsMatch}

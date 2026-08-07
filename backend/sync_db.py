@@ -38,12 +38,18 @@ def sync_db():
         add_column_if_missing(conn, "posts", "images", "TEXT")
         # Safely drop legacy phone column if it exists
         try:
-            conn.execute(text("ALTER TABLE users DROP COLUMN phone;"))
+            conn.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS phone;"))
             conn.commit()
-            print("DONE: Dropped 'phone' column from 'users' table.")
+            print("DONE: Dropped 'phone' column from 'users' table (IF EXISTS).")
         except Exception as drop_err:
             conn.rollback()
-            print(f"INFO: Could not drop column 'phone' (already removed or unsupported): {drop_err}")
+            try:
+                conn.execute(text("ALTER TABLE users DROP COLUMN phone;"))
+                conn.commit()
+                print("DONE: Dropped 'phone' column from 'users' table (standard fallback).")
+            except Exception as fallback_err:
+                conn.rollback()
+                print(f"INFO: Could not drop column 'phone' (already removed or unsupported): {fallback_err}")
 
         try:
             print("Cleaning duplicate follows before enforcing unique constraint...")

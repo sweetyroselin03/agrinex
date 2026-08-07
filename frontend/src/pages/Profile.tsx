@@ -733,6 +733,7 @@ export default function Profile() {
                     </span>
                   </div>
                   <textarea
+                    id="bio"
                     rows={3}
                     maxLength={250}
                     placeholder="Tell the AgriNex community about your farm and experience..."
@@ -837,7 +838,8 @@ export default function Profile() {
                 >
                   Cancel
                 </button>
-                <button
+                 <button
+                  id="save-profile"
                   type="submit"
                   disabled={authLoading || isSubmitting}
                   className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white font-extrabold text-xs flex items-center gap-2 shadow-md shadow-emerald-900/20 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
