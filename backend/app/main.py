@@ -994,15 +994,19 @@ async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.Use
     db.add(ai_msg)
     db.commit()
     db.refresh(ai_msg)
+    
+    ai_msg.success = True
+    ai_msg.reply = ai_reply
     return ai_msg
 
 @app.post("/chat")
 async def chat_legacy(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     res = await chat_with_ai(chat, current_user, db)
     return {
+        "success": True,
         "response": res.message,
         "message": res.message,
-        "reply": res.message,
+        "reply": res.reply,
         "id": res.id,
         "conversation_id": res.conversation_id,
         "is_ai": res.is_ai,

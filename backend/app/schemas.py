@@ -265,6 +265,8 @@ class ChatMessage(BaseModel):
     message: str
     is_ai: bool
     created_at: datetime
+    success: Optional[bool] = True
+    reply: Optional[str] = ""
 
     model_config = ConfigDict(from_attributes=True)
 

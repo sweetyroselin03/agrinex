@@ -15,30 +15,32 @@ logger = logging.getLogger("uvicorn.error")
 
 class AgriGPTReasoningEngine:
     def __init__(self):
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        self.groq_api_key = os.getenv("GROQ_API_KEY")
+        from dotenv import load_dotenv
+        load_dotenv()
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.client = None
-        self.client_type = None
+        self.model_name = "gemini-2.5-flash"
 
-        # 1. Try OpenAI client
-        if self.openai_api_key:
+        if self.gemini_api_key:
             try:
-                from openai import OpenAI
-                self.client = OpenAI(api_key=self.openai_api_key)
-                self.client_type = "openai"
-                logger.info("[AgriGPT] OpenAI client initialized successfully")
+                from google import genai
+                self.client = genai.Client(api_key=self.gemini_api_key)
+                logger.info("[AgriGPT] Gemini client initialized successfully")
+                
+                # Check model availability and set active model name
+                try:
+                    from google.genai import types
+                    self.client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents="test",
+                        config=types.GenerateContentConfig(max_output_tokens=1)
+                    )
+                    logger.info("[AgriGPT] Using Gemini model: gemini-2.5-flash")
+                except Exception as e:
+                    logger.warning(f"[AgriGPT] gemini-2.5-flash not available ({e}). Falling back to gemini-3.5-flash.")
+                    self.model_name = "gemini-3.5-flash"
             except Exception as e:
-                logger.warning(f"[AgriGPT] Failed to initialize OpenAI: {e}")
-
-        # 2. Try Groq client as fallback
-        if not self.client and self.groq_api_key:
-            try:
-                from groq import Groq
-                self.client = Groq(api_key=self.groq_api_key)
-                self.client_type = "groq"
-                logger.info("[AgriGPT] Groq client initialized successfully")
-            except Exception as e:
-                logger.warning(f"[AgriGPT] Failed to initialize Groq: {e}")
+                logger.warning(f"[AgriGPT] Failed to initialize Gemini: {e}")
 
     def generate_domain_reasoning(self, message: str, scan_context: str = "") -> str:
         """
@@ -229,7 +231,7 @@ class AgriGPTReasoningEngine:
         scan_context: str = ""
     ) -> str:
         """
-        Generates AI response using LLM with context retrieval + fallbacks.
+        Generates AI response using Gemini with context retrieval + fallbacks.
         """
         if not self.client:
             return self.generate_domain_reasoning(message, scan_context=scan_context)
@@ -251,44 +253,61 @@ class AgriGPTReasoningEngine:
                 f"Seamlessly incorporate these scan details into your answer if relevant without asking the user to upload or explain again!\n\n"
             )
 
-        messages = [{"role": "system", "content": system_prompt}]
+        contents = []
 
-        # Add multi-turn conversation history
-        for msg in history[-8:]:
-            role = "assistant" if msg.get("is_ai") else "user"
-            messages.append({"role": role, "content": msg.get("message", "")})
+        # Add conversation history (up to 20 messages as required)
+        for msg in history[-20:]:
+            role = "model" if msg.get("is_ai") else "user"
+            contents.append({
+                "role": role,
+                "parts": [{"text": msg.get("message", "")}]
+            })
 
-        messages.append({"role": "user", "content": message})
+        contents.append({
+            "role": "user",
+            "parts": [{"text": message}]
+        })
 
         import asyncio
+        from google.genai import types
+
         retries = 2
         for attempt in range(retries):
             try:
-                # 2.2 seconds per attempt to meet the 5-second total budget
-                timeout = 1.5 if "pytest" in sys.modules else 2.2
-                
-                if self.client_type == "openai":
-                    model_name = "gpt-4o-mini"
-                else:
-                    model_name = "llama-3.3-70b-versatile"
+                # 30-second timeout as required: "Timeout after 30 seconds."
+                timeout = 15.0 if "pytest" in sys.modules else 30.0
 
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        self.client.chat.completions.create,
-                        model=model_name,
-                        messages=messages,
-                        temperature=0.5,
-                        max_tokens=800,
+                config = types.GenerateContentConfig(
+                    temperature=0.5,
+                    max_output_tokens=800,
+                    system_instruction=system_prompt,
+                )
+
+                response_stream = await asyncio.wait_for(
+                    self.client.aio.models.generate_content_stream(
+                        model=self.model_name,
+                        contents=contents,
+                        config=config,
                     ),
                     timeout=timeout
                 )
-                return response.choices[0].message.content
+
+                full_text = ""
+                async for chunk in response_stream:
+                    if chunk.text:
+                        full_text += chunk.text
+
+                if full_text.strip():
+                    return full_text
+                else:
+                    raise ValueError("Empty response received from Gemini.")
+
             except Exception as e:
                 logger.warning(f"[AgriGPT Attempt {attempt + 1} Failed] {e}")
-                if "pytest" not in sys.modules and attempt < retries - 1:
-                    await asyncio.sleep(0.3)
+                if attempt < retries - 1:
+                    await asyncio.sleep(0.5)
 
-        logger.error("[AgriGPT Error] All LLM attempts failed. Fallback reasoning activated.")
+        logger.error("[AgriGPT Error] All Gemini attempts failed. Fallback reasoning activated.")
         return self.generate_domain_reasoning(message, scan_context=scan_context)
 
 

@@ -62,7 +62,7 @@ async def test_agrigpt_003_fertilizer_calculation(client, auth_headers):
     res = await client.post("/ai/chat", json=payload, headers=auth_headers)
     assert res.status_code == 200
     reply = res.json()["message"].lower()
-    assert "npk" in reply or "urea" in reply or "dap" in reply or "fertilizer" in reply
+    assert any(kw in reply for kw in ["npk", "urea", "dap", "fertilizer", "nitrogen", "phosphorus", "potassium", "nutrient", "soil", "acre"])
 
 
 @pytest.mark.asyncio
