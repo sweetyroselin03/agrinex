@@ -99,12 +99,12 @@ async def standardize_json_middleware(request, call_next):
         
     response = await call_next(request)
     content_type = response.headers.get("content-type", "")
-    if "application/json" in content_type:
-        body = b""
-        async for chunk in response.body_iterator:
-            body += chunk
-            
+    if "application/json" in content_type and response.status_code not in [204, 304]:
         try:
+            body = b""
+            async for chunk in response.body_iterator:
+                body += chunk
+                
             data = json.loads(body.decode("utf-8"))
             if isinstance(data, dict) and "success" in data and "data" in data and "errors" in data:
                 async def response_body():
@@ -136,9 +136,8 @@ async def standardize_json_middleware(request, call_next):
             response.body_iterator = new_body_iterator()
             
         except Exception as e:
-            async def response_body():
-                yield body
-            response.body_iterator = response_body()
+            # If body iterator or JSON decoding fails, return the response intact
+            pass
             
     return response
 
