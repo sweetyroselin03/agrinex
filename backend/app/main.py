@@ -1099,7 +1099,14 @@ def get_conversations(current_user: models.User = Depends(get_current_user), db:
 async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     
     # ━━━ STAGE 1: Validate that the image contains a crop/plant ━━━
-    validation = await ai_service.ai_service.validate_crop_image(scan.image_url)
+    try:
+        validation = await ai_service.ai_service.validate_crop_image(scan.image_url)
+    except Exception as e:
+        logger.error(f"[AI Endpoint Error] Stage 1 Validation failed: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI Scanner Stage 1 Validation failed: {str(e)}"
+        )
     
     if not validation.get("is_valid", True):
         # Image rejected — return immediately without running disease detection
@@ -1126,7 +1133,14 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
         )
     
     # ━━━ STAGE 2: Run disease detection (only for validated crop images) ━━━
-    analysis = await ai_service.ai_service.detect_disease(scan.image_url)
+    try:
+        analysis = await ai_service.ai_service.detect_disease(scan.image_url)
+    except Exception as e:
+        logger.error(f"[AI Endpoint Error] Stage 2 Disease Detection failed: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI Scanner Stage 2 Disease Detection failed: {str(e)}"
+        )
     
     if not analysis:
         analysis = {
@@ -1148,9 +1162,9 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             "prevention_tips": "Regular monitoring recommended",
         }
 
-    # Confidence & Validity threshold check (>= 50.0%)
-    confidence = analysis.get("confidence_level", 0.0)
-    if confidence < 50.0 or not analysis.get("is_valid_crop", True):
+    # Only reject when Gemini clearly states the image is not a plant (is_valid_crop = False)
+    if not analysis.get("is_valid_crop", True):
+        confidence = analysis.get("confidence_level", 0.0)
         return schemas.CropScanOut(
             id=-1,
             user_id=current_user.id,

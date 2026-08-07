@@ -46,6 +46,17 @@ class AIService:
         self.vision_engine = vision_engine
         self.agri_gpt = agri_gpt_engine
         self._scan_cache = {}  # Cache to optimize the two-stage FastAPI pipeline calls
+        
+        # Load persistent cache for test/offline environments to protect quota
+        self.cache_file = os.path.join(os.path.dirname(__file__), "gemini_cache.json")
+        self.persistent_cache = {}
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, "r") as f:
+                    self.persistent_cache = json.load(f)
+                logger.info(f"[AI Service] Loaded {len(self.persistent_cache)} persistent cache entries.")
+            except Exception as e:
+                logger.warning(f"[AI Service] Could not load gemini_cache.json: {e}")
 
     def _get_image_bytes(self, image_url: str) -> bytes:
         """Helper to extract bytes from base64 data URI, HTTP URL, or generate mock bytes."""
@@ -74,15 +85,47 @@ class AIService:
         return buf.getvalue()
 
     async def _run_gemini_diagnostic(self, image_url: str) -> dict:
-        """Performs image analysis via Google Gemini Vision, or falls back to local PyTorch."""
+        """Performs image analysis via Google Gemini Vision, logging every step."""
+        # 1. Log: image received
+        logger.info(f"[AI Scanner] Step 1: Image received. URL/Data prefix: '{image_url[:60]}...' (Length: {len(image_url)})")
+
+        # Check persistent cache first to save quota/run offline during tests
+        if image_url in self.persistent_cache:
+            logger.info(f"[AI Scanner] Persistent cache hit for '{image_url}'.")
+            result_dict = self.persistent_cache[image_url].copy()
+            
+            # Calibrate confidence_level if returned in 0.0-1.0 range
+            if "confidence_level" in result_dict and result_dict["confidence_level"] is not None:
+                try:
+                    conf = float(result_dict["confidence_level"])
+                    if 0.0 <= conf <= 1.0:
+                        result_dict["confidence_level"] = conf * 100.0
+                except Exception:
+                    pass
+                    
+            result_dict["treatment"] = result_dict.get("chemical_treatment", "N/A")
+            result_dict["prevention_tips"] = result_dict.get("prevention", "N/A")
+            
+            # Generate Grad-CAM visualization overlay
+            try:
+                image_bytes = self._get_image_bytes(image_url)
+                tensor, original_img = self.vision_engine.preprocess_image(image_bytes)
+                heatmap_uri = self.vision_engine.generate_gradcam(tensor, original_img)
+                result_dict["gradcam_heatmap"] = heatmap_uri
+            except Exception:
+                result_dict["gradcam_heatmap"] = ""
+                
+            return result_dict
+
         image_bytes = self._get_image_bytes(image_url)
 
-        # Fallback if Gemini client is not configured
+        # 2. Log: image encoded
+        logger.info(f"[AI Scanner] Step 2: Image encoded. Size: {len(image_bytes)} bytes.")
+
+        # If Gemini client is not configured, raise an error
         if not self.agri_gpt.client:
-            logger.warning("[AI Service] Gemini client not configured. Falling back to local PyTorch vision engine.")
-            inference = self.vision_engine.run_inference(image_bytes)
-            inference["scientific_name"] = inference.get("scientific_name", "N/A")
-            return inference
+            logger.error("[AI Service] Gemini client is not configured. GEMINI_API_KEY may be missing.")
+            raise RuntimeError("Gemini client is not configured. Please set the GEMINI_API_KEY environment variable.")
 
         # Handle web page or file metadata detection
         mime_type = "image/jpeg"
@@ -118,7 +161,9 @@ class AIService:
         retries = 2
         for attempt in range(retries):
             try:
-                # 30-second timeout
+                # 3. Log: request sent to Gemini
+                logger.info(f"[AI Scanner] Step 3: Request sent to Gemini. Model: {self.agri_gpt.model_name}. Attempt: {attempt + 1}")
+                
                 timeout = 30.0
                 config = types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -138,15 +183,30 @@ class AIService:
                     timeout=timeout
                 )
 
+                # 4. Log: Gemini response
+                logger.info(f"[AI Scanner] Step 4: Gemini response received. Raw Text: '{response.text}'")
+
                 data = json.loads(response.text)
+
+                # Calibrate confidence_level if returned in 0.0-1.0 range
+                if "confidence_level" in data and data["confidence_level"] is not None:
+                    try:
+                        conf = float(data["confidence_level"])
+                        if 0.0 <= conf <= 1.0:
+                            data["confidence_level"] = conf * 100.0
+                            logger.info(f"[AI Scanner] Calibrated confidence_level from {conf} to {data['confidence_level']}")
+                    except Exception as cal_err:
+                        logger.warning(f"[AI Scanner] Could not calibrate confidence_level: {cal_err}")
+
+                # 5. Log: parsing result
                 validated = CropDiagnosticResult(**data)
                 result_dict = validated.model_dump()
+                logger.info(f"[AI Scanner] Step 5: Parsing result successful: {result_dict}")
 
                 # Add extra fields expected by database/main.py
                 result_dict["treatment"] = result_dict.get("chemical_treatment", "N/A")
                 result_dict["prevention_tips"] = result_dict.get("prevention", "N/A")
                 
-                # Confidence format check
                 if not result_dict.get("confidence_level"):
                     result_dict["confidence_level"] = 90.0
 
@@ -158,23 +218,24 @@ class AIService:
                 except Exception:
                     result_dict["gradcam_heatmap"] = ""
 
+                # Save to persistent cache for future runs
+                self.persistent_cache[image_url] = result_dict
+                try:
+                    with open(self.cache_file, "w") as f:
+                        json.dump(self.persistent_cache, f, indent=2)
+                    logger.info(f"[AI Service] Saved new persistent cache entry for '{image_url}'.")
+                except Exception as cache_save_err:
+                    logger.warning(f"[AI Service] Could not write to gemini_cache.json: {cache_save_err}")
+
                 return result_dict
 
             except Exception as e:
                 logger.warning(f"[AI Service Scan Attempt {attempt + 1} Failed] {e}")
                 if attempt < retries - 1:
                     await asyncio.sleep(0.5)
-
-        logger.error("[AI Service Scan Error] All Gemini diagnostic attempts failed. Falling back to local PyTorch vision engine.")
-        inference = self.vision_engine.run_inference(image_bytes)
-        inference["scientific_name"] = inference.get("scientific_name", "N/A")
-        try:
-            tensor, original_img = self.vision_engine.preprocess_image(image_bytes)
-            heatmap_uri = self.vision_engine.generate_gradcam(tensor, original_img)
-            inference["gradcam_heatmap"] = heatmap_uri
-        except Exception:
-            inference["gradcam_heatmap"] = ""
-        return inference
+                else:
+                    logger.error(f"[AI Service Scan Error] All Gemini diagnostic attempts failed: {e}")
+                    raise e
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     # STAGE 1 — Crop Image Validation (Plant vs Non-Plant)

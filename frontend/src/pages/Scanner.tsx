@@ -365,6 +365,12 @@ export default function Scanner() {
                             </h4>
                             <p className="text-textSec text-xs">{result.pesticide_recommendations || 'No chemical control specified.'}</p>
                           </div>
+                          <div>
+                            <h4 className="font-extrabold text-brandDark text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
+                              <Activity className="w-4 h-4 text-primary" /> Fertilizer Recommendation
+                            </h4>
+                            <p className="text-textSec text-xs">{result.fertilizer_recommendations || 'No fertilizer adjustments specified.'}</p>
+                          </div>
                         </div>
                       )}
 
