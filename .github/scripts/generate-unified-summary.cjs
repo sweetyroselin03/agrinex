@@ -27,7 +27,7 @@ function main() {
     { name: '🧪 Web E2E Tests', desc: 'Playwright E2E browser user interaction matrix', status: 'PASSED', points: '300 / 300', duration: '2m 40s' },
     { name: '🧪 Android Appium Tests', desc: 'Mobile Vitest gesture, permissions & offline sync matrix', status: 'PASSED', points: '300 / 300', duration: '3m 15s' },
     { name: '🧪 Selenium Tests', desc: 'Webdriver automated browser flow verification', status: 'PASSED', points: '300 / 300', duration: '1m 05s' },
-    { name: '📊 Unified Summary', desc: 'Consolidated HTML dashboard & GitHub Pages deployment', status: 'PASSED', points: '100 / 100', duration: '0m 30s' }
+    { name: '📊 Unified Summary', desc: 'Consolidated HTML dashboard', status: 'PASSED', points: '100 / 100', duration: '0m 30s' }
   ];
 
   // 1. Generate Markdown Report

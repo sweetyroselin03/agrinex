@@ -2,10 +2,11 @@ name: "📱 Consolidated AgriNex CI/CD Pipeline & Unified Summary"
 
 on:
   push:
-    branches: [main, master]
+    branches:
+      - main
   pull_request:
-    branches: [main, master]
-  workflow_dispatch:
+    branches:
+      - main
 
 concurrency:
   group: agrinex-pipeline-${{ github.ref }}
@@ -13,7 +14,6 @@ concurrency:
 
 permissions:
   contents: write
-  pages: write
   id-token: write
   security-events: write
 
@@ -611,12 +611,4 @@ jobs:
           BRANCH: ${{ github.ref_name }}
         run: node .github/scripts/generate-unified-summary.cjs
 
-      - name: "🚀 Deploy reports to GitHub Pages"
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: unified-reports
-          publish_branch: gh-pages
-          destination_dir: .
-          keep_files: true
-          commit_message: "📊 AgriNex Test Report – Build #${{ github.run_number }} [skip vercel] [skip ci]"
+
