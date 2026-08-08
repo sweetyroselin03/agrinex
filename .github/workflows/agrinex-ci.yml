@@ -87,7 +87,7 @@ jobs:
           npm audit --audit-level=moderate --json > ../security-artifacts/web-audit.json 2>&1 || echo "npm audit completed"
 
       - name: "🛡️ Run Trivy filesystem scan"
-        uses: aquasecurity/trivy-action@57a97e7e7821a5776cebc9bb87c984fa69cba8f1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
         with:
           scan-type: 'fs'
           scan-ref: '.'
