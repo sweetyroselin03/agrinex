@@ -87,11 +87,16 @@ jobs:
           npm audit --audit-level=moderate --json > ../security-artifacts/web-audit.json 2>&1 || echo "npm audit completed"
 
       - name: "🛡️ Run Trivy filesystem scan"
-        run: |
-          wget -q https://github.com/aquasecurity/trivy/releases/download/v0.48.3/trivy_0.48.3_Linux-64bit.tar.gz
-          tar -xzf trivy_0.48.3_Linux-64bit.tar.gz
-          sudo mv trivy /usr/local/bin/
-          trivy fs . --format sarif --output security-artifacts/trivy-results.sarif --severity CRITICAL,HIGH || echo "Trivy scan completed"
+        uses: aquasecurity/trivy-action@57a97e7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'security-artifacts/trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          skip-dirs: '.git,node_modules,**/node_modules/**,frontend/dist,backend/__pycache__,**/__pycache__/**,mobile/android,mobile/.expo,backend/htmlcov,frontend/playwright-report,load-test-reports,Vulnerability Test Results,security-artifacts,unified-reports,**/.pytest_cache/**,**/htmlcov/**'
+          skip-files: 'backend/backend-test-results.xml,backend/coverage.xml,backend/junit.xml,frontend/playwright-results.xml'
 
       - name: "🔑 Run Gitleaks secret detection"
         run: |
@@ -103,6 +108,7 @@ jobs:
         run: npm install exceljs --no-save --no-audit --ignore-scripts
 
       - name: "📊 Generate vulnerability reports"
+        if: always()
         env:
           BUILD_NUMBER: ${{ github.run_number }}
           COMMIT_SHA: ${{ github.sha }}
