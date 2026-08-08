@@ -285,6 +285,22 @@ class AIService:
                 "quality_issue": None
             }
 
+        # Check local model first to detect precisely and save quota
+        try:
+            image_bytes = self._get_image_bytes(image_url)
+            local_res = self.vision_engine.run_inference(image_bytes)
+            if not local_res.get("is_valid_crop", True):
+                logger.info(f"[AI Service] Local model rejected non-plant image: {local_res}")
+                return {
+                    "is_valid": False,
+                    "confidence": local_res.get("confidence_level", 95.0),
+                    "detected_object": local_res.get("detected_object", "Non-Agricultural Object"),
+                    "rejection_reason": local_res.get("rejection_reason", "Unable to identify a plant leaf. Please align a clear crop leaf in the frame."),
+                    "quality_issue": None
+                }
+        except Exception as local_err:
+            logger.warning(f"[AI Service] Local model validation check failed: {local_err}")
+
         # Use cache if already diagnostic scanned
         if image_url in self._scan_cache:
             res = self._scan_cache[image_url]

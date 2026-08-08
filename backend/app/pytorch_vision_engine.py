@@ -125,15 +125,26 @@ class PyTorchVisionEngine:
         self.model = TwoStageCropClassifier(num_diseases=len(DISEASE_CLASSES) - 1).to(self.device)
         self.model.eval()
 
-        # Attempt to load trained checkpoint if exists
-        weights_path = os.path.join(os.path.dirname(__file__), "..", "ai_model_training", "agrinex_crop_disease_mobilenetv3.pth")
-        if os.path.exists(weights_path):
-            try:
-                state_dict = torch.load(weights_path, map_location=self.device)
-                self.model.load_state_dict(state_dict, strict=False)
-                logger.info(f"[PyTorch Vision Engine] Loaded custom weights from {weights_path}")
-            except Exception as e:
-                logger.warning(f"[PyTorch Vision Engine] Could not load checkpoint weights: {e}")
+        # Attempt to load trained checkpoint if exists in various paths
+        weights_paths = [
+            os.path.join(os.path.dirname(__file__), "..", "ai_model_training", "agrinex_crop_disease_mobilenetv3.pth"),
+            os.path.join(os.path.dirname(__file__), "..", "..", "agrinex_crop_disease_mobilenetv3.pth"),
+            os.path.join(os.path.dirname(__file__), "..", "agrinex_crop_disease_mobilenetv3.pth"),
+            os.path.join(os.getcwd(), "agrinex_crop_disease_mobilenetv3.pth"),
+            "agrinex_crop_disease_mobilenetv3.pth"
+        ]
+        
+        loaded = False
+        for path in weights_paths:
+            if os.path.exists(path):
+                try:
+                    state_dict = torch.load(path, map_location=self.device)
+                    self.model.load_state_dict(state_dict, strict=False)
+                    logger.info(f"[PyTorch Vision Engine] Loaded custom weights from {path}")
+                    loaded = True
+                    break
+                except Exception as e:
+                    logger.warning(f"[PyTorch Vision Engine] Could not load checkpoint weights from {path}: {e}")
 
         # Temperature calibration parameter for probability scaling
         self.temperature = 1.25
@@ -263,9 +274,9 @@ class PyTorchVisionEngine:
         except Exception:
             has_plant_color = True
 
-        # Non-plant threshold calibrated: Only reject if definitely not plant color AND very low probability
-        # Relaxed to prevent false rejection of yellow/brown/withered diseased leaves.
-        if not has_plant_color and is_plant_prob < 0.05 and confidence_pct < 25.0:
+        # Non-plant threshold calibrated: Reject if definitely not plant (low probability and no color)
+        # or if extremely low plant probability overall.
+        if is_plant_prob < 0.05 or (not has_plant_color and is_plant_prob < 0.15):
             return {
                 "is_valid_crop": False,
                 "is_plant": False,
