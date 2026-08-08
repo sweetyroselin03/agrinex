@@ -14,7 +14,7 @@
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/netinfo": "11.4.1",
     "@tanstack/react-query": "^5.75.5",
-    "axios": "^1.8.4",
+    "axios": "^1.19.0",
     "expo": "~54.0.35",
     "expo-auth-session": "~7.0.11",
     "expo-blur": "~15.0.7",
@@ -66,5 +66,17 @@
     "typescript": "~5.9.2",
     "vitest": "^4.1.10"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "postcss": "^8.5.26",
+    "tar": "^7.5.22",
+    "websocket-driver": "^0.7.5",
+    "nanoid": "^3.3.17",
+    "shell-quote": "^1.10.0",
+    "undici": "^8.10.0",
+    "js-yaml": "^4.3.0",
+    "axios": "^1.19.0",
+    "brace-expansion": "^5.0.9",
+    "image-size": "^1.2.1"
+  }
 }

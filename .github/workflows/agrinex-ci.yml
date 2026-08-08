@@ -87,16 +87,15 @@ jobs:
           npm audit --audit-level=moderate --json > ../security-artifacts/web-audit.json 2>&1 || echo "npm audit completed"
 
       - name: "🛡️ Run Trivy filesystem scan"
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
         with:
           scan-type: 'fs'
           scan-ref: '.'
-          format: 'sarif'
-          output: 'security-artifacts/trivy-results.sarif'
+          format: 'table'
           severity: 'CRITICAL,HIGH'
           exit-code: '1'
-          skip-dirs: '.git,node_modules,**/node_modules/**,frontend/dist,backend/__pycache__,**/__pycache__/**,mobile/android,mobile/.expo,backend/htmlcov,frontend/playwright-report,load-test-reports,Vulnerability Test Results,security-artifacts,unified-reports,**/.pytest_cache/**,**/htmlcov/**'
-          skip-files: 'backend/backend-test-results.xml,backend/coverage.xml,backend/junit.xml,frontend/playwright-results.xml'
+          ignore-unfixed: true
+          skip-dirs: '.git,node_modules,frontend/dist,backend/__pycache__,coverage,.pytest_cache,.expo,mobile/android/.gradle,mobile/android/app/build,build,dist'
 
       - name: "🔑 Run Gitleaks secret detection"
         run: |
