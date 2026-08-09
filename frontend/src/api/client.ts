@@ -12,6 +12,7 @@ const NO_RETRY_ROUTES = [
   '/auth/verify-otp',
   '/auth/register',
   '/auth/set-password',
+  '/auth/login',
   '/posts',
 ];
 
@@ -110,8 +111,16 @@ api.interceptors.response.use(
 
     if (!config) return Promise.reject(error);
 
-    // Auto-logout on 401 Unauthorized
-    if (error.response?.status === 401 && !config._isRetry) {
+    // Auto-logout on 401 Unauthorized (exclude public auth endpoints)
+    const isAuthRoute = config.url && (
+      config.url.includes('/auth/login') || 
+      config.url.includes('/auth/register') || 
+      config.url.includes('/auth/send-otp') || 
+      config.url.includes('/auth/verify-otp') ||
+      config.url.includes('/auth/check-account') ||
+      config.url.includes('/auth/set-password')
+    );
+    if (error.response?.status === 401 && !config._isRetry && !isAuthRoute) {
       console.warn('[API] Session expired (401) — logging out...');
       try {
         localStorage.removeItem('agrinex-web-auth');

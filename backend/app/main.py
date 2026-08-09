@@ -153,6 +153,46 @@ async def log_requests(request, call_next):
     logger.info(f"Response status: {response.status_code}")
     return response
 
+import re
+from fastapi import Response
+
+def is_origin_allowed(origin: str) -> bool:
+    if not origin:
+        return False
+    if origin in allow_origins:
+        return True
+    if re.match(r"^https://.*\.vercel\.app$", origin):
+        return True
+    if re.match(r"^http://localhost(:\d+)?$", origin) or re.match(r"^http://127\.0\.0\.1(:\d+)?$", origin):
+        return True
+    return False
+
+@app.middleware("http")
+async def custom_cors_middleware(request, call_next):
+    origin = request.headers.get("origin")
+    
+    # Handle preflight OPTIONS request directly
+    if request.method == "OPTIONS" and origin:
+        if is_origin_allowed(origin):
+            response = Response(status_code=200)
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            req_headers = request.headers.get("Access-Control-Request-Headers", "*")
+            response.headers["Access-Control-Allow-Headers"] = req_headers
+            response.headers["Access-Control-Max-Age"] = "600"
+            return response
+            
+    response = await call_next(request)
+    
+    # Add CORS headers to actual response
+    if origin and is_origin_allowed(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+        
+    return response
+
 # ─── Auth (JWT Implementation) ───
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
