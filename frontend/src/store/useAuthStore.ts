@@ -49,7 +49,27 @@ interface AuthState {
 const formatError = (error: any, defaultMsg: string): string => {
   if (!error) return defaultMsg;
   console.error('[Auth Error]', error);
+
+  // Network Error / Server unreachable
+  if (error.message === 'Network Error' || !error.response) {
+    return 'Unable to reach backend server. Please check internet connection or server status.';
+  }
+
+  const status = error.response.status;
+
+  if (status === 401) {
+    return 'Invalid email or password.';
+  }
+
+  if (status === 500) {
+    return 'Server error. Please try again.';
+  }
+
   const detail = error.response?.data?.detail;
+  if (status === 409) {
+    return typeof detail === 'string' ? detail : 'Account already exists.';
+  }
+
   if (detail) {
     if (typeof detail === 'string') {
       if (detail === 'Field required') return 'Please fill in all required fields.';
@@ -72,9 +92,6 @@ const formatError = (error: any, defaultMsg: string): string => {
     }
   }
   if (error.response?.data?.message) return error.response.data.message;
-  if (error.message === 'Network Error') {
-    return 'Unable to reach backend server. Please check internet connection or server status.';
-  }
   const rawMsg = error.message || defaultMsg;
   return rawMsg === 'Field required' ? 'Please fill in all required fields.' : rawMsg;
 };

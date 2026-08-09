@@ -489,7 +489,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (socket && socket.readyState === WebSocket.OPEN) return;
 
     isExplicitDisconnect = false;
-    const apiBase = import.meta.env.VITE_API_URL || 'https://agrinex-backend-c1ig.onrender.com';
+    const apiBase = import.meta.env.VITE_API_URL || 'https://agrinex.onrender.com';
     const cleanHost = apiBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
     const protocol = apiBase.startsWith('https') ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${cleanHost}/ws/chat/${userId}`;

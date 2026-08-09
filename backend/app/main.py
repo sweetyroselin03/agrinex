@@ -49,7 +49,7 @@ default_origins = [
     "http://127.0.0.1:3000",
     "https://agrinex-web.vercel.app",
     "https://agrinex-ai.vercel.app",
-    "https://agrinex-backend-c1ig.onrender.com",
+    "https://agrinex.onrender.com",
 ]
 
 if allowed_origins_str:

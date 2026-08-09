@@ -312,7 +312,7 @@ export default function Chatbot() {
         token = parsed?.state?.token || '';
       }
 
-      const baseUrl = (import.meta.env.VITE_API_URL || 'https://agrinex-backend-c1ig.onrender.com').replace(/\/$/, '');
+      const baseUrl = (import.meta.env.VITE_API_URL || 'https://agrinex.onrender.com').replace(/\/$/, '');
       const response = await fetch(`${baseUrl}/chat`, {
         method: 'POST',
         headers: {
