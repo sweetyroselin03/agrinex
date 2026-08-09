@@ -50,7 +50,7 @@ const formatError = (error: any, defaultMsg: string): string => {
   if (!error) return defaultMsg;
   console.error('[Auth Error]', error);
 
-  // Network Error / Server unreachable
+  // Network Error / Server unreachable / CORS Failure
   if (error.message === 'Network Error' || !error.response) {
     return 'Unable to reach backend server. Please check internet connection or server status.';
   }
@@ -61,15 +61,24 @@ const formatError = (error: any, defaultMsg: string): string => {
     return 'Invalid email or password.';
   }
 
-  if (status === 500) {
-    return 'Server error. Please try again.';
+  if (status === 403) {
+    return 'Access denied.';
   }
 
-  const detail = error.response?.data?.detail;
+  if (status === 404) {
+    return 'Requested API endpoint was not found.';
+  }
+
   if (status === 409) {
+    const detail = error.response?.data?.detail;
     return typeof detail === 'string' ? detail : 'Account already exists.';
   }
 
+  if (status === 500) {
+    return 'Backend server error.';
+  }
+
+  const detail = error.response?.data?.detail;
   if (detail) {
     if (typeof detail === 'string') {
       if (detail === 'Field required') return 'Please fill in all required fields.';

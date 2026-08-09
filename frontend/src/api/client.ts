@@ -43,21 +43,32 @@ export const api = axios.create({
   // withCredentials: false (Omitted/disabled as cookies are not used; auth relies on Bearer headers)
 });
 
-// Request Interceptor: Inject JWT Token
+// Request Interceptor: Inject JWT Token & Safe Logging
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getLocalToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log(`[API DEBUG] Request: ${config.method?.toUpperCase()} ${config.url}`, {
+      baseURL: config.baseURL,
+      headers: { 
+        'Content-Type': config.headers['Content-Type'],
+        Authorization: config.headers.Authorization ? 'Bearer [REDACTED]' : undefined 
+      }
+    });
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error(`[API DEBUG] Request Error:`, error);
+    return Promise.reject(error);
+  }
 );
 
 // Response Interceptor: Auto-logout on 401 & Exponential Backoff & Envelope Unwrapping
 api.interceptors.response.use(
   (response) => {
+    console.log(`[API DEBUG] Response Success: ${response.config.method?.toUpperCase()} ${response.config.url} - Status ${response.status} ${response.statusText}`);
     if (response.data && typeof response.data === 'object' && 'success' in response.data && 'data' in response.data) {
       const envelope = response.data;
       const innerData = envelope.data;
@@ -88,6 +99,14 @@ api.interceptors.response.use(
       _retryCount?: number;
       _isRetry?: boolean;
     };
+
+    const status = error.response?.status;
+    const statusText = error.response?.statusText;
+    const errorType = !error.response ? 'Network/CORS/Offline/CORS-Blocked Error' : error.code === 'ECONNABORTED' ? 'Timeout Error' : 'HTTP Error';
+    console.error(`[API DEBUG] Response Error: ${config?.method?.toUpperCase()} ${config?.url} - ${errorType} - Status: ${status || 'N/A'} ${statusText || ''}`, {
+      message: error.message,
+      code: error.code
+    });
 
     if (!config) return Promise.reject(error);
 
