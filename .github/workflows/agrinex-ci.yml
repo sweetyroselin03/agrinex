@@ -202,7 +202,15 @@ jobs:
 
       - name: "🧪 Run Vitest component tests"
         working-directory: frontend
-        run: npm test
+        run: npm test -- --reporter=junit --outputFile=frontend-test-results.xml
+
+      - name: "📤 Upload frontend test reports"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-reports
+          path: frontend/frontend-test-results.xml
+          retention-days: 7
 
       - name: "📋 Publish Test Summary"
         if: always()
@@ -541,7 +549,15 @@ jobs:
 
       - name: "▶️ Run Mobile E2E Suite"
         working-directory: mobile
-        run: npm test
+        run: npm test -- --reporter=junit --outputFile=mobile-test-results.xml
+
+      - name: "📤 Upload mobile test reports"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-reports
+          path: mobile/mobile-test-results.xml
+          retention-days: 7
 
       - name: "📋 Publish Appium E2E Summary"
         if: always()
@@ -614,6 +630,33 @@ jobs:
         with:
           name: load-test-reports
           path: load-test-reports
+
+      - name: "📥 Download frontend reports"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: frontend-test-reports
+          path: frontend-reports
+
+      - name: "📥 Download mobile reports"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: mobile-test-reports
+          path: mobile-reports
+
+      - name: "📦 Install Excel generation dependencies"
+        run: npm install exceljs --no-save --no-audit --ignore-scripts
+
+      - name: "📊 Generate Excel test case report"
+        run: node scripts/generate-excel-report.js
+
+      - name: "📤 Upload Excel test report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-test-report
+          path: AgriNex_Test_Cases_Report.xlsx
+          retention-days: 7
 
       - name: "📋 Publish Combined Step Summary Dashboard"
         env:
