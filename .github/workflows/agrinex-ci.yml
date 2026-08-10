@@ -162,6 +162,13 @@ jobs:
         run: |
           python -m pytest tests/ --ignore=tests/test_selenium.py -v --cov=app --cov-report=xml:coverage.xml --cov-report=html:htmlcov --junitxml=backend-test-results.xml
 
+      - name: "📊 Generate Backend Excel report"
+        if: always()
+        run: |
+          npm install exceljs --no-save --no-audit --ignore-scripts
+          node ../scripts/generate-excel-report.js --suite=backend --input=backend-test-results.xml --output=Backend_Test_Cases_Report.xlsx
+        working-directory: backend
+
       - name: "📋 Publish Test Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs backend
@@ -175,6 +182,7 @@ jobs:
             backend/backend-test-results.xml
             backend/coverage.xml
             backend/htmlcov/
+            backend/Backend_Test_Cases_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -204,17 +212,26 @@ jobs:
         working-directory: frontend
         run: npm test -- --reporter=junit --outputFile=frontend-test-results.xml
 
+      - name: "📊 Generate Frontend Excel report"
+        if: always()
+        run: |
+          npm install exceljs --no-save --no-audit --ignore-scripts
+          node ../scripts/generate-excel-report.js --suite=frontend --input=frontend-test-results.xml --output=Frontend_Test_Cases_Report.xlsx
+        working-directory: frontend
+
+      - name: "📋 Publish Test Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs web-unit
+
       - name: "📤 Upload frontend test reports"
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: frontend-test-reports
-          path: frontend/frontend-test-results.xml
+          path: |
+            frontend/frontend-test-results.xml
+            frontend/Frontend_Test_Cases_Report.xlsx
           retention-days: 7
-
-      - name: "📋 Publish Test Summary"
-        if: always()
-        run: node .github/scripts/generate-job-summary-matrix.cjs web-unit
 
   # ════════════════════════════════════════════════════════════════════════════
   # JOB 5 – Build Web App
@@ -374,6 +391,12 @@ jobs:
           OUTPUT_DIR: "load-test-reports"
         run: python .github/scripts/run-load-test.py
 
+      - name: "📊 Generate Load Excel report"
+        if: always()
+        run: |
+          npm install exceljs --no-save --no-audit --ignore-scripts
+          node scripts/generate-excel-report.js --suite=load --input=load-test-reports/load-test-results.json --output=load-test-reports/Load_Performance_Test_Report.xlsx
+
       - name: "📋 Publish Load Test Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs performance
@@ -462,6 +485,13 @@ jobs:
         run: |
           python -m pytest tests/test_selenium.py -v --junitxml=selenium-test-results.xml
 
+      - name: "📊 Generate Selenium Excel report"
+        if: always()
+        run: |
+          npm install exceljs --no-save --no-audit --ignore-scripts
+          node ../scripts/generate-excel-report.js --suite=selenium --input=selenium-test-results.xml --output=Selenium_Test_Cases_Report.xlsx
+        working-directory: backend
+
       - name: "📋 Publish Selenium Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs selenium
@@ -471,7 +501,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: selenium-test-reports
-          path: backend/selenium-test-results.xml
+          path: |
+            backend/selenium-test-results.xml
+            backend/Selenium_Test_Cases_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -509,6 +541,13 @@ jobs:
           PLAYWRIGHT_TEST_BASE_URL: ${{ needs.build-web-app.outputs.deploy_url }}
         run: npx playwright test --project=chromium || echo "Playwright suite completed"
 
+      - name: "📊 Generate Playwright Excel report"
+        if: always()
+        run: |
+          npm install exceljs --no-save --no-audit --ignore-scripts
+          node ../scripts/generate-excel-report.js --suite=web-e2e --input=playwright-results.xml --output=Playwright_E2E_Test_Cases_Report.xlsx
+        working-directory: frontend
+
       - name: "📋 Publish E2E Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs web-e2e
@@ -521,6 +560,7 @@ jobs:
           path: |
             frontend/playwright-report/
             frontend/playwright-results.xml
+            frontend/Playwright_E2E_Test_Cases_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -551,17 +591,26 @@ jobs:
         working-directory: mobile
         run: npm test -- --reporter=junit --outputFile=mobile-test-results.xml
 
+      - name: "📊 Generate Mobile Excel report"
+        if: always()
+        run: |
+          npm install exceljs --no-save --no-audit --ignore-scripts
+          node ../scripts/generate-excel-report.js --suite=mobile --input=mobile-test-results.xml --output=Mobile_Test_Cases_Report.xlsx
+        working-directory: mobile
+
+      - name: "📋 Publish Appium E2E Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs android-e2e
+
       - name: "📤 Upload mobile test reports"
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mobile-test-reports
-          path: mobile/mobile-test-results.xml
+          path: |
+            mobile/mobile-test-results.xml
+            mobile/Mobile_Test_Cases_Report.xlsx
           retention-days: 7
-
-      - name: "📋 Publish Appium E2E Summary"
-        if: always()
-        run: node .github/scripts/generate-job-summary-matrix.cjs android-e2e
 
       - name: "📤 Upload Mobile E2E reports"
         if: always()
