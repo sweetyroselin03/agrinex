@@ -5,6 +5,9 @@ const ExcelJS = require('exceljs');
 const LOCAL_WORKSPACE = 'c:/Users/trasr/OneDrive/Desktop/AGRI NEW 12_5';
 const WORKSPACE_DIR = fs.existsSync(LOCAL_WORKSPACE) ? LOCAL_WORKSPACE : process.cwd();
 
+const OUTPUT_EXCEL_PATH = path.join(WORKSPACE_DIR, 'AgriNex_Test_Cases_Report.xlsx');
+const LOCAL_ARTIFACT_PATH = path.join(WORKSPACE_DIR, 'unified-reports/AgriNex_Test_Cases_Report.xlsx');
+
 // Parse CLI Arguments
 const args = process.argv.slice(2);
 const suiteArg = args.find(a => a.startsWith('--suite='));

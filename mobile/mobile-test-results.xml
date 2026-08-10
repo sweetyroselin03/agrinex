@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="77" failures="0" errors="0" time="0.0488671">
+    <testsuite name="__tests__/agrinex-mobile-integration.test.ts" timestamp="2026-08-10T08:41:16.699Z" hostname="HP_VICTUS_" tests="30" failures="0" errors="0" skipped="0" time="0.0065209">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 1. completes OTP request and verification sequence" time="0.001612">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 2. completes Google OAuth sign-in flow" time="0.0002415">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 3. stores access token in secure store upon login" time="0.0001334">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 4. redirects unauthenticated user from protected tab to auth screen" time="0.0001501">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 5. updates global user store state after successful profile fetch" time="0.0001407">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 6. uploads captured leaf photo via multipart form data" time="0.0001184">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 7. parses AI disease diagnosis API response object" time="0.0001991">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 8. handles diagnostic API timeout fallback gracefully" time="0.0002078">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 9. caches completed diagnostic result item to AsyncStorage" time="0.0001424">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 10. shares diagnostic result card to community post creation screen" time="0.000154">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 11. opens WebSocket connection channel for real-time messaging" time="0.0001">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 12. receives incoming message payload and updates message list" time="0.0000927">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 13. sends chat message via WebSocket socket payload" time="0.0000732">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 14. handles reconnection attempt on WebSocket connection loss" time="0.0000839">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 15. marks message thread as read when active screen is open" time="0.0000796">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 16. registers Expo push notification device token with backend" time="0.000089">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 17. parses incoming push notification payload data" time="0.0000821">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 18. deep-links to specific post screen when notification tapped" time="0.0000624">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 19. toggles push notification channel preferences in user settings" time="0.0000703">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 20. handles silent push notification background sync" time="0.0000604">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 21. fetches current weather forecast for farmer GPS location" time="0.0001016">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 22. fetches mandi commodity prices list filtered by state" time="0.0000701">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 23. handles offline cached mandi price data fallback" time="0.000093">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 24. calculates price variance trend percentage (e.g. +3.5%)" time="0.0000806">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 25. displays government agricultural scheme eligibility criteria" time="0.0000742">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 26. queues post creation payload when internet is offline" time="0.000072">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 27. syncs queued post actions sequentially when online restored" time="0.0001239">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 28. resolves conflicting offline edit versions using server timestamp" time="0.0000607">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 29. displays offline network status banner at top of app screen" time="0.0000532">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 30. verifies memory cleanup on component unmount lifecycle" time="0.0000548">
+        </testcase>
+    </testsuite>
+    <testsuite name="__tests__/agrinex-mobile-unit.test.ts" timestamp="2026-08-10T08:41:16.708Z" hostname="HP_VICTUS_" tests="30" failures="0" errors="0" skipped="0" time="0.0307959">
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 1. verifies initial onboarding screen route name" time="0.002389">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 2. verifies tab router navigation screen names" time="0.0002414">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 3. validates header title string on disease scanner screen" time="0.0003231">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 4. handles modal screen presentation style animation" time="0.0001957">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 5. prevents back navigation from onboarding once completed" time="0.0001503">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 6. validates camera permission status check" time="0.0001446">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 7. validates media library storage permission status" time="0.0001226">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 8. formats camera photo aspect ratio (4:3 default)" time="0.0002692">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 9. compresses selected image quality ratio to 0.8" time="0.0002125">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 10. handles camera flash mode toggle (off -&gt; auto -&gt; on)" time="0.0002707">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 11. serializes user profile state to JSON string" time="0.0001386">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 12. deserializes cached authentication state from AsyncStorage" time="0.0001829">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 13. handles cache clearing on user logout action" time="0.0001165">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 14. verifies offline pending diagnostic scan queue length" time="0.0001283">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 15. verifies preferred language setting default (en)" time="0.0000657">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 16. validates username length constraint (&gt;3 chars)" time="0.0001332">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 17. validates email address input string using Zod schema" time="0.0000789">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 18. checks OTP 6-digit pin code numeric length constraint" time="0.0000841">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 19. formats currency string for Mandi prices (e.g. ₹2,400)" time="0.0201351">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 20. handles pull-to-refresh pull threshold state" time="0.0002564">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 21. triggers light impact haptic feedback on button tap" time="0.0002385">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 22. triggers success notification haptic pattern on scan complete" time="0.0001242">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 23. formats audio recording duration time display (0:15)" time="0.0002735">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 24. handles audio playback speed multiplier options (1x, 1.5x, 2x)" time="0.0008455">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 25. checks device location GPS coordinate validity" time="0.0003247">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 26. handles app foreground / background lifecycle state transition" time="0.0001555">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 27. detects offline network status via NetInfo listener" time="0.0001194">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 28. checks Expo push token registration format string" time="0.0000883">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 29. formats relative time for mobile post list (e.g. 5m)" time="0.0001246">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 30. verifies splash screen auto-hide trigger on app ready" time="0.0000822">
+        </testcase>
+    </testsuite>
+    <testsuite name="__tests__/agrinex-mobile.test.ts" timestamp="2026-08-10T08:41:16.713Z" hostname="HP_VICTUS_" tests="12" failures="0" errors="0" skipped="0" time="0.0076832">
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 1. Expo SDK &amp; Configuration Matrix &gt; verifies app.json Expo SDK configuration and scheme" time="0.0017397">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 1. Expo SDK &amp; Configuration Matrix &gt; validates Android permissions manifest configuration" time="0.0012074">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 2. Navigation &amp; Screen Stack &gt; navigates from Onboarding to Login screen" time="0.0003549">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 2. Navigation &amp; Screen Stack &gt; navigates from Login to Tab Navigator (Home, Scanner, Messaging, Profile)" time="0.0002312">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 3. Camera &amp; Gallery Crop Scanner Integration &gt; simulates camera permission grant state" time="0.0002345">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 3. Camera &amp; Gallery Crop Scanner Integration &gt; handles image picking from device gallery" time="0.000309">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 4. Realtime Socket Messaging &amp; Push Notifications &gt; establishes WebSocket connection for direct messaging" time="0.0001983">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 4. Realtime Socket Messaging &amp; Push Notifications &gt; processes incoming push notification for new message" time="0.0002014">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 5. Offline Storage &amp; Network Resiliency &gt; persists offline cached crop disease reports in AsyncStorage" time="0.0001752">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 5. Offline Storage &amp; Network Resiliency &gt; syncs queued offline scans when network connection is restored" time="0.0002149">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 6. Mobile Performance &amp; Memory Optimization &gt; verifies image asset compression before upload" time="0.0001468">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 6. Mobile Performance &amp; Memory Optimization &gt; maintains 60 FPS scrolling performance during community feed scroll" time="0.0001546">
+        </testcase>
+    </testsuite>
+    <testsuite name="e2e/specs/mobile-e2e.spec.ts" timestamp="2026-08-10T08:41:16.715Z" hostname="HP_VICTUS_" tests="5" failures="0" errors="0" skipped="0" time="0.0038671">
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-AUTH-001: Mobile Registration, OTP, Login and Logout flows" time="0.000944">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-COMMUNITY-002: User Search, Follow, Create Post, Like, Comment" time="0.0002246">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-CHAT-003: New Chat, Message Dispatch, Clear Chat, User Isolation" time="0.0001403">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-SCANNER-004: Camera, Gallery, Crop Diagnosis" time="0.0001306">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-PROFILE-005: Edit Profile, Upload Avatar" time="0.0001244">
+        </testcase>
+    </testsuite>
+</testsuites>

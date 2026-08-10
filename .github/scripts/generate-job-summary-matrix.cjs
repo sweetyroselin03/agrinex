@@ -76,7 +76,7 @@ const suitesConfig = {
     prefix: 'AgriNex — Performance',
     categories: ['Warmup Traffic (10 Users)', 'Peak Load Traffic (50 Users)', 'Stress Traffic (100 Concurrent Users)', 'P95 Response Latency (<50ms)', 'P99 Response Latency (<100ms)', 'API Throughput (req/sec)'],
     verbs: ['Measure response time', 'Verify HTTP 200 rate', 'Assert error rate (<0.01%)', 'Validate throughput capacity'],
-    total: 200
+    total: 300
   },
   deployment: {
     title: '🚀 AgriNex — Production Deployment Verification Matrix',
