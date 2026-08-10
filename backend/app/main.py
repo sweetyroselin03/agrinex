@@ -52,23 +52,14 @@ default_origins = [
     "https://agrinex.onrender.com",
 ]
 
+# Standardize: strip whitespace and trailing slashes
+default_origins = [origin.strip().rstrip('/') for origin in default_origins]
+
 if allowed_origins_str:
-    env_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+    env_origins = [origin.strip().rstrip('/') for origin in allowed_origins_str.split(",") if origin.strip()]
     allow_origins = list(set(default_origins + env_origins))
 else:
     allow_origins = default_origins
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allow_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-from fastapi.middleware.gzip import GZipMiddleware
-app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.middleware("http")
 async def add_cache_headers_middleware(request, call_next):
@@ -153,45 +144,19 @@ async def log_requests(request, call_next):
     logger.info(f"Response status: {response.status_code}")
     return response
 
-import re
-from fastapi import Response
+# GZip middleware (registered before CORSMiddleware so CORSMiddleware wraps it)
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-def is_origin_allowed(origin: str) -> bool:
-    if not origin:
-        return False
-    if origin in allow_origins:
-        return True
-    if re.match(r"^https://.*\.vercel\.app$", origin):
-        return True
-    if re.match(r"^http://localhost(:\d+)?$", origin) or re.match(r"^http://127\.0\.0\.1(:\d+)?$", origin):
-        return True
-    return False
-
-@app.middleware("http")
-async def custom_cors_middleware(request, call_next):
-    origin = request.headers.get("origin")
-    
-    # Handle preflight OPTIONS request directly
-    if request.method == "OPTIONS" and origin:
-        if is_origin_allowed(origin):
-            response = Response(status_code=200)
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            req_headers = request.headers.get("Access-Control-Request-Headers", "*")
-            response.headers["Access-Control-Allow-Headers"] = req_headers
-            response.headers["Access-Control-Max-Age"] = "600"
-            return response
-            
-    response = await call_next(request)
-    
-    # Add CORS headers to actual response
-    if origin and is_origin_allowed(origin):
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Vary"] = "Origin"
-        
-    return response
+# Standard CORSMiddleware (registered LAST to wrap everything, ensuring CORS headers are added to all responses)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ─── Auth (JWT Implementation) ───
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):

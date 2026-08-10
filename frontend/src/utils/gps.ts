@@ -37,7 +37,7 @@ export async function getCurrentGPSLocation(): Promise<GPSLocation> {
         });
       });
     } catch (retryErr) {
-      throw new Error("Failed to retrieve GPS location coordinates after retry.");
+      throw new Error("Failed to retrieve GPS location coordinates after retry.", { cause: retryErr });
     }
   }
 

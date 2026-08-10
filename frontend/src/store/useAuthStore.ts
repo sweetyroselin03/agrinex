@@ -50,32 +50,59 @@ const formatError = (error: any, defaultMsg: string): string => {
   if (!error) return defaultMsg;
   console.error('[Auth Error]', error);
 
-  // Network Error / Server unreachable / CORS Failure
-  if (error.message === 'Network Error' || !error.response) {
-    return 'Unable to reach backend server. Please check internet connection or server status.';
+  // Network / CORS / Timeout errors
+  if (!error.response) {
+    if (error.code === 'ECONNABORTED') {
+      return 'Request Timeout: The server took too long to respond. Please try again.';
+    }
+    // Check online status to distinguish local network issues from server CORS/offline issues
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      return 'Network Error: You appear to be offline. Please check your internet connection.';
+    }
+    return 'CORS or Server Connection Error: Unable to reach backend server. Please verify your origin is allowed and the backend is live.';
   }
 
   const status = error.response.status;
 
   if (status === 401) {
-    return 'Invalid email or password.';
+    return 'Invalid credentials (401 Unauthorized). Please check your email or password.';
   }
 
   if (status === 403) {
-    return 'Access denied.';
+    return 'Access Denied (403 Forbidden). You do not have permission to access this resource.';
   }
 
   if (status === 404) {
-    return 'Requested API endpoint was not found.';
+    return 'Not Found (404). The requested API endpoint was not found on the server.';
+  }
+
+  if (status === 422) {
+    const detail = error.response?.data?.detail;
+    if (Array.isArray(detail)) {
+      const messages = detail.map((e: any) => {
+        const fieldLoc = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : '';
+        if (e.msg === 'Field required' || !e.msg) {
+          if (fieldLoc === 'email') return 'Email address is required';
+          if (fieldLoc === 'full_name') return 'Full Name is required';
+          if (fieldLoc === 'password') return 'Password is required';
+          if (fieldLoc === 'confirm_password' || fieldLoc === 'confirmPassword') return 'Confirm Password is required';
+          if (fieldLoc === 'otp' || fieldLoc === 'code') return 'OTP code is required';
+          return fieldLoc ? `${fieldLoc.replace('_', ' ')} is required` : 'Field required';
+        }
+        return `${fieldLoc ? fieldLoc.replace('_', ' ') + ': ' : ''}${e.msg}`;
+      });
+      return `Validation Error (422): ${messages.join(', ')}`;
+    }
+    return typeof detail === 'string' ? `Validation Error (422): ${detail}` : 'Validation Error (422): Invalid input format.';
   }
 
   if (status === 409) {
     const detail = error.response?.data?.detail;
-    return typeof detail === 'string' ? detail : 'Account already exists.';
+    return typeof detail === 'string' ? detail : 'Conflict (409): Account already exists.';
   }
 
   if (status === 500) {
-    return 'Backend server error.';
+    return 'Internal Server Error (500). Something went wrong on the backend server.';
   }
 
   const detail = error.response?.data?.detail;
