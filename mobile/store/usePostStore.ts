@@ -74,6 +74,9 @@ const getFriendlyError = (error: any, context: string): string => {
   return `Unable to ${context.toLowerCase()}. Please try again.`;
 };
 
+/** Safely coerce a value to an array — handles null, undefined, and non-array shapes from stale persisted state */
+const safeArray = <T,>(v: T[] | null | undefined): T[] => (Array.isArray(v) ? v : []);
+
 export const usePostStore = create<PostState>()(
   persist(
     (set, get) => ({
@@ -139,8 +142,8 @@ export const usePostStore = create<PostState>()(
           const response = await client.post('/posts', payload);
           const newPost = response.data;
           set({ 
-            posts: [newPost, ...get().posts],
-            userPosts: [newPost, ...get().userPosts],
+            posts: [newPost, ...safeArray(get().posts)],
+            userPosts: [newPost, ...safeArray(get().userPosts)],
             isLoading: false 
           });
         } catch (error: any) {
@@ -150,7 +153,7 @@ export const usePostStore = create<PostState>()(
         }
       },
       likePost: async (postId) => {
-        const previousPosts = get().posts;
+        const previousPosts = safeArray(get().posts);
         const updatedPosts = previousPosts.map((post) => {
           if (post.id === postId) {
             return { 
@@ -166,7 +169,7 @@ export const usePostStore = create<PostState>()(
         try {
           const response = await client.post(`/posts/${postId}/like`);
           set({ 
-            posts: get().posts.map(p => p.id === postId ? { ...p, likes_count: response.data.likes_count, is_liked: response.data.liked } : p) 
+            posts: safeArray(get().posts).map(p => p.id === postId ? { ...p, likes_count: response.data.likes_count, is_liked: response.data.liked } : p) 
           });
         } catch (error: any) {
           console.warn('[PostStore] Like post failed:', error?.message);
@@ -174,10 +177,10 @@ export const usePostStore = create<PostState>()(
         }
       },
       toggleSavePost: async (postId: number) => {
-        const previousSavedIds = get().savedPostIds;
-        const previousSavedPosts = get().savedPosts;
+        const previousSavedIds = safeArray(get().savedPostIds);
+        const previousSavedPosts = safeArray(get().savedPosts);
         const isSaved = previousSavedIds.includes(postId);
-        const targetPost = get().posts.find(p => p.id === postId);
+        const targetPost = safeArray(get().posts).find(p => p.id === postId);
         
         // Optimistic Update
         if (isSaved) {
@@ -193,35 +196,35 @@ export const usePostStore = create<PostState>()(
         }
         
         set({
-          posts: get().posts.map(p => p.id === postId ? { ...p, is_saved: !isSaved } : p)
+          posts: safeArray(get().posts).map(p => p.id === postId ? { ...p, is_saved: !isSaved } : p)
         });
 
         try {
           const response = await client.post(`/posts/${postId}/save`);
           const savedStatus = response.data.saved;
-          const currentSavedIds = get().savedPostIds.filter(id => id !== postId);
+          const currentSavedIds = safeArray(get().savedPostIds).filter(id => id !== postId);
           if (savedStatus) {
-            const postToAdd = get().posts.find(p => p.id === postId);
+            const postToAdd = safeArray(get().posts).find(p => p.id === postId);
             set({
               savedPostIds: [...currentSavedIds, postId],
               savedPosts: postToAdd
-                ? [...get().savedPosts.filter(p => p.id !== postId), { ...postToAdd, is_saved: true }]
-                : get().savedPosts,
+                ? [...safeArray(get().savedPosts).filter(p => p.id !== postId), { ...postToAdd, is_saved: true }]
+                : safeArray(get().savedPosts),
             });
           } else {
             set({
               savedPostIds: currentSavedIds,
-              savedPosts: get().savedPosts.filter(p => p.id !== postId),
+              savedPosts: safeArray(get().savedPosts).filter(p => p.id !== postId),
             });
           }
           set({
-            posts: get().posts.map(p => p.id === postId ? { ...p, is_saved: savedStatus } : p)
+            posts: safeArray(get().posts).map(p => p.id === postId ? { ...p, is_saved: savedStatus } : p)
           });
         } catch (error: any) {
           console.warn('[PostStore] Toggle save post failed:', error?.message);
           set({ savedPostIds: previousSavedIds, savedPosts: previousSavedPosts });
           set({
-            posts: get().posts.map(p => p.id === postId ? { ...p, is_saved: isSaved } : p)
+            posts: safeArray(get().posts).map(p => p.id === postId ? { ...p, is_saved: isSaved } : p)
           });
         }
       },
@@ -230,8 +233,8 @@ export const usePostStore = create<PostState>()(
           const response = await client.put(`/posts/${postId}`, { content });
           const updatedPost = response.data;
           set({
-            posts: get().posts.map(p => p.id === postId ? updatedPost : p),
-            userPosts: get().userPosts.map(p => p.id === postId ? updatedPost : p)
+            posts: safeArray(get().posts).map(p => p.id === postId ? updatedPost : p),
+            userPosts: safeArray(get().userPosts).map(p => p.id === postId ? updatedPost : p)
           });
         } catch (error: any) {
           console.warn('[PostStore] Edit post failed:', error?.message);
@@ -242,10 +245,10 @@ export const usePostStore = create<PostState>()(
         try {
           await client.delete(`/posts/${postId}`);
           set({ 
-            posts: get().posts.filter((post) => post.id !== postId),
-            userPosts: get().userPosts.filter((post) => post.id !== postId),
-            savedPosts: get().savedPosts.filter((post) => post.id !== postId),
-            savedPostIds: get().savedPostIds.filter((id) => id !== postId)
+            posts: safeArray(get().posts).filter((post) => post.id !== postId),
+            userPosts: safeArray(get().userPosts).filter((post) => post.id !== postId),
+            savedPosts: safeArray(get().savedPosts).filter((post) => post.id !== postId),
+            savedPostIds: safeArray(get().savedPostIds).filter((id) => id !== postId)
           });
         } catch (error: any) {
           console.warn('[PostStore] Delete post failed:', error?.message);
@@ -255,7 +258,7 @@ export const usePostStore = create<PostState>()(
         try {
           await client.post(`/posts/${postId}/comments`, { content });
           set({
-            posts: get().posts.map(p => p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p)
+            posts: safeArray(get().posts).map(p => p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p)
           });
         } catch (error: any) {
           console.warn('[PostStore] Add comment failed:', error?.message);
@@ -276,6 +279,11 @@ export const usePostStore = create<PostState>()(
       name: 'agrinex-post-storage',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ savedPostIds: state.savedPostIds, savedPosts: state.savedPosts }),
+      merge: (persistedState: any, currentState) => ({
+        ...currentState,
+        savedPosts: Array.isArray(persistedState?.savedPosts) ? persistedState.savedPosts : currentState.savedPosts,
+        savedPostIds: Array.isArray(persistedState?.savedPostIds) ? persistedState.savedPostIds : currentState.savedPostIds,
+      }),
     }
   )
 );

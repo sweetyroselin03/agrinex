@@ -32,13 +32,14 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { isDarkMode, theme } = useAppTheme();
   const {
-    notifications = [],
+    notifications: _notifications,
     fetchNotifications,
     markAllRead,
     markOneRead,
     clearAll,
     isLoading
   } = useNotificationStore();
+  const notifications = Array.isArray(_notifications) ? _notifications : [];
 
   const [refreshing, setRefreshing] = useState(false);
 

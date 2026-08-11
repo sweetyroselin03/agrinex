@@ -134,7 +134,12 @@ export default function ProfileTab() {
   const initialTab = params?.initialTab as string;
 
   const { user, updateProfile, checkAuth } = useAuthStore();
-  const { posts = [], userPosts = [], fetchPosts, fetchUserPosts, fetchSavedPosts, savedPosts = [], savedPostIds = [], deletePost, editPost, toggleSavePost } = usePostStore();
+  const { posts: _posts, userPosts: _userPosts, fetchPosts, fetchUserPosts, fetchSavedPosts, savedPosts: _savedPosts, savedPostIds: _savedPostIds, deletePost, editPost, toggleSavePost } = usePostStore();
+  // Runtime safety: normalize store arrays to handle null from stale persisted state
+  const posts = Array.isArray(_posts) ? _posts : [];
+  const userPosts = Array.isArray(_userPosts) ? _userPosts : [];
+  const savedPosts = Array.isArray(_savedPosts) ? _savedPosts : [];
+  const savedPostIds = Array.isArray(_savedPostIds) ? _savedPostIds : [];
   const { isDarkMode, theme } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState('posts'); // tabs: posts, scans, saved

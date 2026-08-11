@@ -61,7 +61,7 @@ export default function MessagesScreen() {
   const { user } = useAuthStore();
 
   const {
-    conversations = [],
+    conversations: _conversations,
     activeConversationId,
     messages,
     typingUsers,
@@ -85,6 +85,7 @@ export default function MessagesScreen() {
     connectWebSocket,
     sendTypingSignal,
   } = useDirectChatStore();
+  const conversations = Array.isArray(_conversations) ? _conversations : [];
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
