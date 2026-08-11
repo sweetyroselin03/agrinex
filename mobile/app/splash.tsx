@@ -41,7 +41,7 @@ export default function Splash() {
   const particles = useRef(
     Array.from({ length: 12 }).map(() => ({
       x: Math.random() * width,
-      y: useRef(new Animated.Value(height + 20)).current,
+      y: new Animated.Value(height + 20),
       size: Math.random() * 6 + 4,
       opacity: Math.random() * 0.5 + 0.3,
       duration: Math.random() * 2000 + 2000,

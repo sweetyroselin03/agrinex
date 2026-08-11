@@ -68,6 +68,8 @@
   },
   "private": true,
   "overrides": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "postcss": "^8.5.26",
     "tar": "^7.5.22",
     "websocket-driver": "^0.7.5",
