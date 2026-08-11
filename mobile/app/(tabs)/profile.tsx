@@ -134,7 +134,7 @@ export default function ProfileTab() {
   const initialTab = params?.initialTab as string;
 
   const { user, updateProfile, checkAuth } = useAuthStore();
-  const { posts, userPosts, fetchPosts, fetchUserPosts, fetchSavedPosts, savedPosts, savedPostIds, deletePost, editPost, toggleSavePost } = usePostStore();
+  const { posts = [], userPosts = [], fetchPosts, fetchUserPosts, fetchSavedPosts, savedPosts = [], savedPostIds = [], deletePost, editPost, toggleSavePost } = usePostStore();
   const { isDarkMode, theme } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState('posts'); // tabs: posts, scans, saved

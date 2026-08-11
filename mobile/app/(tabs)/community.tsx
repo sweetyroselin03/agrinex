@@ -104,7 +104,7 @@ export default function CommunityTab() {
   const { user, followUser } = useAuthStore();
   const { isDarkMode, theme } = useAppTheme();
 
-  const { posts, fetchPosts, likePost, createPost, isLoading, error, clearError, addComment, fetchComments, toggleSavePost, savedPostIds, deletePost } = usePostStore();
+  const { posts = [], fetchPosts, likePost, createPost, isLoading, error, clearError, addComment, fetchComments, toggleSavePost, savedPostIds = [], deletePost } = usePostStore();
   const [refreshing, setRefreshing] = useState(false);
 
   const [isPostModalVisible, setIsPostModalVisible] = useState(false);

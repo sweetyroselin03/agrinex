@@ -36,7 +36,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ isLoading: true });
     try {
       const res = await client.get('/notifications');
-      const notifs: Notification[] = res.data || [];
+      const notifs: Notification[] = Array.isArray(res.data) ? res.data : [];
       const unread = notifs.filter(n => !n.is_read).length;
       set({ notifications: notifs, unreadCount: unread, isLoading: false });
     } catch (e: any) {

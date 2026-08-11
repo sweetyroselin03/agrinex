@@ -32,7 +32,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { isDarkMode, theme } = useAppTheme();
   const {
-    notifications,
+    notifications = [],
     fetchNotifications,
     markAllRead,
     markOneRead,

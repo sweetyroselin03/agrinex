@@ -125,7 +125,7 @@ export const useDirectChatStore = create<DirectChatState>()(
         for (const ep of endpoints) {
           try {
             const res = await client.get(ep);
-            const rawList: DirectConversation[] = res.data || [];
+            const rawList: DirectConversation[] = Array.isArray(res.data) ? res.data : [];
             rawList.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
             set({ conversations: rawList, isLoadingConversations: false });
             return;

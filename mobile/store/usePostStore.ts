@@ -90,7 +90,7 @@ export const usePostStore = create<PostState>()(
         const attemptFetch = async (attempt: number): Promise<void> => {
           try {
             const response = await client.get('/posts');
-            const posts = response.data || [];
+            const posts = Array.isArray(response.data) ? response.data : [];
             const savedIds = posts.filter((p: any) => p.is_saved).map((p: any) => p.id);
             set({ posts, savedPostIds: savedIds, isLoading: false, error: null });
           } catch (error: any) {
@@ -111,7 +111,7 @@ export const usePostStore = create<PostState>()(
       fetchSavedPosts: async () => {
         try {
           const response = await client.get('/posts/saved');
-          const savedPostsList: Post[] = response.data || [];
+          const savedPostsList: Post[] = Array.isArray(response.data) ? response.data : [];
           const savedIds = savedPostsList.map((p: any) => p.id);
           set({ savedPosts: savedPostsList, savedPostIds: savedIds });
         } catch (error: any) {
@@ -121,7 +121,7 @@ export const usePostStore = create<PostState>()(
       fetchUserPosts: async () => {
         try {
           const response = await client.get('/posts/user');
-          set({ userPosts: response.data || [] });
+          set({ userPosts: Array.isArray(response.data) ? response.data : [] });
         } catch (error: any) {
           console.warn('[PostStore] Fetch user posts failed:', error?.message);
         }

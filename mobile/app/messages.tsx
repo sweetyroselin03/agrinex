@@ -61,7 +61,7 @@ export default function MessagesScreen() {
   const { user } = useAuthStore();
 
   const {
-    conversations,
+    conversations = [],
     activeConversationId,
     messages,
     typingUsers,
