@@ -56,6 +56,20 @@ jobs:
           python -m pip install semgrep
           semgrep scan --config auto --severity ERROR || echo "Semgrep scan completed"
 
+      - name: "📊 Generate Security Excel report"
+        if: always()
+        run: |
+          npm install exceljs --no-save --no-audit --ignore-scripts
+          node scripts/generate-excel-report.js --suite=security --output=Security_Test_Report.xlsx
+
+      - name: "📤 Upload Security Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-test-report
+          path: Security_Test_Report.xlsx
+          retention-days: 7
+
   # ════════════════════════════════════════════════════════════════════════════
   # JOB 2 – Vulnerability Scan
   # ════════════════════════════════════════════════════════════════════════════
@@ -114,6 +128,11 @@ jobs:
           BRANCH: ${{ github.ref_name }}
         run: node .github/scripts/generate-security-reports.cjs
 
+      - name: "📊 Generate Vulnerability Excel report"
+        if: always()
+        run: |
+          node scripts/generate-excel-report.js --suite=vulnerability --output=Vulnerability_Test_Report.xlsx
+
       - name: "📋 Publish Vulnerability Summary"
         if: always()
         run: node .github/scripts/generate-job-summary-matrix.cjs vulnerability
@@ -124,6 +143,14 @@ jobs:
         with:
           name: security-reports
           path: Vulnerability Test Results/
+          retention-days: 7
+
+      - name: "📤 Upload Vulnerability Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-test-report
+          path: Vulnerability_Test_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -224,7 +251,7 @@ jobs:
         if: always()
         run: |
           npm install exceljs --no-save --no-audit --ignore-scripts
-          node ../scripts/generate-excel-report.js --suite=frontend --input=frontend-test-results.xml --output=Frontend_Test_Cases_Report.xlsx
+          node ../scripts/generate-excel-report.js --suite=frontend --input=frontend-test-results.xml --output=Frontend_Test_Report.xlsx
         working-directory: frontend
 
       - name: "📋 Publish Test Summary"
@@ -238,7 +265,15 @@ jobs:
           name: frontend-test-reports
           path: |
             frontend/frontend-test-results.xml
-            frontend/Frontend_Test_Cases_Report.xlsx
+            frontend/Frontend_Test_Report.xlsx
+          retention-days: 7
+
+      - name: "📤 Upload Frontend Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-report
+          path: frontend/Frontend_Test_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -685,6 +720,13 @@ jobs:
           name: backend-test-report
           path: backend-reports
 
+      - name: "📥 Download frontend Excel report"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: frontend-test-report
+          path: frontend-reports
+
       - name: "📥 Download web Playwright Excel report"
         uses: actions/download-artifact@v4
         continue-on-error: true
@@ -713,14 +755,31 @@ jobs:
           name: load-performance-test-report
           path: load-reports
 
+      - name: "📥 Download security Excel report"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: security-test-report
+          path: security-reports
+
+      - name: "📥 Download vulnerability Excel report"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: vulnerability-test-report
+          path: vulnerability-reports
+
       - name: "📊 Verify Excel test case reports"
         run: |
-          echo "Verifying presence of all 5 standardized Excel reports..."
+          echo "Verifying presence of all 8 standardized Excel reports..."
           ls -l backend-reports/Backend_API_Test_Report.xlsx
+          ls -l frontend-reports/Frontend_Test_Report.xlsx
           ls -l web-reports/Web_E2E_Playwright_Test_Report.xlsx
           ls -l mobile-reports/Mobile_Test_Report.xlsx
           ls -l selenium-reports/Selenium_Test_Report.xlsx
           ls -l load-reports/Load_Performance_Test_Report.xlsx
+          ls -l security-reports/Security_Test_Report.xlsx
+          ls -l vulnerability-reports/Vulnerability_Test_Report.xlsx
 
       - name: "📋 Publish Combined Step Summary Dashboard"
         env:
