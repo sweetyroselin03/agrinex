@@ -13,3 +13,13 @@ dist/
 build/
 .venv/
 venv/
+
+# Test Reports and Results
+*.xlsx
+*-results.xml
+*-results.json
+*cov/
+coverage/
+security-artifacts/
+vulnerability-reports/
+load-test-reports/

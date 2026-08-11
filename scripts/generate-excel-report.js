@@ -15,19 +15,13 @@ const targetSuite = suiteArg ? suiteArg.split('=')[1] : null;
 const inputPath = inputArg ? inputArg.split('=')[1] : null;
 const outputPath = outputArg ? outputArg.split('=')[1] : null;
 
-// Default Paths for all 8 suites
+// Default Paths for the 6 core suites
 const DEFAULTS = {
   backend: {
     input: 'backend/backend-test-results.xml',
     output: 'Backend_API_Test_Report.xlsx',
     title: 'AgriNex Backend API Test Report',
     suiteName: 'Backend API'
-  },
-  frontend: {
-    input: 'frontend/frontend-test-results.xml',
-    output: 'Frontend_Test_Report.xlsx',
-    title: 'AgriNex Frontend Test Report',
-    suiteName: 'Frontend Unit'
   },
   'web-e2e': {
     input: 'frontend/playwright-results.xml',
@@ -53,14 +47,8 @@ const DEFAULTS = {
     title: 'AgriNex Load & Performance Test Report',
     suiteName: 'Load & Performance'
   },
-  security: {
-    input: '', // generated purely on-the-fly or simulated from Semgrep
-    output: 'Security_Test_Report.xlsx',
-    title: 'AgriNex Semgrep & Gitleaks Security Audit Report',
-    suiteName: 'Security Audit'
-  },
   vulnerability: {
-    input: '', // generated from Trivy/npm audit
+    input: 'backend/security-results.xml',
     output: 'Vulnerability_Test_Report.xlsx',
     title: 'AgriNex Trivy & Package Vulnerability Test Report',
     suiteName: 'Vulnerability Scan'
