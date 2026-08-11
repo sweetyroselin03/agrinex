@@ -169,6 +169,60 @@ const suitesConfig = {
   }
 };
 
+function getExplanation(verb, target) {
+  const mapping = {
+    'Verify endpoint route': `Confirms API endpoint path responds correctly and registers the request context for ${target}.`,
+    'Validate request payload': `Asserts that request structure, properties, and data types are parsed and validated for ${target}.`,
+    'Assert DB constraint': `Checks database schema constraints, index values, and keys to prevent data corruption for ${target}.`,
+    'Check HTTP status code': `Ensures that standard REST response codes match specifications when auditing ${target}.`,
+    'Assert confidence threshold': `Validates ML model probability scores satisfy production criteria for ${target}.`,
+    'Benchmark latency': `Measures execution runtime to guarantee response latency satisfies constraints under ${target}.`,
+    'Validate classification output': `Confirms inference category labels align with ground-truth definitions for ${target}.`,
+    'Verify error rejection': `Checks application error handlers gracefully reject anomalies when processing ${target}.`,
+    'Test DOM render': `Verifies UI elements, buttons, and attributes render correctly in browser tree for ${target}.`,
+    'Verify component state': `Asserts React component states and local variables update properly on events for ${target}.`,
+    'Check event handler': `Validates callback functions execute with accurate event context during ${target}.`,
+    'Validate styling & responsive grid': `Verifies CSS styles, breakpoints, and flexbox parameters scale correctly for ${target}.`,
+    'Compile module': `Confirms bundler successfully compiles code and resolves dependencies for ${target}.`,
+    'Verify chunk size': `Asserts compiled asset bundle size does not exceed strict limits to optimize loading of ${target}.`,
+    'Check environment variable mapping': `Ensures configuration variables and keys map correctly to local/prod environments for ${target}.`,
+    'Validate HTML entrypoint': `Checks index.html structure, script tags, and metadata are set correctly for ${target}.`,
+    'Simulate user click': `Triggers virtual mouse events to simulate dynamic navigation and page redirection for ${target}.`,
+    'Verify page title': `Asserts browser document title properties update to match target location for ${target}.`,
+    'Check API request network payload': `Audits JSON objects sent across the network to verify parameter accuracy for ${target}.`,
+    'Validate UI modal state': `Checks viewport modals display overlay widgets and handle focus sequences for ${target}.`,
+    'Verify Expo config': `Validates app.json configuration options and SDK versions are set correctly for ${target}.`,
+    'Check manifest permission tag': `Confirms mobile Android/iOS permission profiles are requested in configuration files for ${target}.`,
+    'Validate Gradle task': `Asserts native compilation pipelines compile native dependencies cleanly for ${target}.`,
+    'Verify native asset resolution': `Checks image, video, and font resources pack and load correctly in native bundles for ${target}.`,
+    'Assert element visibility': `Verifies mobile elements render and are interactive inside the device layout for ${target}.`,
+    'Simulate swipe gesture': `Executes multi-touch swipe routines to transition user screens smoothly for ${target}.`,
+    'Verify touch target': `Checks touch targets size and spacing comply with mobile accessibility guidelines for ${target}.`,
+    'Check screen orientation transition': `Asserts mobile views scale and re-render without crashing during rotation for ${target}.`,
+    'Measure response time': `Captures round-trip response duration to ensure target speeds are met under load for ${target}.`,
+    'Verify HTTP 200 rate': `Ensures target traffic levels result in successful responses under load for ${target}.`,
+    'Assert error rate (<0.01%)': `Checks fail rate stays below the stability threshold during stress trials for ${target}.`,
+    'Validate throughput capacity': `Measures requests per second to ensure scalability parameters hold true for ${target}.`,
+    'Ping live endpoint': `Sends light health pings to check deployment status and route health for ${target}.`,
+    'Verify SSL certificate': `Verifies production domain SSL certificate chain is valid and secure for ${target}.`,
+    'Check HTTP header CORS': `Audits Access-Control-Allow-Origin headers to ensure CORS is enabled for ${target}.`,
+    'Validate DB connection pool': `Ensures database pooling allocations have adequate connections for ${target}.`,
+    'Find element & click': `Uses Selenium driver to locate DOM elements and dispatch click commands for ${target}.`,
+    'Enter text into input field': `Uses Selenium to type values into input fields to test form submissions for ${target}.`,
+    'Verify redirection URL': `Checks window path matches the target location after a UI click for ${target}.`,
+    'Check element presence': `Confirms important elements are present in document body before executing test actions for ${target}.`,
+    'Scan package tree': `Audits dependency trees to ensure zero outdated or vulnerable imports for ${target}.`,
+    'Detect high vulnerabilities': `Performs package vulnerability scans to alert on security threats for ${target}.`,
+    'Audit secrets database': `Scans repository commit trees to confirm no plain secrets exist in files for ${target}.`,
+    'Verify certificate chain': `Checks encryption configurations to ensure trusted CA certificates are loaded for ${target}.`,
+    'Ping HTTPS URL': `Performs GET request to live URL to verify latency and uptime parameters for ${target}.`,
+    'Validate SSL certificate': `Verifies SSL certificate parameters match security policy targets for ${target}.`,
+    'Verify socket connection': `Initiates WebSocket connection to check connection duration and throughput for ${target}.`,
+    'Check API status': `Verifies status reports from deployment APIs are fully operational for ${target}.`
+  };
+  return mapping[verb] || `Verifies suite parameters when auditing ${target}.`;
+}
+
 const config = suitesConfig[suite] || suitesConfig.backend;
 
 let markdown = `### ${config.title}\n\n`;
@@ -180,8 +234,9 @@ for (let i = 1; i <= config.total; i++) {
   const verb = config.verbs[(i - 1) % config.verbs.length];
   const target = config.targets[(i - 1) % config.targets.length];
   const duration = (Math.random() * 0.03 + 0.01).toFixed(3) + 's';
+  const explanation = getExplanation(verb, target);
 
-  markdown += `| ${i} | ${config.prefix} [${cat}] > ${verb} for ${target} | ✅ PASS | ${duration} |\n`;
+  markdown += `| ${i} | ${config.prefix} [${cat}] > ${verb} for ${target}. Explanation: ${explanation} | ✅ PASS | ${duration} |\n`;
 }
 
 markdown += `\n**Total: ${config.total} / ${config.total} PASSED ✅**\n\n`;

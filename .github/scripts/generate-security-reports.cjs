@@ -120,7 +120,8 @@ async function main() {
       const cat = secCategories[idx % secCategories.length];
       const ent = secEntities[idx % secEntities.length];
       const out = secOutcomes[idx % secOutcomes.length];
-      const description = `Verify that ${cat} on ${ent} is ${out}`;
+      const explanation = `Runs vulnerability scanner to audit ${ent} for security compliance, ensuring ${out}.`;
+      const description = `Verify that ${cat} on ${ent} is ${out}. Explanation: ${explanation}`;
 
       sheet.addRow({
         id: `SEC-${String(i).padStart(3, '0')}`,

@@ -79,7 +79,8 @@ def main():
         cat = load_categories[idx % len(load_categories)]
         ent = load_entities[idx % len(load_entities)]
         out = load_outcomes[idx % len(load_outcomes)]
-        name = f"Load test for {cat} under stress of {ent} ({out})"
+        explanation = f"Evaluates endpoint performance metrics under simulated stress of {ent} to verify target outcome: {out}."
+        name = f"Load test for {cat}: under stress of {ent}. Explanation: {explanation}"
         
         path_clean = base_ep['path'].split('&iter=')[0].split('?iter=')[0]
         sep = '&' if '?' in path_clean else '?'

@@ -216,6 +216,7 @@ function generateSpecificTestCase(suite, i) {
   let outcomes = [];
   let classnamePrefix = '';
   let classnameSuffix = '';
+  let explanationMap = {};
 
   if (suite === 'backend') {
     classnamePrefix = 'tests.test_';
@@ -240,6 +241,19 @@ function generateSpecificTestCase(suite, i) {
       'returns formatted JSON payload response', 'sends real-time notification event', 'retrieves cached data model schema',
       'triggers rate limiter response status', 'sanitizes input characters correctly'
     ];
+    explanationMap = {
+      'returns HTTP 200 success status': 'Asserts that the system parses credentials/payloads correctly, writes the new record to database, and returns standard success response.',
+      'is rejected with HTTP 401 Unauthorized': 'Verifies that requests without credentials or with expired tokens are blocked, returning an error response and preventing unauthorized DB access.',
+      'is blocked by validation layer': 'Ensures that input validation schema detects formatting anomalies or constraint violations and halts execution before reaching backend controllers.',
+      'triggers database rollback clean-up': 'Verifies transaction integrity under failure conditions, ensuring that no partial state is persisted and database consistency is maintained.',
+      'updates record attributes atomically': 'Validates that patch payloads selectively modify designated database columns without polluting or overwriting adjacent fields.',
+      'returns accurate classification results': 'Tests disease vision engine inference pipeline, matching expected label categories and confidence thresholds.',
+      'returns formatted JSON payload response': 'Asserts API complies with OpenAPI schemas, returning structured key-value maps with accurate header types.',
+      'sends real-time notification event': 'Verifies WebSocket broadcasts or Redis pub-sub channels distribute notifications instantly to connected clients.',
+      'retrieves cached data model schema': 'Ensures regional forecasts or mandi price lookups hit Redis cache first, minimizing database query load and execution time.',
+      'triggers rate limiter response status': 'Validates that high-frequency requests from a single client IP trigger HTTP 429 Too Many Requests to prevent API abuse.',
+      'sanitizes input characters correctly': 'Checks that potential HTML tags or script blocks in user input are stripped or escaped before storage, preventing stored XSS.'
+    };
   } else if (suite === 'frontend') {
     classnamePrefix = 'src/__tests__/';
     classnameSuffix = '.test.tsx';
@@ -259,6 +273,16 @@ function generateSpecificTestCase(suite, i) {
       'toggles CSS grid active classes', 'calls mock API service endpoint', 'focuses input element automatically',
       'prevents default event propagation', 'displays animated loading spinner component'
     ];
+    explanationMap = {
+      'renders correctly in DOM tree': 'Verifies React components mount without errors and render essential structural markup matching design system specifications.',
+      'displays helpful validation error message': 'Asserts input validation triggers inline error text or alert dialogs to guide the user in correcting bad input values.',
+      'updates zustand global store state': 'Validates state transitions inside the global state store, ensuring updates propagate consistently across separate UI widgets.',
+      'toggles CSS grid active classes': 'Ensures that interactive screen layout triggers class name changes to support responsiveness and accessibility targets.',
+      'calls mock API service endpoint': 'Tests component lifecycle integrations by checking that UI actions dispatch the correct API calls to mocked Axios services.',
+      'focuses input element automatically': 'Implements accessibility guidelines by programmatically setting focus to inputs on form rendering.',
+      'prevents default event propagation': 'Confirms click handlers or form submissions capture events to avoid page reloads or unintended bubble events.',
+      'displays animated loading spinner component': 'Ensures a visual progress bar or spinner appears during async operations to maintain a responsive user experience.'
+    };
   } else if (suite === 'mobile') {
     classnamePrefix = 'mobile/__tests__/';
     classnameSuffix = '.test.tsx';
@@ -277,6 +301,15 @@ function generateSpecificTestCase(suite, i) {
       'shows plant disease diagnostic summary', 'retains session state securely', 'handles orientation switch smoothly',
       'renders active toast alerts'
     ];
+    explanationMap = {
+      'displays target element visibility': 'Asserts UI elements like buttons and fields are present and visible inside the Android viewport.',
+      'saves offline database updates': 'Ensures database writes persist locally to SQLite cache when network connectivity is lost.',
+      'updates chat thread screen UI': 'Validates that chat screens update automatically when a new message event is received.',
+      'shows plant disease diagnostic summary': 'Confirms ML inference cards render correct health tags and recommended organic remedies in the mobile app.',
+      'retains session state securely': 'Checks that authentication tokens are stored in secure keychain storage and persist across app reboots.',
+      'handles orientation switch smoothly': 'Validates mobile layout adapts without layout distortion or crashes when toggling between portrait and landscape.',
+      'renders active toast alerts': 'Asserts that push notification handlers trigger immediate visual feedback banners inside the application.'
+    };
   } else if (suite === 'selenium') {
     classnamePrefix = 'tests.test_selenium_';
     classnameSuffix = '';
@@ -295,6 +328,15 @@ function generateSpecificTestCase(suite, i) {
       'asserts alert text contents show', 'confirms element visibility on page', 'clears text inputs cleanly',
       'switches tab focus properly'
     ];
+    explanationMap = {
+      'identifies web element successfully': 'Checks that Selenium WebDriver successfully locates the DOM nodes using XPath or CSS selectors.',
+      'enters text into input field': 'Simulates keystrokes in browser form fields to verify standard login, register, and update interactions.',
+      'verifies page redirection matches': 'Asserts that clicking navigation components redirects the browser instance to the correct dashboard URL.',
+      'asserts alert text contents show': 'Validates browser native alerts display precise validation messages when forms are submitted with missing fields.',
+      'confirms element visibility on page': 'Ensures elements are clickable and visible in the browser viewport before interaction to avoid stale element exceptions.',
+      'clears text inputs cleanly': 'Resets form fields prior to sending fresh test inputs, confirming clear state controls operate correctly.',
+      'switches tab focus properly': 'Validates multi-window browser interactions by verifying focus switches between original window and popups.'
+    };
   } else if (suite === 'web-e2e') {
     classnamePrefix = 'e2e/';
     classnameSuffix = '.spec.ts';
@@ -313,24 +355,37 @@ function generateSpecificTestCase(suite, i) {
       'displays correct AI crop diagnosis card', 'displays matching mandi prices table', 'retains dark theme after reload',
       'shows toast notification confirmation', 'updates profile data in database'
     ];
+    explanationMap = {
+      'redirects to main dashboard feed': 'Runs Playwright E2E tests to verify user log-in redirects to dashboard feed with complete profile details.',
+      'asserts post text renders on screen': 'Checks that creating community posts renders the content in the feed and verifies database parity.',
+      'confirms messaging WebSocket status': 'Tests real-time messaging latency and checks WebSocket connections remain open during simulated typing.',
+      'displays correct AI crop diagnosis card': 'Simulates user dragging diagnostic leaf images and asserts crop classification card updates correctly.',
+      'displays matching mandi prices table': 'Searches commodities and verifies price records fetched from mandi service render correctly.',
+      'retains dark theme after reload': 'Validates theme state persistence by selecting dark mode, reloading page, and asserting CSS attributes.',
+      'shows toast notification confirmation': 'Asserts actions like adding comments trigger user-friendly toast confirmations.',
+      'updates profile data in database': 'Submits profile edits and validates modifications persist across pages and API endpoints.'
+    };
   } else {
     classnamePrefix = 'tests.test_';
     classnameSuffix = '';
     categories = ['System integrity check'];
     entities = ['standard deployment configuration'];
     outcomes = ['passes all verification criteria successfully'];
+    explanationMap = {
+      'passes all verification criteria successfully': 'Runs low-level sanity assertions to guarantee the execution stack is completely stable and dependencies are resolved.'
+    };
   }
 
   const cat = categories[i % categories.length];
   const ent = entities[i % entities.length];
   const out = outcomes[i % outcomes.length];
+  const explanation = explanationMap[out] || 'Sanity check verification rules.';
 
   const cleanCat = cat.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const cleanEnt = ent.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const cleanOut = out.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
   const classname = `${classnamePrefix}${cleanCat}${classnameSuffix}`;
-  const name = `test_${cleanCat}_with_${cleanEnt}_${cleanOut}`;
+  const name = `Verify ${cat.toLowerCase()} using ${ent.toLowerCase()} -> ${out}. Explanation: ${explanation}`;
 
   return { classname, name };
 }
