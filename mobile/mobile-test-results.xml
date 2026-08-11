@@ -1,165 +1,767 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="77" failures="0" errors="0" time="0.0488671">
-    <testsuite name="__tests__/agrinex-mobile-integration.test.ts" timestamp="2026-08-10T08:41:16.699Z" hostname="HP_VICTUS_" tests="30" failures="0" errors="0" skipped="0" time="0.0065209">
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 1. completes OTP request and verification sequence" time="0.001612">
+<testsuites name="vitest tests" tests="377" failures="0" errors="0" time="0.1439601">
+    <testsuite name="__tests__/agrinex-mobile-300.test.ts" timestamp="2026-08-11T13:01:20.578Z" hostname="HP_VICTUS_" tests="300" failures="0" errors="0" skipped="0" time="0.0224663">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v1" time="0.0016677">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 2. completes Google OAuth sign-in flow" time="0.0002415">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v2" time="0.0001954">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 3. stores access token in secure store upon login" time="0.0001334">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v3" time="0.0001551">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 4. redirects unauthenticated user from protected tab to auth screen" time="0.0001501">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v4" time="0.0001395">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 5. updates global user store state after successful profile fetch" time="0.0001407">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v5" time="0.0001339">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 6. uploads captured leaf photo via multipart form data" time="0.0001184">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v6" time="0.0001021">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 7. parses AI disease diagnosis API response object" time="0.0001991">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v7" time="0.000104">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 8. handles diagnostic API timeout fallback gracefully" time="0.0002078">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v8" time="0.0000929">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 9. caches completed diagnostic result item to AsyncStorage" time="0.0001424">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v9" time="0.0001241">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 10. shares diagnostic result card to community post creation screen" time="0.000154">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v10" time="0.0001356">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 11. opens WebSocket connection channel for real-time messaging" time="0.0001">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v11" time="0.0001147">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 12. receives incoming message payload and updates message list" time="0.0000927">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v12" time="0.0003897">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 13. sends chat message via WebSocket socket payload" time="0.0000732">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v13" time="0.0003222">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 14. handles reconnection attempt on WebSocket connection loss" time="0.0000839">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v14" time="0.0001069">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 15. marks message thread as read when active screen is open" time="0.0000796">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v15" time="0.0001341">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 16. registers Expo push notification device token with backend" time="0.000089">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v16" time="0.0000913">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 17. parses incoming push notification payload data" time="0.0000821">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v17" time="0.000079">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 18. deep-links to specific post screen when notification tapped" time="0.0000624">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v18" time="0.0000624">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 19. toggles push notification channel preferences in user settings" time="0.0000703">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v19" time="0.0000882">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 20. handles silent push notification background sync" time="0.0000604">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v20" time="0.0000902">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 21. fetches current weather forecast for farmer GPS location" time="0.0001016">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v21" time="0.0000857">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 22. fetches mandi commodity prices list filtered by state" time="0.0000701">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v22" time="0.0000587">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 23. handles offline cached mandi price data fallback" time="0.000093">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v23" time="0.0000693">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 24. calculates price variance trend percentage (e.g. +3.5%)" time="0.0000806">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v24" time="0.0000569">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 25. displays government agricultural scheme eligibility criteria" time="0.0000742">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v25" time="0.0000811">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 26. queues post creation payload when internet is offline" time="0.000072">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v26" time="0.0000574">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 27. syncs queued post actions sequentially when online restored" time="0.0001239">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v27" time="0.0000612">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 28. resolves conflicting offline edit versions using server timestamp" time="0.0000607">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v28" time="0.0000679">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 29. displays offline network status banner at top of app screen" time="0.0000532">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v29" time="0.0000732">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 30. verifies memory cleanup on component unmount lifecycle" time="0.0000548">
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v30" time="0.0000502">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v31" time="0.0000519">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v32" time="0.0000447">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v33" time="0.0000525">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v34" time="0.0000453">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v35" time="0.0000484">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v36" time="0.0000507">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v37" time="0.0000556">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v38" time="0.0000411">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v39" time="0.0000488">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v40" time="0.0000424">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v41" time="0.0000505">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v42" time="0.0000415">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v43" time="0.0000465">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v44" time="0.0000511">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v45" time="0.0000558">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v46" time="0.0000774">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v47" time="0.0000735">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v48" time="0.0000528">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v49" time="0.0000659">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_state_field_default_v50" time="0.0000513">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v1" time="0.0002605">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v2" time="0.0000694">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v3" time="0.0000463">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v4" time="0.0000362">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v5" time="0.0000347">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v6" time="0.0000397">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v7" time="0.0000496">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v8" time="0.0000522">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v9" time="0.0000632">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v10" time="0.0000527">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v11" time="0.0000564">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v12" time="0.0000403">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v13" time="0.0000465">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v14" time="0.0000344">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v15" time="0.0000318">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v16" time="0.0000394">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v17" time="0.000032">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v18" time="0.0000397">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v19" time="0.0000314">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v20" time="0.0000318">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v21" time="0.0000372">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v22" time="0.0000391">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v23" time="0.000041">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v24" time="0.0000312">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v25" time="0.0000393">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v26" time="0.000031">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v27" time="0.0000477">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v28" time="0.0000445">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v29" time="0.0000328">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v30" time="0.0000465">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v31" time="0.0000498">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v32" time="0.0000424">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v33" time="0.0000329">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v34" time="0.0000323">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v35" time="0.000066">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v36" time="0.0000451">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v37" time="0.0000503">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v38" time="0.0000356">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v39" time="0.0000324">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v40" time="0.000038">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v41" time="0.0000387">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v42" time="0.0000459">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v43" time="0.0000325">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v44" time="0.0000316">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v45" time="0.0000406">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v46" time="0.0000316">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v47" time="0.0000619">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v48" time="0.0000375">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v49" time="0.0000332">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_clear_error_handler_v50" time="0.0000478">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v1" time="0.0001408">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v2" time="0.0000572">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v3" time="0.0000344">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v4" time="0.0000409">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v5" time="0.000033">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v6" time="0.0000326">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v7" time="0.0000422">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v8" time="0.0000333">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v9" time="0.0000411">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v10" time="0.0000775">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v11" time="0.0000536">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v12" time="0.0000332">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v13" time="0.0000366">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v14" time="0.0000537">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v15" time="0.0000441">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v16" time="0.0000412">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v17" time="0.0000322">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v18" time="0.0000315">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v19" time="0.0001888">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v20" time="0.0000615">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v21" time="0.0000423">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v22" time="0.000039">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v23" time="0.0000366">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v24" time="0.0000372">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v25" time="0.0000368">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v26" time="0.0000365">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v27" time="0.0000784">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v28" time="0.0000428">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v29" time="0.0000307">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v30" time="0.0000452">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v31" time="0.0000424">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v32" time="0.0000319">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v33" time="0.0000359">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v34" time="0.0000315">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v35" time="0.0000319">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v36" time="0.000032">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v37" time="0.0000485">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v38" time="0.0000313">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v39" time="0.0000303">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v40" time="0.0000296">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v41" time="0.0000294">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v42" time="0.0000299">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v43" time="0.0000299">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v44" time="0.0000294">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v45" time="0.0000358">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v46" time="0.0000314">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v47" time="0.0000291">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v48" time="0.0000366">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v49" time="0.0000703">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_post_store_cache_invalidation_state_v50" time="0.0000337">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v1" time="0.0002375">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v2" time="0.000049">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v3" time="0.0000853">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v4" time="0.0000421">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v5" time="0.0000397">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v6" time="0.0000456">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v7" time="0.0000402">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v8" time="0.0000505">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v9" time="0.0000433">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v10" time="0.00005">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v11" time="0.0000409">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v12" time="0.0000395">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v13" time="0.0000389">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v14" time="0.0000389">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v15" time="0.0000384">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v16" time="0.0000418">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v17" time="0.0000408">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v18" time="0.0000387">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v19" time="0.0000392">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v20" time="0.0000394">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v21" time="0.0000389">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v22" time="0.0000385">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v23" time="0.0000388">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v24" time="0.0000385">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v25" time="0.0000386">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v26" time="0.000038">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v27" time="0.0000382">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v28" time="0.0000929">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v29" time="0.0000426">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v30" time="0.00004">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v31" time="0.0000388">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v32" time="0.0000389">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v33" time="0.0000387">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v34" time="0.000039">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v35" time="0.0000401">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v36" time="0.0000406">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v37" time="0.0000388">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v38" time="0.0000385">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v39" time="0.0000384">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v40" time="0.0000383">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v41" time="0.0000398">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v42" time="0.000078">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v43" time="0.0000422">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v44" time="0.0000387">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v45" time="0.0000369">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v46" time="0.0000371">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v47" time="0.0000366">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v48" time="0.0000376">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v49" time="0.000049">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_coordinates_range_validator_latitude_v50" time="0.0000381">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v1" time="0.0001314">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v2" time="0.0000338">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v3" time="0.0000276">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v4" time="0.0000281">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v5" time="0.0000573">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v6" time="0.000065">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v7" time="0.0000389">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v8" time="0.0000283">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v9" time="0.0000326">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v10" time="0.0000443">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v11" time="0.0000679">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v12" time="0.0000441">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v13" time="0.0000311">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v14" time="0.0000443">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v15" time="0.000043">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v16" time="0.0000441">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v17" time="0.000044">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v18" time="0.0000468">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v19" time="0.0000458">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v20" time="0.0000458">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v21" time="0.0000455">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v22" time="0.0000468">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v23" time="0.0000453">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v24" time="0.0000456">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v25" time="0.0000446">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v26" time="0.0000453">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v27" time="0.0000459">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v28" time="0.000045">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v29" time="0.0000456">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v30" time="0.0000259">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v31" time="0.0000258">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v32" time="0.0000261">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v33" time="0.0000333">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v34" time="0.0000261">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v35" time="0.0000259">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v36" time="0.0000256">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v37" time="0.0000265">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v38" time="0.0000257">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v39" time="0.000026">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v40" time="0.0000263">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v41" time="0.0000256">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v42" time="0.0000259">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v43" time="0.0000266">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v44" time="0.000026">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v45" time="0.0000258">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v46" time="0.0000254">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v47" time="0.0000271">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v48" time="0.000031">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v49" time="0.0000258">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_mandi_price_calculation_variance_v50" time="0.0000261">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v1" time="0.0001931">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v2" time="0.0000427">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v3" time="0.0000308">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v4" time="0.0000285">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v5" time="0.000068">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v6" time="0.0000784">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v7" time="0.0000622">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v8" time="0.0000278">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v9" time="0.0000454">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v10" time="0.0000383">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v11" time="0.0000325">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v12" time="0.0000281">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v13" time="0.0000283">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v14" time="0.0000386">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v15" time="0.000053">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v16" time="0.0000557">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v17" time="0.0000534">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v18" time="0.0000525">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v19" time="0.0000529">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v20" time="0.000067">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v21" time="0.0000538">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v22" time="0.0000542">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v23" time="0.0000974">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v24" time="0.0000539">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v25" time="0.0001205">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v26" time="0.0000326">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v27" time="0.0000258">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v28" time="0.0000273">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v29" time="0.0000399">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v30" time="0.0000272">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v31" time="0.0000261">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v32" time="0.000027">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v33" time="0.0000266">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v34" time="0.0000262">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v35" time="0.0000256">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v36" time="0.0000405">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v37" time="0.0001118">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v38" time="0.0000556">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v39" time="0.0000329">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v40" time="0.0000289">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v41" time="0.0000295">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v42" time="0.0000291">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v43" time="0.0000298">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v44" time="0.0000277">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v45" time="0.0000296">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v46" time="0.0000274">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v47" time="0.0000301">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v48" time="0.0000314">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v49" time="0.0000698">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-300.test.ts" name="AgriNex Mobile Store and Utilities (300 Unique Checks) &gt; test_mobile_weather_temperature_format_celsius_v50" time="0.0000619">
         </testcase>
     </testsuite>
-    <testsuite name="__tests__/agrinex-mobile-unit.test.ts" timestamp="2026-08-10T08:41:16.708Z" hostname="HP_VICTUS_" tests="30" failures="0" errors="0" skipped="0" time="0.0307959">
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 1. verifies initial onboarding screen route name" time="0.002389">
+    <testsuite name="__tests__/agrinex-mobile-integration.test.ts" timestamp="2026-08-11T13:01:20.623Z" hostname="HP_VICTUS_" tests="30" failures="0" errors="0" skipped="0" time="0.0138995">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 1. completes OTP request and verification sequence" time="0.0047921">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 2. verifies tab router navigation screen names" time="0.0002414">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 2. completes Google OAuth sign-in flow" time="0.0004739">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 3. validates header title string on disease scanner screen" time="0.0003231">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 3. stores access token in secure store upon login" time="0.0003073">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 4. handles modal screen presentation style animation" time="0.0001957">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 4. redirects unauthenticated user from protected tab to auth screen" time="0.0002765">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 5. prevents back navigation from onboarding once completed" time="0.0001503">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 1. Authentication Flow Integration &gt; 5. updates global user store state after successful profile fetch" time="0.0002802">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 6. validates camera permission status check" time="0.0001446">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 6. uploads captured leaf photo via multipart form data" time="0.0003168">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 7. validates media library storage permission status" time="0.0001226">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 7. parses AI disease diagnosis API response object" time="0.0004391">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 8. formats camera photo aspect ratio (4:3 default)" time="0.0002692">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 8. handles diagnostic API timeout fallback gracefully" time="0.0004471">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 9. compresses selected image quality ratio to 0.8" time="0.0002125">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 9. caches completed diagnostic result item to AsyncStorage" time="0.000347">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 10. handles camera flash mode toggle (off -&gt; auto -&gt; on)" time="0.0002707">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 2. AI Crop Scanner &amp; Diagnostic Integration &gt; 10. shares diagnostic result card to community post creation screen" time="0.0004074">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 11. serializes user profile state to JSON string" time="0.0001386">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 11. opens WebSocket connection channel for real-time messaging" time="0.0001928">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 12. deserializes cached authentication state from AsyncStorage" time="0.0001829">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 12. receives incoming message payload and updates message list" time="0.0001865">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 13. handles cache clearing on user logout action" time="0.0001165">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 13. sends chat message via WebSocket socket payload" time="0.0000917">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 14. verifies offline pending diagnostic scan queue length" time="0.0001283">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 14. handles reconnection attempt on WebSocket connection loss" time="0.0001219">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 15. verifies preferred language setting default (en)" time="0.0000657">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 3. Direct Messaging &amp; WebSocket Integration &gt; 15. marks message thread as read when active screen is open" time="0.0000942">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 16. validates username length constraint (&gt;3 chars)" time="0.0001332">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 16. registers Expo push notification device token with backend" time="0.0001027">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 17. validates email address input string using Zod schema" time="0.0000789">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 17. parses incoming push notification payload data" time="0.0000827">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 18. checks OTP 6-digit pin code numeric length constraint" time="0.0000841">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 18. deep-links to specific post screen when notification tapped" time="0.000106">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 19. formats currency string for Mandi prices (e.g. ₹2,400)" time="0.0201351">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 19. toggles push notification channel preferences in user settings" time="0.0000881">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 20. handles pull-to-refresh pull threshold state" time="0.0002564">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 4. Push Notification Integration &gt; 20. handles silent push notification background sync" time="0.0000959">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 21. triggers light impact haptic feedback on button tap" time="0.0002385">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 21. fetches current weather forecast for farmer GPS location" time="0.0001273">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 22. triggers success notification haptic pattern on scan complete" time="0.0001242">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 22. fetches mandi commodity prices list filtered by state" time="0.0000946">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 23. formats audio recording duration time display (0:15)" time="0.0002735">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 23. handles offline cached mandi price data fallback" time="0.0001784">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 24. handles audio playback speed multiplier options (1x, 1.5x, 2x)" time="0.0008455">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 24. calculates price variance trend percentage (e.g. +3.5%)" time="0.0001072">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 25. checks device location GPS coordinate validity" time="0.0003247">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 5. Weather &amp; Mandi API Integration &gt; 25. displays government agricultural scheme eligibility criteria" time="0.0001571">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 26. handles app foreground / background lifecycle state transition" time="0.0001555">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 26. queues post creation payload when internet is offline" time="0.0001729">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 27. detects offline network status via NetInfo listener" time="0.0001194">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 27. syncs queued post actions sequentially when online restored" time="0.0002283">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 28. checks Expo push token registration format string" time="0.0000883">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 28. resolves conflicting offline edit versions using server timestamp" time="0.0001372">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 29. formats relative time for mobile post list (e.g. 5m)" time="0.0001246">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 29. displays offline network status banner at top of app screen" time="0.0001856">
         </testcase>
-        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 30. verifies splash screen auto-hide trigger on app ready" time="0.0000822">
-        </testcase>
-    </testsuite>
-    <testsuite name="__tests__/agrinex-mobile.test.ts" timestamp="2026-08-10T08:41:16.713Z" hostname="HP_VICTUS_" tests="12" failures="0" errors="0" skipped="0" time="0.0076832">
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 1. Expo SDK &amp; Configuration Matrix &gt; verifies app.json Expo SDK configuration and scheme" time="0.0017397">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 1. Expo SDK &amp; Configuration Matrix &gt; validates Android permissions manifest configuration" time="0.0012074">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 2. Navigation &amp; Screen Stack &gt; navigates from Onboarding to Login screen" time="0.0003549">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 2. Navigation &amp; Screen Stack &gt; navigates from Login to Tab Navigator (Home, Scanner, Messaging, Profile)" time="0.0002312">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 3. Camera &amp; Gallery Crop Scanner Integration &gt; simulates camera permission grant state" time="0.0002345">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 3. Camera &amp; Gallery Crop Scanner Integration &gt; handles image picking from device gallery" time="0.000309">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 4. Realtime Socket Messaging &amp; Push Notifications &gt; establishes WebSocket connection for direct messaging" time="0.0001983">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 4. Realtime Socket Messaging &amp; Push Notifications &gt; processes incoming push notification for new message" time="0.0002014">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 5. Offline Storage &amp; Network Resiliency &gt; persists offline cached crop disease reports in AsyncStorage" time="0.0001752">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 5. Offline Storage &amp; Network Resiliency &gt; syncs queued offline scans when network connection is restored" time="0.0002149">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 6. Mobile Performance &amp; Memory Optimization &gt; verifies image asset compression before upload" time="0.0001468">
-        </testcase>
-        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 6. Mobile Performance &amp; Memory Optimization &gt; maintains 60 FPS scrolling performance during community feed scroll" time="0.0001546">
+        <testcase classname="__tests__/agrinex-mobile-integration.test.ts" name="AgriNex Mobile Integration &amp; End-to-End Suite (30 Tests) &gt; 6. Offline Queue &amp; Background Sync &gt; 30. verifies memory cleanup on component unmount lifecycle" time="0.0001562">
         </testcase>
     </testsuite>
-    <testsuite name="e2e/specs/mobile-e2e.spec.ts" timestamp="2026-08-10T08:41:16.715Z" hostname="HP_VICTUS_" tests="5" failures="0" errors="0" skipped="0" time="0.0038671">
-        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-AUTH-001: Mobile Registration, OTP, Login and Logout flows" time="0.000944">
+    <testsuite name="__tests__/agrinex-mobile-unit.test.ts" timestamp="2026-08-11T13:01:20.628Z" hostname="HP_VICTUS_" tests="30" failures="0" errors="0" skipped="0" time="0.0901276">
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 1. verifies initial onboarding screen route name" time="0.003464">
         </testcase>
-        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-COMMUNITY-002: User Search, Follow, Create Post, Like, Comment" time="0.0002246">
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 2. verifies tab router navigation screen names" time="0.0004613">
         </testcase>
-        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-CHAT-003: New Chat, Message Dispatch, Clear Chat, User Isolation" time="0.0001403">
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 3. validates header title string on disease scanner screen" time="0.0005286">
         </testcase>
-        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-SCANNER-004: Camera, Gallery, Crop Diagnosis" time="0.0001306">
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 4. handles modal screen presentation style animation" time="0.0003547">
         </testcase>
-        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-PROFILE-005: Edit Profile, Upload Avatar" time="0.0001244">
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 1. Navigation &amp; Screen Stack Router &gt; 5. prevents back navigation from onboarding once completed" time="0.0002771">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 6. validates camera permission status check" time="0.0002824">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 7. validates media library storage permission status" time="0.0002325">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 8. formats camera photo aspect ratio (4:3 default)" time="0.0003047">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 9. compresses selected image quality ratio to 0.8" time="0.0003039">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 2. Expo Camera &amp; Media Library Permissions &gt; 10. handles camera flash mode toggle (off -&gt; auto -&gt; on)" time="0.0004283">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 11. serializes user profile state to JSON string" time="0.000249">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 12. deserializes cached authentication state from AsyncStorage" time="0.0002468">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 13. handles cache clearing on user logout action" time="0.0001843">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 14. verifies offline pending diagnostic scan queue length" time="0.0002296">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 3. Local Storage &amp; Zustand State Persistence &gt; 15. verifies preferred language setting default (en)" time="0.000136">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 16. validates username length constraint (&gt;3 chars)" time="0.0002683">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 17. validates email address input string using Zod schema" time="0.0001667">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 18. checks OTP 6-digit pin code numeric length constraint" time="0.0001646">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 19. formats currency string for Mandi prices (e.g. ₹2,400)" time="0.0748699">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 4. Mobile UI Hooks &amp; Form Validation &gt; 20. handles pull-to-refresh pull threshold state" time="0.000167">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 21. triggers light impact haptic feedback on button tap" time="0.0002893">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 22. triggers success notification haptic pattern on scan complete" time="0.0000956">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 23. formats audio recording duration time display (0:15)" time="0.000147">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 24. handles audio playback speed multiplier options (1x, 1.5x, 2x)" time="0.0009746">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 5. Native Haptics &amp; Audio Voice Notes &gt; 25. checks device location GPS coordinate validity" time="0.0002921">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 26. handles app foreground / background lifecycle state transition" time="0.0001064">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 27. detects offline network status via NetInfo listener" time="0.0000755">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 28. checks Expo push token registration format string" time="0.00007">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 29. formats relative time for mobile post list (e.g. 5m)" time="0.0000512">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile-unit.test.ts" name="AgriNex Mobile Expo Unit Suite (30 Tests) &gt; 6. App State &amp; Network Resilience &gt; 30. verifies splash screen auto-hide trigger on app ready" time="0.0000485">
+        </testcase>
+    </testsuite>
+    <testsuite name="__tests__/agrinex-mobile.test.ts" timestamp="2026-08-11T13:01:20.632Z" hostname="HP_VICTUS_" tests="12" failures="0" errors="0" skipped="0" time="0.0122565">
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 1. Expo SDK &amp; Configuration Matrix &gt; verifies app.json Expo SDK configuration and scheme" time="0.0055878">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 1. Expo SDK &amp; Configuration Matrix &gt; validates Android permissions manifest configuration" time="0.0012109">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 2. Navigation &amp; Screen Stack &gt; navigates from Onboarding to Login screen" time="0.0002716">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 2. Navigation &amp; Screen Stack &gt; navigates from Login to Tab Navigator (Home, Scanner, Messaging, Profile)" time="0.0001719">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 3. Camera &amp; Gallery Crop Scanner Integration &gt; simulates camera permission grant state" time="0.0002372">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 3. Camera &amp; Gallery Crop Scanner Integration &gt; handles image picking from device gallery" time="0.0003121">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 4. Realtime Socket Messaging &amp; Push Notifications &gt; establishes WebSocket connection for direct messaging" time="0.0001653">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 4. Realtime Socket Messaging &amp; Push Notifications &gt; processes incoming push notification for new message" time="0.0002465">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 5. Offline Storage &amp; Network Resiliency &gt; persists offline cached crop disease reports in AsyncStorage" time="0.0002427">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 5. Offline Storage &amp; Network Resiliency &gt; syncs queued offline scans when network connection is restored" time="0.0003942">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 6. Mobile Performance &amp; Memory Optimization &gt; verifies image asset compression before upload" time="0.0002875">
+        </testcase>
+        <testcase classname="__tests__/agrinex-mobile.test.ts" name="AgriNex Mobile App (Expo / React Native) Automated Suite &gt; 6. Mobile Performance &amp; Memory Optimization &gt; maintains 60 FPS scrolling performance during community feed scroll" time="0.0002755">
+        </testcase>
+    </testsuite>
+    <testsuite name="e2e/specs/mobile-e2e.spec.ts" timestamp="2026-08-11T13:01:20.634Z" hostname="HP_VICTUS_" tests="5" failures="0" errors="0" skipped="0" time="0.0052102">
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-AUTH-001: Mobile Registration, OTP, Login and Logout flows" time="0.0009888">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-COMMUNITY-002: User Search, Follow, Create Post, Like, Comment" time="0.0005748">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-CHAT-003: New Chat, Message Dispatch, Clear Chat, User Isolation" time="0.0002881">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-SCANNER-004: Camera, Gallery, Crop Diagnosis" time="0.0002468">
+        </testcase>
+        <testcase classname="e2e/specs/mobile-e2e.spec.ts" name="AgriNex Expo React Native Appium E2E Suite &gt; MOBILE-PROFILE-005: Edit Profile, Upload Avatar" time="0.0002715">
         </testcase>
     </testsuite>
 </testsuites>
