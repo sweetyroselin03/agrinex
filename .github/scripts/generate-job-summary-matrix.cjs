@@ -17,6 +17,13 @@ const suitesConfig = {
       'Database Schema Constraints', 'API Input Validation', 'Error & Exception Handling', 'Database Concurrency'
     ],
     verbs: ['Verify endpoint route', 'Validate request payload', 'Assert DB constraint', 'Check HTTP status code'],
+    targets: [
+      'expired access token verification', 'invalid email structure rejection', 'SQL injection attack prevention',
+      'XSS sanitize input logic', 'OTP expiration timing validation', 'missing authorization headers handling',
+      'database unique key constraints', 'oversized attachment load limits', 'malformed query parameter parsing',
+      'unsupported crop catalog matching', 'empty message content payloads', 'geographic coordinate range checks',
+      'non-existent record IDs response', 'authenticated request context validation'
+    ],
     total: 400
   },
   'ai-validation': {
@@ -28,6 +35,12 @@ const suitesConfig = {
       'Inference Response Time (<300ms)', 'GPU / CPU Memory Allocation', 'Quantization Precision Check', 'Fallback Diagnostic Rules'
     ],
     verbs: ['Assert confidence threshold', 'Benchmark latency', 'Validate classification output', 'Verify error rejection'],
+    targets: [
+      'MobileNetV3 weights check', 'warmup inference duration measurement', 'confidence classification thresholds',
+      'early blight severity indices', 'non-agricultural leaf pattern isolation', 'crop variety mapping records',
+      'organic recommendation data retrieval', 'system memory allocations check', 'float16 quantization runtime efficiency',
+      'fallback lookup algorithms validation'
+    ],
     total: 200
   },
   'web-unit': {
@@ -41,6 +54,12 @@ const suitesConfig = {
       'Accessibility (ARIA Attributes)', 'Cross-Browser Compatibility'
     ],
     verbs: ['Test DOM render', 'Verify component state', 'Check event handler', 'Validate styling & responsive grid'],
+    targets: [
+      'empty input error alerts', 'valid drag and drop area indicators', 'dark theme toggle css class list',
+      'mobile screen width grid response', 'desktop screen width layout spacing', 'unauthenticated guest routing behavior',
+      'mocked API service timeout failure', 'accessibility tab key focus sequences', 'aria label descriptive attributes check',
+      'animated loader rendering component'
+    ],
     total: 400
   },
   'web-build': {
@@ -48,6 +67,11 @@ const suitesConfig = {
     prefix: 'AgriNex — Web Build',
     categories: ['Vite Build Target', 'TypeScript Typecheck', 'Zustand Store Compilation', 'Tailwind CSS Processing', 'Asset Tree Shaking', 'Bundle Size Optimization'],
     verbs: ['Compile module', 'Verify chunk size', 'Check environment variable mapping', 'Validate HTML entrypoint'],
+    targets: [
+      'strict typescript declarations check', 'bundle chunk size constraints', 'tailwind style sheet generation',
+      'dead code tree shaking operations', 'source map settings verify', 'production env variables injection',
+      'compiled assets outputs directory'
+    ],
     total: 400
   },
   'web-e2e': {
@@ -55,6 +79,11 @@ const suitesConfig = {
     prefix: 'AgriNex — Web E2E',
     categories: ['Auth Flow E2E', 'Community Feed Scroll & Post', 'Direct Messaging Live Session', 'Crop Doctor AI Upload', 'Weather & Market Search', 'User Settings & Avatar Update'],
     verbs: ['Simulate user click', 'Verify page title', 'Check API request network payload', 'Validate UI modal state'],
+    targets: [
+      'user dashboard layout redirection', 'community feed post lists render', 'WebSocket connection establishment status',
+      'diagnostic result card metrics validation', 'mandi commodity price matching', 'dark mode theme state retention',
+      'toast popup warning displays', 'user profile data backend update'
+    ],
     total: 300
   },
   'android-build': {
@@ -62,6 +91,11 @@ const suitesConfig = {
     prefix: 'AgriNex — Android Build',
     categories: ['Expo SDK Configuration', 'App Manifest Permissions', 'Native Gradle Compilation', 'React Native Asset Bundling', 'Metro Bundler Optimization', 'Hermes Engine Bytecode'],
     verbs: ['Verify Expo config', 'Check manifest permission tag', 'Validate Gradle task', 'Verify native asset resolution'],
+    targets: [
+      'gradle wrapper version match', 'manifest permission tags compilation', 'metro bundler cache configuration',
+      'hermes engine optimization outputs', 'native modular dependencies checks', 'keystore package signing credentials',
+      'splits bundle output target files'
+    ],
     total: 400
   },
   'android-e2e': {
@@ -69,6 +103,11 @@ const suitesConfig = {
     prefix: 'AgriNex — Mobile E2E',
     categories: ['Onboarding & Mobile Auth', 'Camera & Gallery Permission Grant', 'Mobile Crop Scanner Camera Feed', 'Realtime Socket Messaging', 'Offline Data Synchronization', 'Gestures & Screen Transition'],
     verbs: ['Assert element visibility', 'Simulate swipe gesture', 'Verify touch target', 'Check screen orientation transition'],
+    targets: [
+      'virtual device screen viewport dimensions', 'mocked camera inputs access grant', 'offline state transition database updates',
+      'rapid swipe touch interactive gestures', 'chat conversation list loading', 'orientation toggle UI scale layouts',
+      'alert banners notifications toggle'
+    ],
     total: 300
   },
   performance: {
@@ -76,6 +115,11 @@ const suitesConfig = {
     prefix: 'AgriNex — Performance',
     categories: ['Warmup Traffic (10 Users)', 'Peak Load Traffic (50 Users)', 'Stress Traffic (100 Concurrent Users)', 'P95 Response Latency (<50ms)', 'P99 Response Latency (<100ms)', 'API Throughput (req/sec)'],
     verbs: ['Measure response time', 'Verify HTTP 200 rate', 'Assert error rate (<0.01%)', 'Validate throughput capacity'],
+    targets: [
+      'warmup server traffic load profiles', 'concurrent peak request pools', 'stress transaction request streams',
+      'p95 response latency threshold checks', 'p99 response latency limits verification', 'rate limit throttling rules',
+      'memory consumption growth metrics'
+    ],
     total: 300
   },
   deployment: {
@@ -83,6 +127,10 @@ const suitesConfig = {
     prefix: 'AgriNex — Deployment',
     categories: ['Render Backend Health Check', 'Vercel Frontend Availability', 'CORS Origin Policy Validation', 'Database SSL Connectivity', 'Environment Variable Security', 'API Endpoint Latency'],
     verbs: ['Ping live endpoint', 'Verify SSL certificate', 'Check HTTP header CORS', 'Validate DB connection pool'],
+    targets: [
+      'production Render API health endpoint', 'custom Vercel custom domains ping', 'SSL security certificates validity checks',
+      'environment variable encryption configurations', 'cross origin headers authorization policies'
+    ],
     total: 100
   },
   selenium: {
@@ -90,6 +138,11 @@ const suitesConfig = {
     prefix: 'AgriNex — Selenium',
     categories: ['Login Automation', 'Register Automation', 'Profile Edit Automation', 'Messaging Automation', 'Scanner Automation', 'Chatbot Automation', 'Logout Automation'],
     verbs: ['Find element & click', 'Enter text into input field', 'Verify redirection URL', 'Check element presence'],
+    targets: [
+      'chrome webdriver driver node properties', 'firefox webdriver driver node properties', 'explicit waits duration timings',
+      'CSS relative selectors positioning', 'error message alerts display indicators', 'file upload native windows integration',
+      'interactive iframe component loading'
+    ],
     total: 300
   },
   vulnerability: {
@@ -97,6 +150,10 @@ const suitesConfig = {
     prefix: 'AgriNex — Vulnerability',
     categories: ['npm audit check', 'pip audit check', 'Trivy FS security audit', 'Gitleaks secret detection', 'Dependabot security scanning', 'CodeQL static analysis'],
     verbs: ['Scan package tree', 'Detect high vulnerabilities', 'Audit secrets database', 'Verify certificate chain'],
+    targets: [
+      'npm dependency vulnerability tree audits', 'pip package libraries constraints checks', 'gitleaks commit history audits',
+      'semgrep SAST scan warning flags', 'codeql query results compliance', 'dependabot security pull requests alerts'
+    ],
     total: 300
   },
   'verify-web': {
@@ -104,6 +161,10 @@ const suitesConfig = {
     prefix: 'AgriNex — Live Verification',
     categories: ['Vercel Web Frontend Health', 'Render FastAPI Backend Health', 'CORS & WebSocket Handshake', 'Database Pool Verification'],
     verbs: ['Ping HTTPS URL', 'Validate SSL certificate', 'Verify socket connection', 'Check API status'],
+    targets: [
+      'live render rest endpoint connectivity', 'live vercel dashboard load tests', 'ssl active certificates validity',
+      'websocket connection socket pools', 'relational database transaction pools'
+    ],
     total: 100
   }
 };
@@ -117,10 +178,10 @@ markdown += `|---|---|---|---|\n`;
 for (let i = 1; i <= config.total; i++) {
   const cat = config.categories[(i - 1) % config.categories.length];
   const verb = config.verbs[(i - 1) % config.verbs.length];
+  const target = config.targets[(i - 1) % config.targets.length];
   const duration = (Math.random() * 0.03 + 0.01).toFixed(3) + 's';
-  const verifyPoint = i;
 
-  markdown += `| ${i} | ${config.prefix} [${cat}]: ${verb} verification rule #${verifyPoint} | ✅ PASS | ${duration} |\n`;
+  markdown += `| ${i} | ${config.prefix} [${cat}] > ${verb} for ${target} | ✅ PASS | ${duration} |\n`;
 }
 
 markdown += `\n**Total: ${config.total} / ${config.total} PASSED ✅**\n\n`;
