@@ -166,7 +166,7 @@ jobs:
         if: always()
         run: |
           npm install exceljs --no-save --no-audit --ignore-scripts
-          node ../scripts/generate-excel-report.js --suite=backend --input=backend-test-results.xml --output=Backend_Test_Cases_Report.xlsx
+          node ../scripts/generate-excel-report.js --suite=backend --input=backend-test-results.xml --output=Backend_API_Test_Report.xlsx
         working-directory: backend
 
       - name: "📋 Publish Test Summary"
@@ -182,7 +182,15 @@ jobs:
             backend/backend-test-results.xml
             backend/coverage.xml
             backend/htmlcov/
-            backend/Backend_Test_Cases_Report.xlsx
+            backend/Backend_API_Test_Report.xlsx
+          retention-days: 7
+
+      - name: "📤 Upload backend Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/Backend_API_Test_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -409,6 +417,14 @@ jobs:
           path: load-test-reports/
           retention-days: 7
 
+      - name: "📤 Upload Load Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-performance-test-report
+          path: load-test-reports/Load_Performance_Test_Report.xlsx
+          retention-days: 7
+
   # ════════════════════════════════════════════════════════════════════════════
   # JOB 8 – Verify Live Deployment
   # ════════════════════════════════════════════════════════════════════════════
@@ -489,7 +505,7 @@ jobs:
         if: always()
         run: |
           npm install exceljs --no-save --no-audit --ignore-scripts
-          node ../scripts/generate-excel-report.js --suite=selenium --input=selenium-test-results.xml --output=Selenium_Test_Cases_Report.xlsx
+          node ../scripts/generate-excel-report.js --suite=selenium --input=selenium-test-results.xml --output=Selenium_Test_Report.xlsx
         working-directory: backend
 
       - name: "📋 Publish Selenium Summary"
@@ -503,7 +519,15 @@ jobs:
           name: selenium-test-reports
           path: |
             backend/selenium-test-results.xml
-            backend/Selenium_Test_Cases_Report.xlsx
+            backend/Selenium_Test_Report.xlsx
+          retention-days: 7
+
+      - name: "📤 Upload Selenium Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-test-report
+          path: backend/Selenium_Test_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -545,7 +569,7 @@ jobs:
         if: always()
         run: |
           npm install exceljs --no-save --no-audit --ignore-scripts
-          node ../scripts/generate-excel-report.js --suite=web-e2e --input=playwright-results.xml --output=Playwright_E2E_Test_Cases_Report.xlsx
+          node ../scripts/generate-excel-report.js --suite=web-e2e --input=playwright-results.xml --output=Web_E2E_Playwright_Test_Report.xlsx
         working-directory: frontend
 
       - name: "📋 Publish E2E Summary"
@@ -560,7 +584,15 @@ jobs:
           path: |
             frontend/playwright-report/
             frontend/playwright-results.xml
-            frontend/Playwright_E2E_Test_Cases_Report.xlsx
+            frontend/Web_E2E_Playwright_Test_Report.xlsx
+          retention-days: 7
+
+      - name: "📤 Upload Web Playwright Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-playwright-test-report
+          path: frontend/Web_E2E_Playwright_Test_Report.xlsx
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -595,7 +627,7 @@ jobs:
         if: always()
         run: |
           npm install exceljs --no-save --no-audit --ignore-scripts
-          node ../scripts/generate-excel-report.js --suite=mobile --input=mobile-test-results.xml --output=Mobile_Test_Cases_Report.xlsx
+          node ../scripts/generate-excel-report.js --suite=mobile --input=mobile-test-results.xml --output=Mobile_Test_Report.xlsx
         working-directory: mobile
 
       - name: "📋 Publish Appium E2E Summary"
@@ -609,7 +641,15 @@ jobs:
           name: mobile-test-reports
           path: |
             mobile/mobile-test-results.xml
-            mobile/Mobile_Test_Cases_Report.xlsx
+            mobile/Mobile_Test_Report.xlsx
+          retention-days: 7
+
+      - name: "📤 Upload Mobile Excel report only"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-report
+          path: mobile/Mobile_Test_Report.xlsx
           retention-days: 7
 
       - name: "📤 Upload Mobile E2E reports"
@@ -638,74 +678,49 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: "📥 Download security reports"
+      - name: "📥 Download backend Excel report"
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: security-reports
-          path: security-reports
-
-      - name: "📥 Download backend reports"
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: backend-test-reports
+          name: backend-test-report
           path: backend-reports
 
-      - name: "📥 Download web E2E reports"
+      - name: "📥 Download web Playwright Excel report"
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: web-e2e-reports
+          name: web-playwright-test-report
           path: web-reports
 
-      - name: "📥 Download mobile E2E reports"
+      - name: "📥 Download mobile Excel report"
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: mobile-e2e-reports
+          name: mobile-test-report
           path: mobile-reports
 
-      - name: "📥 Download selenium reports"
+      - name: "📥 Download selenium Excel report"
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: selenium-test-reports
+          name: selenium-test-report
           path: selenium-reports
 
-      - name: "📥 Download load test reports"
+      - name: "📥 Download load performance Excel report"
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: load-test-reports
-          path: load-test-reports
+          name: load-performance-test-report
+          path: load-reports
 
-      - name: "📥 Download frontend reports"
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: frontend-test-reports
-          path: frontend-reports
-
-      - name: "📥 Download mobile reports"
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: mobile-test-reports
-          path: mobile-reports
-
-      - name: "📦 Install Excel generation dependencies"
-        run: npm install exceljs --no-save --no-audit --ignore-scripts
-
-      - name: "📊 Generate Excel test case report"
-        run: node scripts/generate-excel-report.js
-
-      - name: "📤 Upload Excel test report"
-        uses: actions/upload-artifact@v4
-        with:
-          name: excel-test-report
-          path: AgriNex_Test_Cases_Report.xlsx
-          retention-days: 7
+      - name: "📊 Verify Excel test case reports"
+        run: |
+          echo "Verifying presence of all 5 standardized Excel reports..."
+          ls -l backend-reports/Backend_API_Test_Report.xlsx
+          ls -l web-reports/Web_E2E_Playwright_Test_Report.xlsx
+          ls -l mobile-reports/Mobile_Test_Report.xlsx
+          ls -l selenium-reports/Selenium_Test_Report.xlsx
+          ls -l load-reports/Load_Performance_Test_Report.xlsx
 
       - name: "📋 Publish Combined Step Summary Dashboard"
         env:
