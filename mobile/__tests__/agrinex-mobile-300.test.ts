@@ -1,4 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+if (typeof window === 'undefined') {
+  (global as any).window = {};
+}
+
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: () => Promise.resolve(null),
+    setItem: () => Promise.resolve(),
+    removeItem: () => Promise.resolve(),
+    clear: () => Promise.resolve(),
+  },
+}));
+
 import { usePostStore } from '../store/usePostStore';
 
 describe('AgriNex Mobile Store and Utilities (300 Unique Checks)', () => {
