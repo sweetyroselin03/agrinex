@@ -103,6 +103,7 @@ jobs:
         if: always()
         run: |
           node scripts/generate-excel-report.js --suite=vulnerability --input=backend/security-results.xml --output=vulnerability-reports/Vulnerability_Test_Report.xlsx
+          cp backend/security-results.xml vulnerability-reports/security-results.xml || echo "No XML results found"
 
       - name: "📋 Publish Vulnerability Summary"
         if: always()
@@ -115,7 +116,7 @@ jobs:
           name: vulnerability-test-report
           path: |
             vulnerability-reports/Vulnerability_Test_Report.xlsx
-            backend/security-results.xml
+            vulnerability-reports/security-results.xml
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
