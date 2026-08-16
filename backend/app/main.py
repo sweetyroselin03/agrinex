@@ -1080,8 +1080,9 @@ async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.Use
     if scans:
         scan_context = "User's recent crop scans:\n"
         for scan in scans:
-            crop_name = scan.detected_object or "Crop"
-            scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name}, Severity: {scan.severity_level}, Date: {scan.created_at.strftime('%Y-%m-%d')}\n"
+            crop_name = getattr(scan, 'detected_object', None) or "Crop"
+            date_str = scan.created_at.strftime('%Y-%m-%d') if getattr(scan, 'created_at', None) else "N/A"
+            scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name or 'N/A'}, Severity: {scan.severity_level or 'N/A'}, Date: {date_str}\n"
 
     # Handle image attachment analysis if present
     if chat.image_url:
