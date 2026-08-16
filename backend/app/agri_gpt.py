@@ -33,7 +33,7 @@ class AgriGPTReasoningEngine:
                     self.model_name = self.configured_model
                     logger.info(f"[AgriGPT] Using configured GEMINI_MODEL: {self.model_name}")
                 else:
-                    self.model_name = "gemini-2.0-flash"
+                    self.model_name = "gemini-3.5-flash"
                     logger.info(f"[AgriGPT] Using default model: {self.model_name}")
             except Exception as e:
                 logger.error(f"[AgriGPT] Failed to initialize Gemini: {e}")

@@ -266,6 +266,7 @@ class ChatMessageCreate(BaseModel):
     conversation_id: Optional[str] = None
     language: Optional[str] = None
     stream: Optional[bool] = False
+    image_url: Optional[str] = None
 
 class ChatMessage(BaseModel):
     id: int
