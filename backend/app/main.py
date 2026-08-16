@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +9,10 @@ import httpx
 import json
 import os
 import sys
+import time
+import base64
+import io
+from PIL import Image
 from datetime import datetime, timedelta, timezone
 from . import models, schemas, ai_service, auth_utils, auth_router
 from .database import engine, get_db
@@ -1281,33 +1285,102 @@ def get_conversations(current_user: models.User = Depends(get_current_user), db:
 
 # ─── Crop Scan (Two-Stage Validation Pipeline) ───
 @app.post("/ai/detect-disease", response_model=schemas.CropScanOut)
-async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    effective_scan_mode = (scan.scan_mode or "full").lower()
+async def create_scan(
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    content_type = request.headers.get("content-type", "")
+    image_url = ""
+    scan_mode = "full"
+    filename = "data_url.jpg"
+
+    print("=== CROP IMAGE RECEIVED ===")
+    print("Filename:", filename)
+    print("Content type:", content_type)
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        file_obj = form.get("file") or form.get("image")
+        scan_mode_val = form.get("scan_mode")
+        if scan_mode_val:
+            scan_mode = str(scan_mode_val)
+
+        if file_obj and hasattr(file_obj, "read"):
+            filename = getattr(file_obj, "filename", "uploaded_image.jpg")
+            file_mime = getattr(file_obj, "content_type", "image/jpeg")
+            image_bytes = await file_obj.read()
+            print("Image byte size:", len(image_bytes))
+            logger.info(f"[AI Endpoint] Received filename: '{filename}', Content-Type: '{file_mime}', Byte size: {len(image_bytes)} bytes")
+
+            # Verify & decode image via PIL
+            try:
+                img = Image.open(io.BytesIO(image_bytes))
+                print("- width:", img.width)
+                print("- height:", img.height)
+                print("- mode:", img.mode)
+                print("- format:", getattr(img, "format", "JPEG"))
+                logger.info(f"[AI Endpoint] Decoded image dimensions: {img.width}x{img.height}, Color mode: {img.mode}")
+            except Exception as img_err:
+                logger.error(f"[AI Endpoint Error] Failed to decode image bytes: {img_err}")
+                raise HTTPException(status_code=400, detail=f"Invalid or corrupted image file: {img_err}")
+
+            b64_str = base64.b64encode(image_bytes).decode("utf-8")
+            image_url = f"data:{file_mime};base64,{b64_str}"
+        elif form.get("image_url"):
+            image_url = str(form.get("image_url"))
+    else:
+        try:
+            body = await request.json()
+            image_url = body.get("image_url", "")
+            scan_mode = body.get("scan_mode", "full")
+            logger.info(f"[AI Endpoint] Received JSON request. Image URL prefix: '{image_url[:40]}...' (Length: {len(image_url)})")
+            if image_url.startswith("data:image"):
+                try:
+                    b64_part = image_url.split(",")[1]
+                    image_bytes = base64.b64decode(b64_part)
+                    print("Image byte size:", len(image_bytes))
+                    img = Image.open(io.BytesIO(image_bytes))
+                    print("- width:", img.width)
+                    print("- height:", img.height)
+                    print("- mode:", img.mode)
+                    print("- format:", getattr(img, "format", "JPEG"))
+                except Exception:
+                    pass
+        except Exception as json_err:
+            logger.error(f"[AI Endpoint Error] Failed to parse JSON request body: {json_err}")
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    if not image_url:
+        raise HTTPException(status_code=400, detail="Missing required image_url or image file payload.")
+
+    effective_scan_mode = (scan_mode or "full").lower()
     if effective_scan_mode not in ["crop", "full"]:
         effective_scan_mode = "full"
 
     # ━━━ STAGE 1: Validate that the image contains a crop/plant ━━━
     try:
-        validation = await ai_service.ai_service.validate_crop_image(scan.image_url)
+        validation = await ai_service.ai_service.validate_crop_image(image_url)
+        logger.info(f"[AI Endpoint] Stage 1 Validation Result: is_valid={validation.get('is_valid')}, detected={validation.get('detected_object')}, confidence={validation.get('confidence')}")
     except Exception as e:
         logger.error(f"[AI Endpoint Error] Stage 1 Validation failed: {e}")
         raise HTTPException(
             status_code=502,
             detail=f"AI Scanner Stage 1 Validation failed: {str(e)}"
         )
-    
+
     if not validation.get("is_valid", True):
         # Image rejected — return immediately without running disease detection
         detected = validation.get("detected_object", "non-agricultural object")
         reason = validation.get("rejection_reason", "This image does not contain a detectable crop or plant.")
         quality_issue = validation.get("quality_issue")
-        
+
         disease_name = "Quality Issue" if quality_issue else "Invalid Crop Scan"
-        
+
         return schemas.CropScanOut(
             id=-1,
             user_id=current_user.id,
-            image_url=scan.image_url,
+            image_url=image_url,
             disease_name=disease_name,
             confidence=validation.get("confidence", 0.0),
             scan_mode=effective_scan_mode,
@@ -1320,17 +1393,18 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             rejection_reason=reason,
             created_at=datetime.now(timezone.utc)
         )
-    
+
     # ━━━ STAGE 2: Run disease detection (only for validated crop images) ━━━
     try:
-        analysis = await ai_service.ai_service.detect_disease(scan.image_url)
+        analysis = await ai_service.ai_service.detect_disease(image_url)
+        logger.info(f"[AI Endpoint] Stage 2 Disease Model Result: crop={analysis.get('crop_type')}, disease={analysis.get('disease_name')}, confidence={analysis.get('confidence_level')}")
     except Exception as e:
         logger.error(f"[AI Endpoint Error] Stage 2 Disease Detection failed: {e}")
         raise HTTPException(
             status_code=502,
             detail=f"AI Scanner Stage 2 Disease Detection failed: {str(e)}"
         )
-    
+
     if not analysis:
         analysis = {
             "is_valid_crop": True,
@@ -1357,7 +1431,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
         return schemas.CropScanOut(
             id=-1,
             user_id=current_user.id,
-            image_url=scan.image_url,
+            image_url=image_url,
             disease_name="Invalid Crop Scan",
             confidence=confidence,
             scan_mode=effective_scan_mode,
@@ -1371,10 +1445,10 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             scientific_name="N/A",
             created_at=datetime.now(timezone.utc)
         )
-    
+
     db_scan = models.CropScan(
         user_id=current_user.id,
-        image_url=scan.image_url,
+        image_url=image_url,
         disease_name=analysis.get("disease_name", "Unknown"),
         confidence=analysis.get("confidence_level", 0.0),
         scan_mode=effective_scan_mode,

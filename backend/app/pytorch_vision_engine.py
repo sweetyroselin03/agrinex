@@ -262,21 +262,26 @@ class PyTorchVisionEngine:
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         # STAGE 1 GATE ASSESSMENT
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        # Check green/foliage hue ratio in original image to ensure real leaves pass
+        # Check foliage/crop color ratio in original image to ensure real leaves and crops pass (including brinjal, yellow/brown diseased foliage)
         has_plant_color = False
         try:
             arr = np.array(original_img)
             if arr.ndim == 3 and arr.shape[2] >= 3:
                 r, g, b = arr[:, :, 0].astype(float), arr[:, :, 1].astype(float), arr[:, :, 2].astype(float)
-                # Green/foliage dominance mask
-                foliage_mask = ((g > r * 0.75) & (g > b * 0.75) & (g > 25)) | ((r > 50) & (g > 40) & (b < 80))
-                has_plant_color = float(np.mean(foliage_mask)) > 0.08
+                # Foliage & agricultural crop mask (green leaves, yellow/brown diseased spots, dark brinjal/eggplant fruit)
+                foliage_mask = (
+                    ((g > r * 0.65) & (g > b * 0.65) & (g > 15)) |   # Green foliage
+                    ((r > 40) & (g > 35) & (b < 120)) |              # Yellowing / diseased leaf
+                    ((r > 30) & (g > 20) & (r > g) & (b < 70)) |     # Brown leaf lesions
+                    ((r < 90) & (g < 90) & (b < 90) & (r + g + b > 30))  # Dark crop tissue / brinjal fruit
+                )
+                has_plant_color = float(np.mean(foliage_mask)) > 0.03
         except Exception:
             has_plant_color = True
 
-        # Non-plant threshold calibrated: Reject if definitely not plant (low probability and no color)
+        # Non-plant threshold calibrated: Only reject if definitely not plant (low probability and no plant color)
         # or if extremely low plant probability overall.
-        if is_plant_prob < 0.05 or (not has_plant_color and is_plant_prob < 0.15):
+        if is_plant_prob < 0.02 or (not has_plant_color and is_plant_prob < 0.10):
             return {
                 "is_valid_crop": False,
                 "is_plant": False,
