@@ -284,7 +284,7 @@ export default function SettingsScreen() {
               icon={Lock}
               title="Change Account Password"
               subtitle="Update password via email OTP verification"
-              onPress={() => router.push('/(auth)/change-password')}
+              onPress={() => router.push('/(auth)/change-password' as any)}
             />
             <SettingItem
               icon={Shield}

@@ -1,4 +1,5 @@
 import client from '../api/client';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export interface AIServiceResponse {
   text: string;
@@ -32,13 +33,32 @@ export async function sendMessage(
     return 'Please provide a question or attach an image so I can help you.';
   }
 
+  let formattedImageUrl = imageUri;
+  if (imageUri && (imageUri.startsWith('file://') || imageUri.startsWith('content://') || !imageUri.startsWith('http'))) {
+    try {
+      let normalizedUri = imageUri;
+      if (imageUri.startsWith('content://')) {
+        const fileName = `chat_${Date.now()}.jpg`;
+        const destUri = `${FileSystem.cacheDirectory}${fileName}`;
+        await FileSystem.copyAsync({ from: imageUri, to: destUri });
+        normalizedUri = destUri;
+      } else if (!imageUri.startsWith('file://')) {
+        normalizedUri = `file://${imageUri}`;
+      }
+      const base64 = await FileSystem.readAsStringAsync(normalizedUri, { encoding: 'base64' });
+      formattedImageUrl = `data:image/jpeg;base64,${base64}`;
+    } catch (e) {
+      console.warn('[aiService] Failed to convert imageUri to base64:', e);
+    }
+  }
+
   // Route chat strictly through backend /ai/chat (Gemini API)
   const payload: any = {
     message: trimmed || 'Analyze this crop image',
     conversation_id: conversationId,
   };
-  if (imageUri) {
-    payload.image_url = imageUri;
+  if (formattedImageUrl) {
+    payload.image_url = formattedImageUrl;
   }
   if (language) {
     payload.language = language;

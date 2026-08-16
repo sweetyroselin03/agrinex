@@ -452,9 +452,19 @@ export default function ChatTab() {
 
     try {
       let aiResponseText = '';
+      const chatHistory = updatedMsgs
+        .filter((m) => m.sender === 'user' && m.id !== userMsg.id)
+        .slice(-10)
+        .map((m) => m.text);
 
-      if (imgToSend) {
-        // Run vision crop analysis directly
+      const msgWithLanguage = selectedLanguage !== 'English'
+        ? `${msgText} (Please reply in ${selectedLanguage})`
+        : msgText;
+
+      aiResponseText = await sendMessage(msgWithLanguage, activeConversationId, imgToSend || undefined, chatHistory, selectedLanguage);
+
+      if ((!aiResponseText || aiResponseText.includes('AI service temporarily unavailable')) && imgToSend) {
+        // Fallback to direct vision crop analysis
         const result = await analyzeCropImage(imgToSend);
 
         if (result.is_valid_crop === false) {
@@ -484,19 +494,6 @@ export default function ChatTab() {
               `💡 **Pro Tip**: ${result.pro_tips || 'Rotate crops next season.'}`;
           }
         }
-      } else {
-        // Normal text message
-        const chatHistory = updatedMsgs
-          .filter((m) => m.sender === 'user' && m.id !== userMsg.id)
-          .slice(-10)
-          .map((m) => m.text);
-
-        // Instruct AI to reply in the selected language
-        const msgWithLanguage = selectedLanguage !== 'English'
-          ? `${msgText} (Please reply in ${selectedLanguage})`
-          : msgText;
-
-        aiResponseText = await sendMessage(msgWithLanguage, activeConversationId, undefined, chatHistory, selectedLanguage);
       }
 
       const aiMsg: ChatMsg = {

@@ -1,5 +1,6 @@
 import client from '../api/client';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export interface DiseaseResult {
   disease_name: string;
@@ -136,25 +137,101 @@ export async function analyzeImage(imageUri: string, scanMode: 'crop' | 'full' =
       };
     }
 
+    // HEIC / HEIF format conversion to JPEG if needed
+    const isHeic = normalizedUri.toLowerCase().includes('.heic') || normalizedUri.toLowerCase().includes('.heif');
+    if (isHeic) {
+      try {
+        const manip = await ImageManipulator.manipulateAsync(
+          normalizedUri,
+          [],
+          { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        normalizedUri = manip.uri;
+      } catch (manipErr) {
+        console.warn('[Mobile Scanner Debug] HEIC conversion warning:', manipErr);
+      }
+    }
+
+    const rawFilename = normalizedUri.split('/').pop() || `scan_${Date.now()}.jpg`;
+    const filename = rawFilename.endsWith('.jpg') || rawFilename.endsWith('.jpeg') || rawFilename.endsWith('.png') || rawFilename.endsWith('.webp')
+      ? rawFilename 
+      : `crop_scan.jpg`;
+    const mimeType = filename.endsWith('.png') ? 'image/png' : filename.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+    const fileSize = (fileInfo as any).size || 0;
+
+    // Fetch actual image bytes as Blob if fetch is available
+    let blob: Blob | null = null;
+    try {
+      const fetchResp = await fetch(normalizedUri);
+      blob = await fetchResp.blob();
+    } catch (e) {
+      console.warn('[Mobile Scanner Debug] fetch blob fallback to FileSystem base64:', e);
+    }
+
     const base64 = await FileSystem.readAsStringAsync(normalizedUri, {
       encoding: 'base64',
     });
+    const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    const dataUrl = `data:image/jpeg;base64,${base64}`;
+    // In React Native (Hermes engine), FormData requires { uri, name, type } format
+    const fileObj = {
+      uri: normalizedUri,
+      name: filename,
+      type: mimeType,
+    };
 
-    // 25-second timeout for backend Gemini vision scan
+    console.log("=== MOBILE CROP UPLOAD ===");
+    console.log("URI:", imageUri);
+    console.log("WebPath:", normalizedUri);
+    console.log("Filename:", filename);
+    console.log("MIME:", mimeType);
+    console.log("Size:", fileSize);
+
+    // Prepare FormData payload matching Web multipart specification
+    const formData = new FormData();
+    formData.append('file', fileObj as any);
+    formData.append('scan_mode', scanMode);
+
+    console.log('[Mobile Scanner Debug] FormData Field Name: file');
+    console.log('[Mobile Scanner Debug] API URL:', `${client.defaults.baseURL || 'https://agrinex.onrender.com'}/ai/detect-disease`);
+
+    // 30-second timeout for backend Gemini vision scan
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await client.post('/ai/detect-disease', {
-      image_url: dataUrl,
-      scan_mode: scanMode,
-    }, {
-      signal: controller.signal,
-      timeout: 25000,
-    });
+    let response;
+    try {
+      // 1. Attempt Multipart FormData Upload first
+      response = await client.post('/ai/detect-disease', formData, {
+        headers: {
+          'Accept': 'application/json',
+        },
+        transformRequest: [(data, headers) => {
+          if (headers) {
+            delete headers['Content-Type'];
+            delete headers['content-type'];
+          }
+          return data;
+        }],
+        signal: controller.signal,
+        timeout: 30000,
+      });
+    } catch (formDataErr: any) {
+      console.warn('[Mobile Scanner Debug] Multipart FormData upload failed/falling back to JSON Base64 DataURL:', formDataErr?.message);
+      // 2. Fallback to JSON payload matching reference Web scanner
+      response = await client.post('/ai/detect-disease', {
+        image_url: dataUrl,
+        scan_mode: scanMode,
+      }, {
+        signal: controller.signal,
+        timeout: 30000,
+      });
+    }
 
     clearTimeout(timeoutId);
+
+    console.log("Status:", response.status);
+    console.log("Response:", response.data);
 
     // Unwrap standardize_json_middleware response if present
     const resPayload = (response.data && typeof response.data === 'object' && 'data' in response.data && response.data.data) 

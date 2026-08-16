@@ -64,19 +64,35 @@ export default function MobileCropModal({
   const handleConfirm = async () => {
     try {
       setIsProcessing(true);
-      // Perform central foliage crop manipulation
-      const manipResult = await ImageManipulator.manipulateAsync(
-        currentUri,
-        [
+      // Perform central foliage crop manipulation based on actual image dimensions
+      const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+        Image.getSize(
+          currentUri,
+          (w, h) => resolve({ width: w, height: h }),
+          () => resolve({ width: 0, height: 0 })
+        );
+      });
+
+      let actions: ImageManipulator.Action[] = [];
+      if (dims.width > 0 && dims.height > 0) {
+        const cropSize = Math.floor(Math.min(dims.width, dims.height) * 0.9);
+        const originX = Math.max(0, Math.floor((dims.width - cropSize) / 2));
+        const originY = Math.max(0, Math.floor((dims.height - cropSize) / 2));
+        actions = [
           {
             crop: {
-              originX: 0,
-              originY: 0,
-              width: 1000,
-              height: 1000,
+              originX,
+              originY,
+              width: cropSize,
+              height: cropSize,
             },
           },
-        ],
+        ];
+      }
+
+      const manipResult = await ImageManipulator.manipulateAsync(
+        currentUri,
+        actions,
         { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
       ).catch(() => null);
 
@@ -168,7 +184,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: 1,
@@ -212,7 +228,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     zIndex: 20,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
   previewImage: {
     width: SCREEN_WIDTH * 0.9,
@@ -226,7 +242,7 @@ const styles = StyleSheet.create({
     borderColor: '#10B981',
     borderRadius: 24,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(16,185,129,0.05)',
   },
   corner: {
@@ -259,7 +275,7 @@ const styles = StyleSheet.create({
   },
   controlRow: {
     flexDirection: 'row',
-    justify: 'space-around',
+    justifyContent: 'space-around',
   },
   controlBtn: {
     flexDirection: 'row',
@@ -285,7 +301,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
   cancelActionText: {
     color: '#9CA3AF',
@@ -299,7 +315,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
   confirmActionText: {
