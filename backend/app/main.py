@@ -1050,108 +1050,115 @@ def is_following_user(user_id: int, current_user: models.User = Depends(get_curr
 # ─── Chat AI ───
 @app.post("/ai/chat")
 async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Save user message to database
-    user_msg = models.ChatMessage(
-        user_id=current_user.id,
-        conversation_id=chat.conversation_id,
-        message=chat.message,
-        is_ai=False
-    )
-    db.add(user_msg)
-    db.commit()
-
-    # Get history for context
-    query = db.query(models.ChatMessage).filter(models.ChatMessage.user_id == current_user.id)
-    if chat.conversation_id:
-        query = query.filter(models.ChatMessage.conversation_id == chat.conversation_id)
-    else:
-        query = query.filter(models.ChatMessage.conversation_id == None)
-
-    history = query.order_by(models.ChatMessage.created_at.desc()).limit(10).all()
-    history.reverse()
-
-    # Fetch last 3 scans for smart context memory
-    scans = db.query(models.CropScan).filter(
-        models.CropScan.user_id == current_user.id,
-        models.CropScan.is_valid_crop == True
-    ).order_by(models.CropScan.created_at.desc()).limit(3).all()
-    
-    scan_context = ""
-    if scans:
-        scan_context = "User's recent crop scans:\n"
-        for scan in scans:
-            crop_name = getattr(scan, 'detected_object', None) or "Crop"
-            date_str = scan.created_at.strftime('%Y-%m-%d') if getattr(scan, 'created_at', None) else "N/A"
-            scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name or 'N/A'}, Severity: {scan.severity_level or 'N/A'}, Date: {date_str}\n"
-
-    # Handle image attachment analysis if present
-    if chat.image_url:
-        try:
-            img_analysis = await ai_service.ai_service.detect_disease(chat.image_url)
-            if img_analysis:
-                crop = img_analysis.get("crop_type", "Crop")
-                disease = img_analysis.get("disease_name", "Unknown")
-                sev = img_analysis.get("severity_level", "Unknown")
-                symp = img_analysis.get("symptoms", "")
-                scan_context += f"\n[CURRENT ATTACHED IMAGE ANALYSIS]: Crop: {crop}, Condition: {disease}, Severity: {sev}, Symptoms: {symp}\n"
-        except Exception as img_err:
-            logger.warning(f"[Chat Image Analysis Warning] {img_err}")
-
-    if chat.stream:
-        from fastapi.responses import StreamingResponse
-        import json
-
-        async def sse_chat_generator():
-            ai_reply = ""
-            try:
-                async for chunk in ai_service.ai_service.get_chat_response_stream(
-                    chat.message, history, scan_context=scan_context, language=chat.language
-                ):
-                    ai_reply += chunk
-                    yield f"data: {json.dumps({'text': chunk, 'done': False})}\n\n"
-                
-                # At the end, save the response to database
-                ai_msg = models.ChatMessage(
-                    user_id=current_user.id,
-                    conversation_id=chat.conversation_id,
-                    message=ai_reply,
-                    is_ai=True
-                )
-                db.add(ai_msg)
-                db.commit()
-                db.refresh(ai_msg)
-                
-                # Yield final event
-                yield f"data: {json.dumps({'text': '', 'done': True, 'id': ai_msg.id, 'conversation_id': ai_msg.conversation_id})}\n\n"
-            except Exception as e:
-                logger.error(f"[Chat Stream Error] {e}")
-                fallback_msg = "AgriGPT is temporarily unavailable. Please try again."
-                yield f"data: {json.dumps({'text': fallback_msg, 'done': False})}\n\n"
-                yield f"data: {json.dumps({'text': '', 'done': True, 'id': -1, 'conversation_id': chat.conversation_id})}\n\n"
-
-        return StreamingResponse(sse_chat_generator(), media_type="text/event-stream")
-
     try:
-        ai_reply = await ai_service.ai_service.get_chat_response(
-            chat.message, history, scan_context=scan_context, language=chat.language
+        # Save user message to database
+        user_msg = models.ChatMessage(
+            user_id=current_user.id,
+            conversation_id=chat.conversation_id,
+            message=chat.message,
+            is_ai=False
         )
-    except Exception as e:
-        logger.error(f"[Chat Error] {e}")
-        ai_reply = "AgriGPT is temporarily unavailable. Please try again."
+        db.add(user_msg)
+        db.commit()
 
-    ai_msg = models.ChatMessage(
-        user_id=current_user.id,
-        conversation_id=chat.conversation_id,
-        message=ai_reply,
-        is_ai=True
-    )
-    db.add(ai_msg)
-    db.commit()
-    db.refresh(ai_msg)
-    
-    ai_msg.success = True
-    ai_msg.reply = ai_reply
-    return ai_msg
+        # Get history for context
+        query = db.query(models.ChatMessage).filter(models.ChatMessage.user_id == current_user.id)
+        if chat.conversation_id:
+            query = query.filter(models.ChatMessage.conversation_id == chat.conversation_id)
+        else:
+            query = query.filter(models.ChatMessage.conversation_id == None)
+
+        history = query.order_by(models.ChatMessage.created_at.desc()).limit(10).all()
+        history.reverse()
+
+        # Fetch last 3 scans for smart context memory
+        scan_context = ""
+        try:
+            scans = db.query(models.CropScan).filter(
+                models.CropScan.user_id == current_user.id,
+                models.CropScan.is_valid_crop == True
+            ).order_by(models.CropScan.created_at.desc()).limit(3).all()
+            
+            if scans:
+                scan_context = "User's recent crop scans:\n"
+                for scan in scans:
+                    crop_name = getattr(scan, 'detected_object', None) or "Crop"
+                    date_str = scan.created_at.strftime('%Y-%m-%d') if getattr(scan, 'created_at', None) else "N/A"
+                    scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name or 'N/A'}, Severity: {scan.severity_level or 'N/A'}, Date: {date_str}\n"
+        except Exception as scan_err:
+            logger.warning(f"[Chat Scan Context Error] {scan_err}")
+
+        # Handle image attachment analysis if present
+        if chat.image_url:
+            try:
+                img_analysis = await ai_service.ai_service.detect_disease(chat.image_url)
+                if img_analysis:
+                    crop = img_analysis.get("crop_type", "Crop")
+                    disease = img_analysis.get("disease_name", "Unknown")
+                    sev = img_analysis.get("severity_level", "Unknown")
+                    symp = img_analysis.get("symptoms", "")
+                    scan_context += f"\n[CURRENT ATTACHED IMAGE ANALYSIS]: Crop: {crop}, Condition: {disease}, Severity: {sev}, Symptoms: {symp}\n"
+            except Exception as img_err:
+                logger.warning(f"[Chat Image Analysis Warning] {img_err}")
+
+        if chat.stream:
+            from fastapi.responses import StreamingResponse
+            import json
+
+            async def sse_chat_generator():
+                ai_reply = ""
+                try:
+                    async for chunk in ai_service.ai_service.get_chat_response_stream(
+                        chat.message, history, scan_context=scan_context, language=chat.language
+                    ):
+                        ai_reply += chunk
+                        yield f"data: {json.dumps({'text': chunk, 'done': False})}\n\n"
+                    
+                    # At the end, save the response to database
+                    ai_msg = models.ChatMessage(
+                        user_id=current_user.id,
+                        conversation_id=chat.conversation_id,
+                        message=ai_reply,
+                        is_ai=True
+                    )
+                    db.add(ai_msg)
+                    db.commit()
+                    db.refresh(ai_msg)
+                    
+                    # Yield final event
+                    yield f"data: {json.dumps({'text': '', 'done': True, 'id': ai_msg.id, 'conversation_id': ai_msg.conversation_id})}\n\n"
+                except Exception as e:
+                    logger.error(f"[Chat Stream Error] {e}")
+                    fallback_msg = "AgriGPT is temporarily unavailable. Please try again."
+                    yield f"data: {json.dumps({'text': fallback_msg, 'done': False})}\n\n"
+                    yield f"data: {json.dumps({'text': '', 'done': True, 'id': -1, 'conversation_id': chat.conversation_id})}\n\n"
+
+            return StreamingResponse(sse_chat_generator(), media_type="text/event-stream")
+
+        try:
+            ai_reply = await ai_service.ai_service.get_chat_response(
+                chat.message, history, scan_context=scan_context, language=chat.language
+            )
+        except Exception as e:
+            logger.error(f"[Chat Error] {e}")
+            ai_reply = f"AgriGPT Assistant: I have received your request. ({str(e)})"
+
+        ai_msg = models.ChatMessage(
+            user_id=current_user.id,
+            conversation_id=chat.conversation_id,
+            message=ai_reply,
+            is_ai=True
+        )
+        db.add(ai_msg)
+        db.commit()
+        db.refresh(ai_msg)
+        
+        ai_msg.success = True
+        ai_msg.reply = ai_reply
+        return ai_msg
+    except Exception as top_err:
+        logger.error(f"[Chat Top-Level Exception] {top_err}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Chat Error: {str(top_err)}")
 
 @app.post("/chat")
 async def chat_legacy(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
