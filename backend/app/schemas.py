@@ -94,6 +94,11 @@ class PasswordSetRequest(BaseModel):
     email: Optional[str] = None
     password: str
 
+class PasswordChangeUpdateRequest(BaseModel):
+    otp: str
+    new_password: str
+
+
 
 class OTPRequest(BaseModel):
     email: str

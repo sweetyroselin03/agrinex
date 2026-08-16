@@ -282,6 +282,12 @@ export default function SettingsScreen() {
           <View style={[styles.cardPanel, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <SettingItem
               icon={Lock}
+              title="Change Account Password"
+              subtitle="Update password via email OTP verification"
+              onPress={() => router.push('/(auth)/change-password')}
+            />
+            <SettingItem
+              icon={Shield}
               title="Account Privacy"
               subtitle="Make account visible to followers only"
               type="switch"

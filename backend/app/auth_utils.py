@@ -193,3 +193,44 @@ def send_otp_email(email: str, otp: str):
         return (True, True)
 
 
+from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from .database import get_db
+from . import models
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+def get_current_user_from_token(token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
+    if not token or "\x00" in token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication token required.")
+    payload = verify_token(token, "access")
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired authentication token.")
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject.")
+    
+    if str(sub).isdigit():
+        user = db.query(models.User).filter(models.User.id == int(sub)).first()
+    else:
+        user = db.query(models.User).filter(models.User.email == str(sub)).first()
+    
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authenticated user account not found.")
+    return user
+
+
+def mask_email(email: str) -> str:
+    if not email or "@" not in email:
+        return email
+    parts = email.split("@", 1)
+    name, domain = parts[0], parts[1]
+    if len(name) <= 3:
+        masked_name = name[0] + "*" * max(1, len(name) - 1)
+    else:
+        masked_name = name[:3] + "*" * 8
+    return f"{masked_name}@{domain}"
+
+
+

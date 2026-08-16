@@ -130,6 +130,30 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Password change OTP modal state
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
+  const [resendTimer, setResendTimer] = useState(60);
+  const [isResendDisabled, setIsResendDisabled] = useState(true);
+  const [otpErr, setOtpErr] = useState<string | null>(null);
+  const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (isOtpModalOpen && resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (resendTimer === 0) {
+      setIsResendDisabled(false);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isOtpModalOpen, resendTimer]);
+
   // Alerts
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [localErr, setLocalErr] = useState<string | null>(null);
@@ -143,11 +167,11 @@ export default function Profile() {
 
     const trimmedFullName = fullName.trim();
     if (!trimmedFullName) {
-      setLocalErr('Full name is required.');
+      setLocalErr('Full Name is required.');
       return;
     }
 
-    if (bio.trim().length > 250) {
+    if (bio.length > 250) {
       setLocalErr('Bio cannot exceed 250 characters.');
       return;
     }
@@ -192,6 +216,15 @@ export default function Profile() {
     }
   };
 
+  const validatePasswordStrength = (pw: string): string | null => {
+    if (!pw || pw.length < 8) return 'Password must be at least 8 characters long.';
+    if (!/[A-Z]/.test(pw)) return 'Password must contain at least one uppercase letter (A-Z).';
+    if (!/[a-z]/.test(pw)) return 'Password must contain at least one lowercase letter (a-z).';
+    if (!/\d/.test(pw)) return 'Password must contain at least one number (0-9).';
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pw)) return 'Password must contain at least one special character (!@#$%^&*...).';
+    return null;
+  };
+
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMsg(null);
@@ -208,21 +241,71 @@ export default function Profile() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setLocalErr('Password must be at least 6 characters long.');
+    const validationErr = validatePasswordStrength(newPassword);
+    if (validationErr) {
+      setLocalErr(validationErr);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await setPassword(currentUser?.email || '', newPassword);
-      setSuccessMsg('Security credentials updated successfully');
-      setNewPassword('');
-      setConfirmPassword('');
+      setIsRequestingOtp(true);
+      const res = await api.post('/auth/change-password/request-otp');
+      setMaskedEmail(res.data?.email_masked || currentUser?.email || 'your email');
+      setResendTimer(60);
+      setIsResendDisabled(true);
+      setOtpCode('');
+      setOtpErr(null);
+      setIsOtpModalOpen(true);
     } catch (err: any) {
-      setLocalErr(err?.response?.data?.detail || 'Failed to update security credentials.');
+      setLocalErr(err?.response?.data?.detail || 'Failed to send verification code. Please try again.');
     } finally {
       setIsSubmitting(false);
+      setIsRequestingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (isResendDisabled) return;
+    setOtpErr(null);
+    try {
+      setIsRequestingOtp(true);
+      const res = await api.post('/auth/change-password/request-otp');
+      setMaskedEmail(res.data?.email_masked || currentUser?.email || 'your email');
+      setResendTimer(60);
+      setIsResendDisabled(true);
+    } catch (err: any) {
+      setOtpErr(err?.response?.data?.detail || 'Failed to resend verification code.');
+    } finally {
+      setIsRequestingOtp(false);
+    }
+  };
+
+  const handleOtpVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpErr(null);
+
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setOtpErr('Please enter a valid 6-digit verification code.');
+      return;
+    }
+
+    try {
+      setIsSubmittingOtp(true);
+      const res = await api.post('/auth/change-password/verify-and-update', {
+        otp: otpCode.trim(),
+        new_password: newPassword,
+      });
+
+      setIsOtpModalOpen(false);
+      setSuccessMsg(res.data?.message || '✓ Account password updated successfully.');
+      setNewPassword('');
+      setConfirmPassword('');
+      setOtpCode('');
+    } catch (err: any) {
+      setOtpErr(err?.response?.data?.detail || 'Verification failed. Please check the code and try again.');
+    } finally {
+      setIsSubmittingOtp(false);
     }
   };
 
@@ -913,7 +996,109 @@ export default function Profile() {
 
       </AnimatePresence>
 
+      {/* ─── PASSWORD CHANGE OTP VERIFICATION MODAL ─── */}
+      <AnimatePresence>
+        {isOtpModalOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setIsOtpModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-5"
+            >
+              <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base">Verify Email Address</h3>
+                    <p className="text-[11px] text-slate-400 font-medium">Security OTP Verification</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOtpModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="text-xs text-slate-600 space-y-2">
+                <p>We've sent a 6-digit verification code to your registered email address:</p>
+                <p className="font-bold text-slate-900 text-sm bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center font-mono">
+                  {maskedEmail}
+                </p>
+              </div>
+
+              {otpErr && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 font-bold animate-fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{otpErr}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleOtpVerifySubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block text-center">
+                    Enter 6-Digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    required
+                    placeholder="123456"
+                    className="w-full px-4 py-3 text-center text-xl font-bold tracking-[0.5em] font-mono rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 outline-none transition-all"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Didn't receive code?</span>
+                  {isResendDisabled ? (
+                    <span className="font-semibold text-slate-400">Resend in {resendTimer}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isRequestingOtp}
+                      onClick={handleResendOtp}
+                      className="font-bold text-emerald-600 hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      {isRequestingOtp ? 'Sending...' : 'Resend Code'}
+                    </button>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingOtp || otpCode.trim().length !== 6}
+                    className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-900/20 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingOtp ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Verifying & Updating...</span>
+                      </>
+                    ) : (
+                      <span>Verify & Complete Password Change</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ─── FOLLOWERS / FOLLOWING NETWORK LIST MODAL ─── */}
+
       <AnimatePresence>
         {networkModal && (
           <div

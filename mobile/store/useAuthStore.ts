@@ -37,6 +37,8 @@ interface AuthState {
   login: (credentials: any) => Promise<void>;
   register: (userData: any) => Promise<any>;
   setPassword: (email: string, password: string) => Promise<void>;
+  requestChangePasswordOTP: () => Promise<any>;
+  verifyAndUpdatePassword: (otp: string, newPassword: string) => Promise<any>;
   sendOTP: (email: string) => Promise<any>;
   verifyOTP: (email: string, otp: string) => Promise<any>;
   forgotPassword: (email: string) => Promise<void>;
@@ -235,6 +237,41 @@ export const useAuthStore = create<AuthState>()(
             error: formatError(error, 'Failed to set password'), 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      requestChangePasswordOTP: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const { safeApiCall } = require('../utils/network');
+          const response = await safeApiCall(() => client.post('/auth/change-password/request-otp'), 30000);
+          const payload = unwrapResponse(response.data);
+          return payload;
+        } catch (error: any) {
+          const formattedErr = formatError(error, 'Failed to send verification code');
+          set({ error: formattedErr });
+          throw new Error(formattedErr);
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      verifyAndUpdatePassword: async (otp: string, newPassword: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { safeApiCall } = require('../utils/network');
+          const response = await safeApiCall(() => client.post('/auth/change-password/verify-and-update', {
+            otp,
+            new_password: newPassword,
+          }), 30000);
+          const payload = unwrapResponse(response.data);
+          return payload;
+        } catch (error: any) {
+          const formattedErr = formatError(error, 'Verification failed');
+          set({ error: formattedErr });
+          throw new Error(formattedErr);
         } finally {
           set({ isLoading: false });
         }

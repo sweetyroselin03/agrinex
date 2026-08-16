@@ -369,3 +369,118 @@ def refresh_token(request: schemas.RefreshTokenRequest, db: Session = Depends(ge
         "refresh_token": new_refresh_token,
         "token_type": "bearer"
     }
+
+
+@router.post("/change-password/request-otp")
+def request_change_password_otp(
+    current_user: models.User = Depends(auth_utils.get_current_user_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Step 1 of Change Password:
+    Generates and emails a 6-digit OTP to the authenticated user's email address.
+    """
+    identifier = current_user.email.strip().lower()
+    
+    # Rate limit check (60 seconds)
+    db_otp = db.query(models.OTPCode).filter(models.OTPCode.email_or_phone == identifier).first()
+    if db_otp and db_otp.last_sent_at:
+        diff = (utcnow() - db_otp.last_sent_at).total_seconds()
+        if diff < 60:
+            wait_time = int(60 - diff)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Please wait {wait_time} seconds before requesting a new verification code."
+            )
+
+    otp = str(random.randint(100000, 999999))
+    expiry = utcnow() + timedelta(minutes=5)
+
+    if db_otp:
+        db_otp.otp_code = otp
+        db_otp.expires_at = expiry
+        db_otp.verified = False
+        db_otp.attempts = 0
+        db_otp.last_sent_at = utcnow()
+    else:
+        db_otp = models.OTPCode(
+            email_or_phone=identifier,
+            otp_code=otp,
+            expires_at=expiry,
+            last_sent_at=utcnow()
+        )
+        db.add(db_otp)
+    db.commit()
+
+    result = auth_utils.send_otp_email(identifier, otp)
+    success, is_mock = result if isinstance(result, tuple) else (result, False)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to send verification code email.")
+
+    response = {
+        "success": True,
+        "message": "Verification code sent to your email",
+        "email_masked": auth_utils.mask_email(identifier),
+    }
+    if is_mock:
+        response["dev_otp"] = otp
+    return response
+
+
+@router.post("/change-password/verify-and-update")
+def verify_and_update_password(
+    request: schemas.PasswordChangeUpdateRequest,
+    current_user: models.User = Depends(auth_utils.get_current_user_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Step 2 of Change Password:
+    Verifies the OTP code and updates the authenticated user's password.
+    """
+    identifier = current_user.email.strip().lower()
+    new_password = request.new_password
+
+    # Validate password criteria
+    if not new_password or len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+    if not any(c.isupper() for c in new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter.")
+    if not any(c.islower() for c in new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter.")
+    if not any(c.isdigit() for c in new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number.")
+    special_chars = "!@#$%^&*(),.?\":{}|<>"
+    if not any(c in special_chars for c in new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character.")
+
+    db_otp = db.query(models.OTPCode).filter(models.OTPCode.email_or_phone == identifier).first()
+    if not db_otp:
+        raise HTTPException(status_code=400, detail="No verification OTP requested for this email.")
+
+    if db_otp.attempts >= 5:
+        db.delete(db_otp)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Too many failed attempts. Please request a new verification code.")
+
+    if db_otp.otp_code != request.otp.strip():
+        db_otp.attempts += 1
+        db.commit()
+        remaining = 5 - db_otp.attempts
+        raise HTTPException(status_code=400, detail=f"Invalid verification code. {remaining} attempt(s) remaining.")
+
+    if utcnow() > db_otp.expires_at:
+        db.delete(db_otp)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
+
+    # OTP is valid! Update user password
+    current_user.hashed_password = auth_utils.get_password_hash(new_password)
+    db.delete(db_otp)
+    db.commit()
+
+    logger.info(f"[Password Change Success] Password successfully changed for user {identifier}")
+    return {
+        "success": True,
+        "message": "Your account password has been updated successfully."
+    }
+
