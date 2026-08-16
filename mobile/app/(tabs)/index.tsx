@@ -110,7 +110,7 @@ export default function Dashboard() {
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.greeting, { color: theme.textLight }]}>{greeting},</Text>
-          <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{user?.full_name || 'Farmer'} 👋</Text>
+          <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{user?.full_name || user?.username || (user?.email ? user.email.split('@')[0] : 'Farmer')} 👋</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity 
@@ -160,7 +160,7 @@ export default function Dashboard() {
               <View>
                 <View style={styles.locationRow}>
                   <Navigation size={12} color={theme.primary} fill={theme.primary} />
-                  <Text style={[styles.locationText, { color: theme.textLight }]}>Maharashtra, India</Text>
+                  <Text style={[styles.locationText, { color: theme.textLight }]}>{weather?.location || 'Local Region'}</Text>
                 </View>
                 <Text style={[styles.tempText, { color: theme.text }]}>{weather?.temp || 32}°C</Text>
                 <Text style={[styles.conditionText, { color: theme.textLight }]}>{weather?.condition || 'Partly Cloudy'}</Text>

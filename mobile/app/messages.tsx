@@ -137,15 +137,16 @@ export default function MessagesScreen() {
       try {
         let res;
         try {
-          res = await client.get('/users/suggested?limit=8');
+          res = await client.get('/users/search');
         } catch {
-          res = await client.get('/api/users/suggested?limit=8');
+          res = await client.get('/users/suggested?limit=20');
         }
         if (res.data) {
-          setSuggestedFarmers(res.data);
+          const list = Array.isArray(res.data) ? res.data : (res.data.data || []);
+          setSuggestedFarmers(list);
         }
       } catch (err) {
-        console.log('[Messages] Could not load suggested farmers', err);
+        console.log('[Messages] Could not load registered farmers', err);
       } finally {
         setIsLoadingSuggested(false);
       }
@@ -198,11 +199,12 @@ export default function MessagesScreen() {
       try {
         let res;
         try {
-          res = await client.get(`/messages/search?q=${encodeURIComponent(searchQuery.trim())}`);
-        } catch {
           res = await client.get(`/users/search?q=${encodeURIComponent(searchQuery.trim())}`);
+        } catch {
+          res = await client.get(`/messages/search?q=${encodeURIComponent(searchQuery.trim())}`);
         }
-        setUserSearchResults(res.data || []);
+        const results = Array.isArray(res.data) ? res.data : (res.data.data || []);
+        setUserSearchResults(results);
       } catch (err) {
         setUserSearchResults([]);
       } finally {
@@ -714,7 +716,7 @@ export default function MessagesScreen() {
           <FlatList
             ref={flatListRef}
             data={activeMessages}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item, index) => item.id ? String(item.id) : `msg-${index}`}
             renderItem={renderMessageItem}
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}

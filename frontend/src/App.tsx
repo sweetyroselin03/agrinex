@@ -17,6 +17,7 @@ import Notifications from './pages/Notifications';
 import Messages from './pages/Messages';
 import Splash from './pages/Splash';
 import Onboarding from './pages/Onboarding';
+import SetPassword from './pages/SetPassword';
 import { useAuthStore } from './store/useAuthStore';
 
 const queryClient = new QueryClient({
@@ -30,7 +31,7 @@ const queryClient = new QueryClient({
 
 // Protected Route Wrapper Component
 function ProtectedRoute({ children }: { children: React.JSX.Element }) {
-  const { isAuthenticated, checkAuth } = useAuthStore();
+  const { isAuthenticated, user, checkAuth } = useAuthStore();
   const location = useLocation();
 
   useEffect(() => {
@@ -41,14 +42,37 @@ function ProtectedRoute({ children }: { children: React.JSX.Element }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  // Mandatory Password Setup Guard
+  if (user && (user.password_setup_required === true || user.is_password_set === false)) {
+    return <Navigate to="/set-password" replace state={{ from: location }} />;
+  }
+
+  return children;
+}
+
+// Password Setup Route Guard (allows authenticated users requiring password setup)
+function PasswordSetupRoute({ children }: { children: React.JSX.Element }) {
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user && user.is_password_set === true && user.password_setup_required === false) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 }
 
 // Redirect Route Wrapper for Auth (e.g. login/register) to prevent logged-in users from seeing them
 function AuthRoute({ children }: { children: React.JSX.Element }) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   if (isAuthenticated) {
+    if (user && (user.password_setup_required === true || user.is_password_set === false)) {
+      return <Navigate to="/set-password" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -85,6 +109,7 @@ function AppRoutes() {
         <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
         <Route path="/register" element={<AuthRoute><Signup /></AuthRoute>} />
         <Route path="/forgot-password" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
+        <Route path="/set-password" element={<PasswordSetupRoute><SetPassword /></PasswordSetupRoute>} />
         
         {/* Protected Dashboard Routes */}
         <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>

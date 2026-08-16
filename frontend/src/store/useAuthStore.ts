@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import api from '../api/client';
+import { API_BASE_URL } from '../config/api';
 
 export interface User {
   id: number;
@@ -18,6 +19,8 @@ export interface User {
   bio?: string;
   website?: string;
   is_verified: boolean;
+  is_password_set?: boolean;
+  password_setup_required?: boolean;
   followers_count?: number;
   following_count?: number;
   posts_count?: number;
@@ -59,7 +62,7 @@ const formatError = (error: any, defaultMsg: string): string => {
     if (typeof window !== 'undefined' && !window.navigator.onLine) {
       return 'Network Error: You appear to be offline. Please check your internet connection.';
     }
-    return 'CORS or Server Connection Error: Unable to reach backend server. Please verify your origin is allowed and the backend is live.';
+    return 'Server Connection Error: Unable to reach backend server. Please verify backend server status or CORS settings.';
   }
 
   const status = error.response.status;
@@ -101,8 +104,8 @@ const formatError = (error: any, defaultMsg: string): string => {
     return typeof detail === 'string' ? detail : 'Conflict (409): Account already exists.';
   }
 
-  if (status === 500) {
-    return 'Internal Server Error (500). Something went wrong on the backend server.';
+  if (status === 500 || status === 503) {
+    return `Server Error (${status}). The backend server is currently experiencing issues. Please try again shortly.`;
   }
 
   const detail = error.response?.data?.detail;
@@ -143,10 +146,20 @@ export const useAuthStore = create<AuthState>()(
 
       checkAccount: async (identifier) => {
         set({ isLoading: true, error: null });
+        const finalEndpoint = `${API_BASE_URL}/auth/check-account`;
+        console.log("API_BASE_URL:", API_BASE_URL);
+        console.log("Check account endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/check-account', { identifier });
           return response.data;
         } catch (error: any) {
+          console.error('[REGISTRATION DIAGNOSTICS] Check account error:', {
+            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
+            status: error.response?.status || 'N/A',
+            responseBody: error.response?.data,
+            errorCode: error.code,
+            message: error.message,
+          });
           const msg = formatError(error, 'Check account failed');
           set({ error: msg });
           throw error;
@@ -157,10 +170,20 @@ export const useAuthStore = create<AuthState>()(
 
       sendOTP: async (email) => {
         set({ isLoading: true, error: null });
+        const finalEndpoint = `${API_BASE_URL}/auth/send-otp`;
+        console.log("API_BASE_URL:", API_BASE_URL);
+        console.log("OTP endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/send-otp', { email });
           return response.data;
         } catch (error: any) {
+          console.error('[REGISTRATION DIAGNOSTICS] Send OTP error:', {
+            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
+            status: error.response?.status || 'N/A',
+            responseBody: error.response?.data,
+            errorCode: error.code,
+            message: error.message,
+          });
           const msg = formatError(error, 'Failed to send OTP');
           set({ error: msg });
           throw error;
@@ -171,10 +194,20 @@ export const useAuthStore = create<AuthState>()(
 
       verifyOTP: async (email, otp) => {
         set({ isLoading: true, error: null });
+        const finalEndpoint = `${API_BASE_URL}/auth/verify-otp`;
+        console.log("API_BASE_URL:", API_BASE_URL);
+        console.log("Verify OTP endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/verify-otp', { email, otp });
           return response.data;
         } catch (error: any) {
+          console.error('[REGISTRATION DIAGNOSTICS] Verify OTP error:', {
+            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
+            status: error.response?.status || 'N/A',
+            responseBody: error.response?.data,
+            errorCode: error.code,
+            message: error.message,
+          });
           const msg = formatError(error, 'Invalid OTP code');
           set({ error: msg });
           throw error;
@@ -185,10 +218,20 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (userData) => {
         set({ isLoading: true, error: null });
+        const finalEndpoint = `${API_BASE_URL}/auth/register`;
+        console.log("API_BASE_URL:", API_BASE_URL);
+        console.log("Register endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/register', userData);
           return response.data;
         } catch (error: any) {
+          console.error('[REGISTRATION DIAGNOSTICS] Register error:', {
+            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
+            status: error.response?.status || 'N/A',
+            responseBody: error.response?.data,
+            errorCode: error.code,
+            message: error.message,
+          });
           const msg = formatError(error, 'Registration failed');
           set({ error: msg });
           throw error;
@@ -217,7 +260,12 @@ export const useAuthStore = create<AuthState>()(
       },
 
       login: async (credentials) => {
+        const state = get();
+        if (state.isLoading) return;
         set({ isLoading: true, error: null });
+        const finalEndpoint = `${API_BASE_URL}/auth/login`;
+        console.log("API_BASE_URL:", API_BASE_URL);
+        console.log("Login endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/login', credentials);
           const { access_token, user } = response.data;
@@ -227,6 +275,13 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
           });
         } catch (error: any) {
+          console.error('[LOGIN DIAGNOSTICS] Login error:', {
+            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
+            status: error.response?.status || 'N/A',
+            responseBody: error.response?.data,
+            errorCode: error.code,
+            message: error.message,
+          });
           const msg = formatError(error, 'Login failed');
           set({ error: msg });
           throw error;

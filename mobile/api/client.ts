@@ -8,13 +8,14 @@ const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000; // 1 second
 const MAX_RETRY_DELAY_MS = 8000;     // 8 seconds cap
 
-// Routes that should NOT be retried (idempotency-sensitive)
+// Routes that should NOT be retried (idempotency-sensitive or heavy AI tasks)
 const NO_RETRY_ROUTES = [
   '/auth/send-otp',
   '/auth/verify-otp',
   '/auth/register',
   '/auth/set-password',
   '/posts',              // POST create
+  '/ai/detect-disease',  // Heavy AI vision inference
 ];
 
 /**
@@ -46,8 +47,10 @@ api.interceptors.request.use(
     try {
       const { useAuthStore } = require('../store/useAuthStore');
       const state = useAuthStore.getState();
-      if (state.token) {
-        config.headers.Authorization = `Bearer ${state.token}`;
+      const token = state.token;
+      // Only inject valid, non-empty tokens
+      if (token && typeof token === 'string' && token !== 'undefined' && token !== 'null' && token.length > 10) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (e) {
       // AuthStore might not be initialized yet during app boot
@@ -70,14 +73,19 @@ api.interceptors.response.use(
 
     // ── Auto-logout on 401 (expired token) ──────────────────────────────────
     if (error.response?.status === 401 && !config._isRetry) {
-      try {
-        const { useAuthStore } = require('../store/useAuthStore');
-        const state = useAuthStore.getState();
-        if (state.isAuthenticated) {
-          console.log('[API] Token expired — logging out');
-          state.logout();
-        }
-      } catch (e) {}
+      const reqUrl = config.url || '';
+      // Don't auto-logout for auth check or login routes — 401 is expected there
+      const isAuthRoute = reqUrl.includes('/auth/me') || reqUrl.includes('/auth/login') || reqUrl.includes('/auth/verify');
+      if (!isAuthRoute) {
+        try {
+          const { useAuthStore } = require('../store/useAuthStore');
+          const state = useAuthStore.getState();
+          if (state.isAuthenticated) {
+            console.log('[API] Token expired — logging out');
+            state.logout();
+          }
+        } catch (e) {}
+      }
       return Promise.reject(error);
     }
 

@@ -19,6 +19,8 @@ interface User {
   cover_photo?: string;
   bio?: string;
   is_verified: boolean;
+  is_password_set?: boolean;
+  password_setup_required?: boolean;
   followers_count?: number;
   following_count?: number;
 }
@@ -103,6 +105,26 @@ const formatError = (error: any, defaultMsg: string): string => {
   const finalMsg = responseMsg || msg || defaultMsg;
   return finalMsg === 'Field required' ? 'Please fill in all required fields.' : finalMsg;
 };
+/**
+ * Unwrap the backend's standardize_json_middleware envelope.
+ * Backend wraps all JSON responses as: { success, message, data, errors }
+ * The actual payload (e.g. { access_token, user }) lives inside `.data`.
+ */
+const unwrapResponse = (responseData: any): any => {
+  if (
+    responseData &&
+    typeof responseData === 'object' &&
+    'success' in responseData &&
+    'data' in responseData &&
+    'errors' in responseData
+  ) {
+    return responseData.data; // unwrap the envelope
+  }
+  return responseData; // already unwrapped (e.g. during tests)
+};
+
+// Single-flight promise reference to prevent duplicate parallel /auth/me checks
+let checkAuthInFlight: Promise<void> | null = null;
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -119,11 +141,12 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           const response = await safeApiCall(() => client.post('/auth/check-account', { identifier }), 60000);
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
-          set({ isLoading: false, error: formatError(error, 'Check account failed') });
+          set({ error: formatError(error, 'Check account failed') });
           return { exists: false };
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -132,19 +155,21 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           const response = await safeApiCall(() => client.post('/auth/google', { id_token: idToken, profile }), 60000);
-          const { access_token, user } = response.data;
+          const payload = unwrapResponse(response.data);
+          const { access_token, user } = payload;
+          if (!access_token) throw new Error('No access token received from server');
           set({ 
             token: access_token, 
             user, 
             isAuthenticated: true, 
-            isLoading: false 
           });
         } catch (error: any) {
           set({ 
             error: formatError(error, 'Google login failed'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -153,19 +178,22 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           const response = await safeApiCall(() => client.post('/auth/login', credentials), 60000);
-          const { access_token, user } = response.data;
+          const payload = unwrapResponse(response.data);
+          const { access_token, user } = payload;
+          if (!access_token) throw new Error('No access token received from server');
+          console.log('[AuthStore] Login successful, token received, user:', user?.email || user?.full_name);
           set({ 
             token: access_token, 
             user, 
             isAuthenticated: true, 
-            isLoading: false 
           });
         } catch (error: any) {
           set({ 
             error: formatError(error, 'Login failed'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -174,14 +202,14 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           const response = await safeApiCall(() => client.post('/auth/register', userData), 60000);
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           set({ 
             error: formatError(error, 'Registration failed'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -190,19 +218,25 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           const response = await safeApiCall(() => client.post('/auth/set-password', { email, password }), 60000);
-          const { access_token, user } = response.data;
+          const payload = unwrapResponse(response.data);
+          const { access_token, user } = payload;
+          if (!access_token) throw new Error('No access token received from server');
           set({ 
             token: access_token, 
-            user, 
+            user: {
+              ...user,
+              is_password_set: true,
+              password_setup_required: false,
+            }, 
             isAuthenticated: true, 
-            isLoading: false 
           });
         } catch (error: any) {
           set({ 
             error: formatError(error, 'Failed to set password'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -211,13 +245,14 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           const response = await safeApiCall(() => client.post('/auth/send-otp', { email }), 60000);
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           console.log('[AuthStore] sendOTP failed:', error?.message);
           const errorMsg = formatError(error, 'Unable to send OTP. Please try again.');
-          set({ error: errorMsg, isLoading: false });
+          set({ error: errorMsg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -226,25 +261,24 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           const response = await safeApiCall(() => client.post('/auth/verify-otp', { email, otp }), 60000);
-          const { access_token, user } = response.data;
+          const payload = unwrapResponse(response.data);
+          const { access_token, user } = payload || {};
           if (access_token) {
             set({ 
               token: access_token, 
               user, 
               isAuthenticated: true, 
-              isLoading: false 
             });
-          } else {
-            set({ isLoading: false });
           }
-          return response.data;
+          return payload;
         } catch (error: any) {
           console.log('[AuthStore] verifyOTP failed:', error?.message);
           set({ 
             error: formatError(error, 'Invalid OTP code'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -255,16 +289,15 @@ export const useAuthStore = create<AuthState>()(
           const { auth } = require('../utils/firebase');
           const { sendPasswordResetEmail } = require('firebase/auth');
           
-          // USE ONLY Firebase sendPasswordResetEmail with a 5 second max timeout
           await safeApiCall(() => sendPasswordResetEmail(auth, email), 30000);
-          set({ isLoading: false });
         } catch (error: any) {
           console.log('[AuthStore] Firebase password reset failed:', error?.message);
           set({ 
             error: formatError(error, 'Recovery email sent successfully.'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -273,13 +306,13 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { safeApiCall } = require('../utils/network');
           await safeApiCall(() => client.post('/auth/reset-password', data), 60000);
-          set({ isLoading: false });
         } catch (error: any) {
           set({ 
             error: formatError(error, 'Failed to reset password'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -287,12 +320,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const response = await client.put('/user/profile', userData);
-          set({ user: response.data, isLoading: false });
+          set({ user: response.data });
         } catch (error: any) {
           set({ 
             error: formatError(error, 'Failed to update profile'), 
-            isLoading: false 
           });
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -313,9 +347,10 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           set({ 
             error: formatError(error, 'Failed to delete account'), 
-            isLoading: false 
           });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -363,28 +398,39 @@ export const useAuthStore = create<AuthState>()(
       clearError: () => set({ error: null }),
 
       checkAuth: async () => {
+        if (checkAuthInFlight) {
+          return checkAuthInFlight;
+        }
+
         const { token } = get();
-        if (!token) {
-          set({ isAuthenticated: false, isLoading: false });
+        if (!token || token === 'undefined' || token === 'null') {
+          set({ isAuthenticated: false, isLoading: false, token: null, user: null });
           return;
         }
 
-        // 8-second timeout to prevent infinite loading
-        const timeoutPromise = new Promise<void>((_, reject) => {
-          setTimeout(() => reject(new Error('Auth check timeout')), 8000);
-        });
+        checkAuthInFlight = (async () => {
+          try {
+            const response = await client.get('/auth/me', { timeout: 5000 });
+            const userData = unwrapResponse(response.data);
+            if (userData && userData.id) {
+              set({ user: userData, isAuthenticated: true, isLoading: false });
+            } else {
+              set({ isAuthenticated: true, isLoading: false });
+            }
+          } catch (error: any) {
+            console.log('[AuthStore] checkAuth failed or timed out:', error?.message || error);
+            const { user: existingUser } = get();
+            if (existingUser && existingUser.id) {
+              set({ isAuthenticated: true, isLoading: false });
+            } else {
+              set({ isLoading: false });
+            }
+          } finally {
+            checkAuthInFlight = null;
+          }
+        })();
 
-        try {
-          const authPromise = (async () => {
-            const response = await client.get('/auth/me');
-            set({ user: response.data, isAuthenticated: true, isLoading: false });
-          })();
-
-          await Promise.race([authPromise, timeoutPromise]);
-        } catch (error) {
-          console.log('[AuthStore] checkAuth failed or timed out:', error);
-          set({ isLoading: false });
-        }
+        return checkAuthInFlight;
       }
     }),
     {

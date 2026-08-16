@@ -32,6 +32,15 @@ class User(Base):
     followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following")
     following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower")
 
+    @property
+    def is_password_set(self) -> bool:
+        return bool(self.hashed_password and len(self.hashed_password.strip()) > 0)
+
+    @property
+    def password_setup_required(self) -> bool:
+        return not self.is_password_set
+
+
 
 class Post(Base):
     __tablename__ = "posts"
@@ -142,6 +151,7 @@ class CropScan(Base):
     detected_object = Column(String, nullable=True)
     rejection_reason = Column(String, nullable=True)
     scientific_name = Column(String, nullable=True)
+    scan_mode = Column(String, nullable=True, default="full")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

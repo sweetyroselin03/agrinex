@@ -4,20 +4,26 @@ import {
   UploadCloud, 
   Camera, 
   Trash2, 
-  Sparkles, 
   ShieldAlert, 
   CheckCircle,
   HelpCircle,
   FileText,
   Activity,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Crop,
+  Maximize2,
+  RefreshCw
 } from 'lucide-react';
 import api from '../api/client';
+import ImageCropperModal from '../components/ImageCropperModal';
 
 export default function Scanner() {
-  const [image, setImage] = useState<string | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [croppedImage, setCroppedImage] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
+  const [scanMode, setScanMode] = useState<'crop' | 'full'>('crop');
+  const [showCropper, setShowCropper] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('symptoms');
@@ -59,8 +65,13 @@ export default function Scanner() {
     setFileSize((file.size / 1024 / 1024).toFixed(2) + ' MB');
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImage(reader.result as string);
+      const dataUrl = reader.result as string;
+      setOriginalImage(dataUrl);
+      setCroppedImage(null);
       setResult(null);
+      if (scanMode === 'crop') {
+        setShowCropper(true);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -84,14 +95,32 @@ export default function Scanner() {
     }
   };
 
+  const handleConfirmCrop = (croppedDataUrl: string) => {
+    setCroppedImage(croppedDataUrl);
+    setShowCropper(false);
+  };
+
+  const handleCancelCrop = () => {
+    setShowCropper(false);
+  };
+
+  const handleResetCrop = () => {
+    setCroppedImage(null);
+  };
+
   // Triggers backend disease detection
   const handleStartScan = async () => {
-    if (!image) return;
+    const activeImage = scanMode === 'crop' ? (croppedImage || originalImage) : originalImage;
+    if (!activeImage) return;
+
     setScanning(true);
     setResult(null);
 
     try {
-      const response = await api.post('/ai/detect-disease', { image_url: image });
+      const response = await api.post('/ai/detect-disease', {
+        image_url: activeImage,
+        scan_mode: scanMode,
+      });
       setResult(response.data);
       fetchScanHistory();
     } catch (e: any) {
@@ -102,10 +131,14 @@ export default function Scanner() {
   };
 
   const clearImage = () => {
-    setImage(null);
+    setOriginalImage(null);
+    setCroppedImage(null);
     setFileSize(null);
     setResult(null);
+    setShowCropper(false);
   };
+
+  const displayImage = scanMode === 'crop' ? (croppedImage || originalImage) : originalImage;
 
   return (
     <motion.div 
@@ -113,6 +146,15 @@ export default function Scanner() {
       animate={{ opacity: 1 }} 
       className="space-y-8"
     >
+      {/* Interactive Crop Modal */}
+      {showCropper && originalImage && (
+        <ImageCropperModal
+          imageUrl={originalImage}
+          onConfirmCrop={handleConfirmCrop}
+          onCancel={handleCancelCrop}
+          onReset={handleResetCrop}
+        />
+      )}
       
       {/* Page Header */}
       <div>
@@ -122,7 +164,7 @@ export default function Scanner() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* LEFT COLUMN: UPLOADER & PREVIEW (7 Cols) */}
+        {/* LEFT COLUMN: UPLOADER & PREVIEW (6 Cols) */}
         <div className="lg:col-span-6 space-y-6">
           <div 
             onDragOver={handleDragOver}
@@ -132,11 +174,11 @@ export default function Scanner() {
               dragOver ? 'border-primary bg-brandLight/20' : 'border-slate-200 bg-white'
             }`}
           >
-            {image ? (
+            {displayImage ? (
               // Preview State
               <div className="w-full h-full flex flex-col items-center relative">
-                <div className="relative rounded-xl overflow-hidden max-h-[300px] w-full border border-slate-100 bg-slate-50">
-                  <img src={image} alt="Crop Upload" className="w-full h-full object-contain mx-auto" />
+                <div className="relative rounded-xl overflow-hidden max-h-[300px] w-full border border-slate-100 bg-slate-50 flex items-center justify-center">
+                  <img src={displayImage} alt="Crop Upload" className="w-full h-full object-contain mx-auto" />
                   
                   {/* Pulsing Scan overlay line */}
                   {scanning && (
@@ -153,11 +195,11 @@ export default function Scanner() {
                 <div className="flex justify-between items-center w-full mt-4 text-xs font-semibold text-textSec">
                   <span className="flex items-center gap-1">
                     <FileText className="w-4 h-4" />
-                    Size: {fileSize}
+                    Size: {fileSize || 'N/A'}
                   </span>
                   <button 
                     onClick={clearImage}
-                    className="text-rose hover:text-rose/85 flex items-center gap-1"
+                    className="text-rose hover:text-rose/85 flex items-center gap-1 cursor-pointer"
                     disabled={scanning}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -183,8 +225,61 @@ export default function Scanner() {
             )}
           </div>
 
+          {/* Scan Type Selection Options */}
+          {originalImage && (
+            <div className="glass-card p-4 rounded-2xl border border-slate-100 bg-white space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-brandDark uppercase tracking-wider">
+                  Scan Type
+                </span>
+                {scanMode === 'crop' && (
+                  <button
+                    onClick={() => setShowCropper(true)}
+                    className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Crop className="w-3.5 h-3.5" />
+                    Edit Crop Area
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScanMode('crop');
+                    if (!croppedImage) {
+                      setShowCropper(true);
+                    }
+                  }}
+                  className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    scanMode === 'crop'
+                      ? 'bg-primary/10 border-primary text-brandDark shadow-sm'
+                      : 'bg-slate-50 border-slate-200 text-textSec hover:border-slate-300'
+                  }`}
+                >
+                  <Crop className="w-4 h-4 text-primary" />
+                  Crop Image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScanMode('full');
+                  }}
+                  className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    scanMode === 'full'
+                      ? 'bg-primary/10 border-primary text-brandDark shadow-sm'
+                      : 'bg-slate-50 border-slate-200 text-textSec hover:border-slate-300'
+                  }`}
+                >
+                  <Maximize2 className="w-4 h-4 text-primary" />
+                  Full Image
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Action Trigger button */}
-          {image && !result && (
+          {originalImage && !result && (
             <button
               onClick={handleStartScan}
               disabled={scanning}
@@ -198,14 +293,14 @@ export default function Scanner() {
               ) : (
                 <>
                   <Camera className="w-5 h-5" />
-                  Analyze Foliage Health
+                  Analyze Foliage Health ({scanMode === 'crop' ? 'Cropped Mode' : 'Full Image Mode'})
                 </>
               )}
             </button>
           )}
         </div>
 
-        {/* RIGHT COLUMN: RESULTS PANEL (5 Cols) */}
+        {/* RIGHT COLUMN: RESULTS PANEL (6 Cols) */}
         <div className="lg:col-span-6 space-y-6">
           <AnimatePresence mode="wait">
             {!result && !scanning && (
@@ -223,9 +318,9 @@ export default function Scanner() {
                 </h3>
                 <div className="space-y-4">
                   {[
-                    { title: "Center the leaf", text: "Ensure the leaf or fruit fills at least 70% of the camera frame for focal accuracy." },
-                    { title: "Avoid blur & glare", text: "Steady your camera and photograph under neutral light. Avoid hard shadows and direct sun flares." },
-                    { title: "Pest vs Spot check", text: "Get close enough so the AI can capture spot contours and tiny pest shapes." }
+                    { title: "Choose Crop vs Full Image", text: "Use Crop Image mode for focused spot checks on single leaves; use Full Image mode for overall plant view." },
+                    { title: "Center the foliage", text: "Ensure the leaf or fruit fills at least 70% of the crop frame for focal accuracy." },
+                    { title: "Avoid blur & glare", text: "Steady your camera and photograph under neutral daylight. Avoid hard shadows and sun flares." }
                   ].map((tip, idx) => (
                     <div key={idx} className="flex gap-3">
                       <div className="w-6 h-6 rounded-full bg-slate-100 text-brandDark flex items-center justify-center text-xs font-bold shrink-0">
@@ -292,6 +387,9 @@ export default function Scanner() {
                         <span className="text-[10px] text-textSec font-bold uppercase tracking-widest">
                           {result.detected_object || 'Unknown Plant'}
                         </span>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 text-brandDark uppercase tracking-wider">
+                          Scan Type: {result.scan_mode === 'crop' ? 'Cropped Image' : 'Full Image'}
+                        </span>
                       </div>
                       <h3 className="text-xl font-extrabold text-brandDark tracking-tight">{result.disease_name}</h3>
                     </div>
@@ -335,7 +433,7 @@ export default function Scanner() {
                         <button
                           key={t.key}
                           onClick={() => setActiveTab(t.key)}
-                          className={`flex-1 py-3.5 text-center border-b-2 transition-all ${
+                          className={`flex-1 py-3.5 text-center border-b-2 transition-all cursor-pointer ${
                             activeTab === t.key 
                               ? 'border-primary text-brandDark bg-white font-extrabold'
                               : 'border-transparent hover:text-brandDark hover:bg-slate-50'
@@ -475,51 +573,64 @@ export default function Scanner() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {historyScans.map((scan) => (
-              <div 
-                key={scan.id} 
-                onClick={() => {
-                  setResult(scan);
-                  if (scan.image_url) {
-                    setImage(scan.image_url);
-                  }
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="p-4 rounded-2xl border border-slate-100 bg-white hover:border-primary/40 hover:shadow-md cursor-pointer transition-all flex gap-3 group relative overflow-hidden"
-              >
-                {scan.image_url && (
-                  <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden shrink-0">
-                    <img src={scan.image_url} alt={scan.disease_name} className="w-full h-full object-cover" />
+            {historyScans.map((scan) => {
+              const modeLabel = scan.scan_mode === 'crop' 
+                ? 'Cropped Scan' 
+                : scan.scan_mode === 'full' 
+                ? 'Full Image Scan' 
+                : 'Scan';
+              return (
+                <div 
+                  key={scan.id} 
+                  onClick={() => {
+                    setResult(scan);
+                    if (scan.image_url) {
+                      setOriginalImage(scan.image_url);
+                      setCroppedImage(null);
+                    }
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="p-4 rounded-2xl border border-slate-100 bg-white hover:border-primary/40 hover:shadow-md cursor-pointer transition-all flex gap-3 group relative overflow-hidden"
+                >
+                  {scan.image_url && (
+                    <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden shrink-0">
+                      <img src={scan.image_url} alt={scan.disease_name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[9px] font-black text-primary uppercase tracking-wider truncate">
+                        {scan.detected_object || 'Crop'}
+                      </span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        scan.severity_level === 'Critical' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'
+                      }`}>
+                        {scan.severity_level || 'Normal'}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-brandDark text-xs truncate group-hover:text-primary transition-colors">
+                      {scan.disease_name}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                        {modeLabel}
+                      </span>
+                      <span className="text-[10px] text-textSec truncate">
+                        {Math.round(scan.confidence)}%
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-0.5">
+                      {new Date(scan.created_at || scan.timestamp).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="text-[9px] font-black text-primary uppercase tracking-wider truncate">
-                      {scan.detected_object || 'Crop'}
-                    </span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                      scan.severity_level === 'Critical' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'
-                    }`}>
-                      {scan.severity_level || 'Normal'}
-                    </span>
-                  </div>
-                  <h4 className="font-bold text-brandDark text-xs truncate group-hover:text-primary transition-colors">
-                    {scan.disease_name}
-                  </h4>
-                  <p className="text-[10px] text-textSec mt-1 truncate">
-                    Confidence: {Math.round(scan.confidence)}%
-                  </p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">
-                    {new Date(scan.created_at || scan.timestamp).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

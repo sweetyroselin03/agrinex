@@ -25,6 +25,7 @@ interface NotificationState {
   markOneRead: (id: number) => Promise<void>;
   clearAll: () => Promise<void>;
   clearLocalCache: () => void;
+  startPolling: (intervalMs?: number) => () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -92,5 +93,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   clearLocalCache: () => {
     set({ notifications: [], unreadCount: 0, isLoading: false });
+  },
+
+  startPolling: (intervalMs = 30000) => {
+    get().fetchUnreadCount();
+    const interval = setInterval(() => {
+      get().fetchUnreadCount();
+    }, intervalMs);
+    return () => clearInterval(interval);
   },
 }));

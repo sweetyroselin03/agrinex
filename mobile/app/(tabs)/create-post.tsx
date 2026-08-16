@@ -310,7 +310,7 @@ export default function CreatePostScreen() {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'] as any,
             allowsMultipleSelection: true,
             selectionLimit: remaining,
             quality: 1,
@@ -318,10 +318,14 @@ export default function CreatePostScreen() {
         });
 
         if (!result.canceled && result.assets.length > 0) {
-            openCropFor(result.assets[0], (croppedUri) => {
-                const rest = result.assets.slice(1).map(a => a.uri);
-                setImages(prev => [...prev, croppedUri, ...rest].slice(0, MAX_IMAGES));
-            });
+            const firstAsset = result.assets[0];
+            openCropFor(
+                { uri: firstAsset.uri, width: firstAsset.width || 1200, height: firstAsset.height || 1200 },
+                (croppedUri) => {
+                    const rest = result.assets.slice(1).map(a => a.uri);
+                    setImages(prev => [...prev, croppedUri, ...rest].slice(0, MAX_IMAGES));
+                }
+            );
         }
     }, [images.length]);
 
@@ -340,7 +344,7 @@ export default function CreatePostScreen() {
         const result = await ImagePicker.launchCameraAsync({ quality: 1, exif: false });
         if (!result.canceled && result.assets[0]) {
             const asset = result.assets[0];
-            openCropFor({ uri: asset.uri, width: asset.width, height: asset.height }, (croppedUri) => {
+            openCropFor({ uri: asset.uri, width: asset.width || 1200, height: asset.height || 1200 }, (croppedUri) => {
                 setImages(prev => [...prev, croppedUri].slice(0, MAX_IMAGES));
             });
         }
@@ -404,6 +408,15 @@ export default function CreatePostScreen() {
             Alert.alert('Empty post', 'Add a caption or at least one image.');
             return;
         }
+
+        // Pre-flight token check
+        const { useAuthStore } = require('../../store/useAuthStore');
+        const currentToken = useAuthStore.getState().token;
+        if (!currentToken || currentToken === 'undefined' || currentToken === 'null') {
+            Alert.alert('Session expired', 'Please log in again to publish your post.');
+            return;
+        }
+
         setPosting(true);
         try {
             // Step 1: Upload all local images to Cloudinary → get https:// URLs
@@ -412,6 +425,8 @@ export default function CreatePostScreen() {
                 imageUrls = await Promise.all(images.map(uri => uploadToCloudinary(uri)));
             }
 
+            console.log('[CreatePost] Publishing with', imageUrls.length, 'images');
+
             // Step 2: POST JSON to backend (matches your schemas.PostCreate)
             await api.post('/posts', {
                 content: caption.trim(),
@@ -419,11 +434,21 @@ export default function CreatePostScreen() {
                 image_url: imageUrls[0] ?? null,
             });
 
+            // Trigger feed refresh in PostStore
+            try {
+                const { usePostStore } = require('../../store/usePostStore');
+                await usePostStore.getState().fetchPosts();
+            } catch (refErr) {
+                console.warn('[CreatePost] Post store refresh failed:', refErr);
+            }
+
             setShowPreview(false);
             router.back();
         } catch (e: any) {
-            const msg = e?.response?.data?.detail ?? e?.message ?? 'Something went wrong. Please try again.';
-            Alert.alert('Post failed', msg);
+            console.log('[CreatePost] Publish error:', e?.response?.status, e?.message);
+            const errData = e?.response?.data;
+            const detail = errData?.detail ?? errData?.errors ?? e?.message ?? 'Something went wrong. Please try again.';
+            Alert.alert('Post failed', typeof detail === 'string' ? detail : JSON.stringify(detail));
         } finally {
             setPosting(false);
         }

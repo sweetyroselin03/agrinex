@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import random
 import os
 import logging
+import time
 from . import models, schemas, auth_utils
 from .database import get_db
 
@@ -197,9 +198,28 @@ def google_login(request: schemas.GoogleLoginRequest, db: Session = Depends(get_
     }
 
 
+def validate_password_strength(password: str):
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+    if not any(c.isupper() for c in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter.")
+    if not any(c.islower() for c in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter.")
+    if not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number.")
+    special_chars = r"""!@#$%^&*()_+-=[]{};':"\|,.<>/?`~"""
+    if not any(c in special_chars for c in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character.")
+
+
 @router.post("/set-password", response_model=schemas.Token)
 def set_password(request: schemas.PasswordSetRequest, db: Session = Depends(get_db)):
-    target = request.email.strip()
+    validate_password_strength(request.password)
+    
+    target = (request.email or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="Email is required to set password")
+
     user = db.query(models.User).filter(
         (models.User.email == target) | (models.User.email == f"{target}@agrinex.local")
     ).first()
@@ -215,24 +235,44 @@ def set_password(request: schemas.PasswordSetRequest, db: Session = Depends(get_
         "access_token": access_token,
         "token_type": "bearer",
         "user": user,
-        "is_new": True
+        "is_new": False
     }
+
 
 
 @router.post("/login", response_model=schemas.Token)
 def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
+    t_start = time.time()
+    logger.info("[LOGIN START] Login request received")
+    
     target = request.email.strip()
+    
+    logger.info(f"[USER LOOKUP START] Querying database for email: {target}")
+    t0 = time.time()
     user = db.query(models.User).filter(
         (models.User.email == target) | (models.User.email == f"{target}@agrinex.local")
     ).first()
+    logger.info(f"[USER LOOKUP COMPLETE] User found: {bool(user)} ({round((time.time() - t0) * 1000, 2)}ms)")
         
     if not user:
+        logger.info(f"[LOGIN COMPLETE] Email not registered (401) ({round((time.time() - t_start) * 1000, 2)}ms)")
         raise HTTPException(status_code=401, detail="Email not registered")
     
-    if not auth_utils.verify_password(request.password, user.hashed_password):
+    logger.info("[PASSWORD VERIFY START] Verifying bcrypt password hash")
+    t1 = time.time()
+    is_valid = auth_utils.verify_password(request.password, user.hashed_password)
+    logger.info(f"[PASSWORD VERIFY COMPLETE] Hash valid: {is_valid} ({round((time.time() - t1) * 1000, 2)}ms)")
+    
+    if not is_valid:
+        logger.info(f"[LOGIN COMPLETE] Invalid password (401) ({round((time.time() - t_start) * 1000, 2)}ms)")
         raise HTTPException(status_code=401, detail="Invalid password")
     
+    logger.info("[TOKEN CREATION START] Generating JWT access token")
+    t2 = time.time()
     access_token = auth_utils.create_access_token(data={"sub": user.email})
+    logger.info(f"[TOKEN CREATION COMPLETE] Token generated ({round((time.time() - t2) * 1000, 2)}ms)")
+    
+    logger.info(f"[LOGIN COMPLETE] Login successful for {user.email} (200 OK) ({round((time.time() - t_start) * 1000, 2)}ms)")
     return {
         "access_token": access_token,
         "token_type": "bearer",

@@ -205,7 +205,7 @@ jobs:
       - name: "🏗️ Build Vite Production Bundle"
         working-directory: frontend
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://agrinex-backend-c1ig.onrender.com' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://agrinex.onrender.com' }}
         run: npm run build
 
       - name: "🚀 Deploy to Vercel"

@@ -168,8 +168,8 @@ export default function Signup() {
 
       setIsSuccess(true);
       setTimeout(() => {
-        navigate('/login', { state: { registeredEmail: email.trim() } });
-      }, 1800);
+        navigate('/dashboard', { replace: true });
+      }, 1500);
     } catch (err: any) {
       setIsSubmitting(false);
     }

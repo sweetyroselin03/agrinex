@@ -53,6 +53,8 @@ class UserOut(BaseModel):
     posts_count: Optional[int] = 0
     is_following: Optional[bool] = False
     isFollowing: Optional[bool] = False
+    is_password_set: Optional[bool] = True
+    password_setup_required: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -89,8 +91,9 @@ class RegisterRequest(BaseModel):
     email: str
 
 class PasswordSetRequest(BaseModel):
-    email: str
+    email: Optional[str] = None
     password: str
+
 
 class OTPRequest(BaseModel):
     email: str
@@ -286,6 +289,7 @@ class ConversationSummary(BaseModel):
 # ─── Crop Scan ────────────────────────────────────────────────────────────────
 class CropScanCreate(BaseModel):
     image_url: str
+    scan_mode: Optional[str] = "full"
 
 class CropScanOut(BaseModel):
     id: int
@@ -293,6 +297,7 @@ class CropScanOut(BaseModel):
     image_url: str
     disease_name: str
     confidence: float
+    scan_mode: Optional[str] = "full"
     is_valid_crop: Optional[bool] = True
     severity_level: Optional[str] = "Warning"
     symptoms: Optional[str] = None

@@ -1,7 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
+import { API_BASE_URL } from '../config/api';
 
-const BASE_URL = (import.meta.env.VITE_API_URL || 'https://agrinex.onrender.com').replace(/\/$/, '');
+const BASE_URL = API_BASE_URL;
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const MAX_RETRY_DELAY_MS = 8000;

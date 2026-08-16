@@ -25,29 +25,13 @@ export default function Layout() {
 
   useEffect(() => {
     const prepare = async () => {
-      // Check onboarding status
       try {
         const onboardingDone = await AsyncStorage.getItem('agrinex_onboarding_completed');
         setHasSeenOnboarding(onboardingDone === 'true');
       } catch (_) {}
 
-      // Add 10-second max timeout to handle Render cold starts gracefully
-      const authTimeout = new Promise<void>((resolve) => {
-        setTimeout(() => {
-          console.log('[Layout] Auth check timed out after 10s — continuing');
-          resolve();
-        }, 10000);
-      });
-
-      const authCheck = (async () => {
-        try {
-          await checkAuth();
-        } catch (e) {
-          console.log('[Layout] Auth check failed:', e);
-        }
-      })();
-
-      await Promise.race([authCheck, authTimeout]);
+      // Trigger background auth validation if a token exists
+      checkAuth().catch((e) => console.log('[Layout] Background auth check failed:', e));
       setIsReady(true);
     };
     prepare();
@@ -64,6 +48,9 @@ export default function Layout() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inTabsGroup = segments[0] === '(tabs)';
+    const currentScreen = segments[1] as string | undefined;
+
+    const { user } = useAuthStore.getState();
 
     if (!isAuthenticated && !inAuthGroup && segments[0] !== 'onboarding' && segments[0] !== 'redirect') {
       // Route to onboarding first if not seen, otherwise to welcome
@@ -72,9 +59,16 @@ export default function Layout() {
       } else {
         router.replace('/(auth)/welcome');
       }
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to tabs if authenticated and trying to access auth screens
-      router.replace('/(tabs)');
+    } else if (isAuthenticated) {
+      const needsPasswordSetup = user && (user.password_setup_required === true || user.is_password_set === false);
+      if (needsPasswordSetup) {
+        if (currentScreen !== 'set-password') {
+          router.replace('/(auth)/set-password');
+        }
+      } else if (inAuthGroup) {
+        // Redirect to tabs if authenticated and trying to access auth screens
+        router.replace('/(tabs)');
+      }
     }
   }, [isAuthenticated, segments, isReady, hasSeenOnboarding]);
 

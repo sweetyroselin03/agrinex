@@ -24,6 +24,7 @@ export interface DiseaseResult {
   health_score?: number;
   yield_impact?: string;
   pro_tips?: string;
+  scan_mode?: string;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -73,7 +74,7 @@ async function validateImageQuality(imageUri: string): Promise<{ valid: boolean;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Main Analysis Function — Multi-Stage Pipeline
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export async function analyzeImage(imageUri: string): Promise<DiseaseResult> {
+export async function analyzeImage(imageUri: string, scanMode: 'crop' | 'full' = 'full'): Promise<DiseaseResult> {
 
   // ── STAGE 2: Image Quality Validation ──
   const quality = await validateImageQuality(imageUri);
@@ -99,105 +100,123 @@ export async function analyzeImage(imageUri: string): Promise<DiseaseResult> {
     };
   }
 
-  // ── STAGE 1 + 3: Backend handles crop validation AND disease detection ──
+  // ── STAGE 1 + 3: Backend handles crop validation AND disease detection (Gemini) ──
   try {
-    const base64 = await FileSystem.readAsStringAsync(imageUri, {
+    // Normalize image URI safely for iOS / Android content URIs
+    let normalizedUri = imageUri;
+    if (imageUri.startsWith('content://')) {
+      const fileName = `scan_${Date.now()}.jpg`;
+      const destUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.copyAsync({ from: imageUri, to: destUri });
+      normalizedUri = destUri;
+    } else if (!imageUri.startsWith('file://') && !imageUri.startsWith('http')) {
+      normalizedUri = `file://${imageUri}`;
+    }
+
+    const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
+    if (!fileInfo.exists) {
+      return {
+        disease_name: 'Image Error',
+        confidence: 0,
+        severity_level: 'Warning',
+        symptoms: 'Selected image file could not be read.',
+        causes: 'The image file may have been deleted or moved.',
+        prevention: 'Please pick or take a new photo.',
+        treatment: '',
+        organic_treatment: '',
+        pesticide_recommendations: '',
+        irrigation_recommendations: '',
+        fertilizer_recommendations: '',
+        recovery_steps: '',
+        estimated_recovery_time: '',
+        weather_risk: '',
+        prevention_tips: '',
+        is_valid_crop: false,
+        quality_issue: 'Please select a valid crop image.',
+      };
+    }
+
+    const base64 = await FileSystem.readAsStringAsync(normalizedUri, {
       encoding: 'base64',
     });
 
     const dataUrl = `data:image/jpeg;base64,${base64}`;
 
-    // 15-second timeout for two-stage scan requests
+    // 25-second timeout for backend Gemini vision scan
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-    const response = await client.post('/ai/detect-disease', { image_url: dataUrl }, {
+    const response = await client.post('/ai/detect-disease', {
+      image_url: dataUrl,
+      scan_mode: scanMode,
+    }, {
       signal: controller.signal,
-      timeout: 18000,
+      timeout: 25000,
     });
 
     clearTimeout(timeoutId);
 
-    if (response.data && response.data.disease_name) {
-      return {
-        disease_name: response.data.disease_name || 'Unknown',
-        confidence: parseFloat(response.data.confidence) || 85.0,
-        severity_level: response.data.severity_level || 'Warning',
-        symptoms: response.data.symptoms || 'Analysis pending',
-        causes: response.data.causes || 'Under investigation',
-        prevention: response.data.prevention || 'Consult local expert',
-        treatment: response.data.treatment || response.data.recovery_steps || 'Consult agricultural expert',
-        organic_treatment: response.data.organic_treatment || 'Neem oil spray recommended',
-        pesticide_recommendations: response.data.pesticide_recommendations || 'Consult dealer',
-        irrigation_recommendations: response.data.irrigation_recommendations || 'Maintain regular schedule',
-        fertilizer_recommendations: response.data.fertilizer_recommendations || 'Balanced NPK',
-        recovery_steps: response.data.recovery_steps || 'Follow treatment plan',
-        estimated_recovery_time: response.data.estimated_recovery_time || '7-14 days',
-        weather_risk: response.data.weather_risk || 'Monitor during high humidity',
-        prevention_tips: response.data.prevention_tips || 'Regular monitoring recommended',
-        is_valid_crop: response.data.is_valid_crop !== false,
-        detected_object: response.data.detected_object,
-        rejection_reason: response.data.rejection_reason,
-        health_score: response.data.health_score,
-        yield_impact: response.data.yield_impact,
-        pro_tips: response.data.pro_tips,
-      };
-    }
-    throw new Error('Invalid backend response');
-  } catch (error: any) {
-    console.log('Backend AI unavailable, trying fallback:', error?.message);
-    try {
-      console.log('[diseaseDetection] Triggering direct Groq Vision fallback...');
-      const { analyzeCropImage: directAnalyze } = require('./groqService');
-      const directResult = await directAnalyze(imageUri);
-      return {
-        disease_name: directResult.disease_name || 'Healthy Crop',
-        confidence: directResult.confidence || 90.0,
-        severity_level: directResult.severity_level || 'Healthy',
-        symptoms: directResult.symptoms || 'No disease symptoms detected.',
-        causes: 'Pathogenic infection or physiological disorder.',
-        prevention: directResult.pro_tips || 'Maintain standard farm hygiene.',
-        treatment: directResult.treatment || 'Apply target fungicides.',
-        organic_treatment: directResult.organic_treatment || 'Apply organic neem oil.',
-        pesticide_recommendations: directResult.treatment || '',
-        irrigation_recommendations: directResult.irrigation_recommendations || 'Maintain normal irrigation.',
-        fertilizer_recommendations: 'Apply balanced NPK nutrients.',
-        recovery_steps: directResult.recovery_steps || 'Prune infected leaves and separate diseased crops.',
-        estimated_recovery_time: '7-14 days',
-        weather_risk: 'High risk during heavy moisture.',
-        prevention_tips: directResult.pro_tips || 'Keep surveillance active.',
-        is_valid_crop: directResult.is_valid_crop !== false,
-        detected_object: directResult.crop_type,
-        rejection_reason: directResult.rejection_reason,
-        health_score: directResult.severity_level?.toLowerCase() === 'healthy' ? 95 : 65,
-        yield_impact: directResult.yield_impact,
-        pro_tips: directResult.pro_tips,
-      };
-    } catch (fallbackError) {
-      console.error('[diseaseDetection] Groq Vision fallback also failed:', fallbackError);
-    }
-  }
+    // Unwrap standardize_json_middleware response if present
+    const resPayload = (response.data && typeof response.data === 'object' && 'data' in response.data && response.data.data) 
+      ? response.data.data 
+      : response.data;
 
-  // Backend unavailable — return explicit error instead of random guess
-  return {
-    disease_name: 'Connection Error',
-    confidence: 0,
-    severity_level: 'Warning',
-    symptoms: 'Unable to connect to the AI analysis service.',
-    causes: 'The backend server may be offline or your internet connection is unstable.',
-    prevention: 'Ensure you have a stable internet connection.',
-    treatment: 'Please try scanning again when you have a stable connection.',
-    organic_treatment: '',
-    pesticide_recommendations: '',
-    irrigation_recommendations: '',
-    fertilizer_recommendations: '',
-    recovery_steps: '1. Check your internet connection\n2. Restart the app\n3. Try scanning again',
-    estimated_recovery_time: '',
-    weather_risk: '',
-    prevention_tips: '',
-    is_valid_crop: undefined,
-    quality_issue: 'Unable to reach the analysis server. Please check your connection and try again.',
-  };
+    if (resPayload && resPayload.disease_name) {
+      const isValidCrop = resPayload.is_valid_crop !== false && resPayload.disease_name !== 'Non-Crop Object';
+      return {
+        disease_name: resPayload.disease_name || 'Unknown',
+        confidence: parseFloat(resPayload.confidence) || (isValidCrop ? 85.0 : 0),
+        severity_level: resPayload.severity_level || (isValidCrop ? 'Warning' : 'Low'),
+        symptoms: resPayload.symptoms || (isValidCrop ? 'Analysis completed' : 'Please upload a clearer image of the affected crop/leaf.'),
+        causes: resPayload.causes || 'Under investigation',
+        prevention: resPayload.prevention || 'Consult local expert',
+        treatment: resPayload.treatment || resPayload.recovery_steps || 'Consult agricultural expert',
+        organic_treatment: resPayload.organic_treatment || 'Neem oil spray recommended',
+        pesticide_recommendations: resPayload.pesticide_recommendations || '',
+        irrigation_recommendations: resPayload.irrigation_recommendations || '',
+        fertilizer_recommendations: resPayload.fertilizer_recommendations || '',
+        recovery_steps: resPayload.recovery_steps || '',
+        estimated_recovery_time: resPayload.estimated_recovery_time || '',
+        weather_risk: resPayload.weather_risk || '',
+        prevention_tips: resPayload.prevention_tips || '',
+        is_valid_crop: isValidCrop,
+        detected_object: resPayload.detected_object,
+        rejection_reason: resPayload.rejection_reason || (!isValidCrop ? 'Please upload a clearer image of the affected crop/leaf.' : undefined),
+        health_score: resPayload.health_score,
+        yield_impact: resPayload.yield_impact,
+        pro_tips: resPayload.pro_tips,
+        scan_mode: resPayload.scan_mode || scanMode,
+      };
+    }
+    throw new Error('Invalid response structure from backend AI service.');
+  } catch (error: any) {
+    console.warn('[diseaseDetection] Backend Gemini analysis call failed:', error?.message);
+    const isTimeout = error?.message?.includes('timeout') || error?.code === 'ECONNABORTED' || error?.name === 'AbortError';
+
+    return {
+      disease_name: isTimeout ? 'Scanner Timeout' : 'Service Unavailable',
+      confidence: 0,
+      severity_level: 'Warning',
+      symptoms: isTimeout 
+        ? 'Crop analysis is taking longer than expected. Please try again.'
+        : 'Unable to connect to the crop diagnosis service.',
+      causes: 'Network connection delay or temporary server busyness.',
+      prevention: 'Ensure a stable internet connection before re-scanning.',
+      treatment: 'Please try again in a few moments.',
+      organic_treatment: '',
+      pesticide_recommendations: '',
+      irrigation_recommendations: '',
+      fertilizer_recommendations: '',
+      recovery_steps: '1. Check your internet connection\n2. Hold camera steady\n3. Tap scan again',
+      estimated_recovery_time: '',
+      weather_risk: '',
+      prevention_tips: '',
+      is_valid_crop: false,
+      quality_issue: isTimeout 
+        ? 'Crop analysis is taking longer than expected. Please try again.'
+        : 'Unable to process crop image. Please check your connection and try again.',
+    };
+  }
 }
 
 export function getDiseaseColor(diseaseName: string): string {

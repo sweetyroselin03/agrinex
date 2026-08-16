@@ -25,51 +25,74 @@ export function AgriNexIcon({ size = 48 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 48 48" fill="none">
       <Defs>
         <LinearGradient id="agriGreen" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <Stop offset="0%" stopColor="#22C55E" />
-          <Stop offset="100%" stopColor="#15803D" />
+          <Stop offset="0%" stopColor="#10B981" />
+          <Stop offset="50%" stopColor="#059669" />
+          <Stop offset="100%" stopColor="#047857" />
         </LinearGradient>
         <LinearGradient id="aiGlow" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <Stop offset="0%" stopColor="#86EFAC" />
-          <Stop offset="100%" stopColor="#22C55E" />
+          <Stop offset="0%" stopColor="#34D399" />
+          <Stop offset="100%" stopColor="#059669" />
+        </LinearGradient>
+        <LinearGradient id="goldAccent" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <Stop offset="0%" stopColor="#F59E0B" />
+          <Stop offset="100%" stopColor="#D97706" />
         </LinearGradient>
       </Defs>
 
-      {/* Outer Leaf Silhouette */}
+      {/* Hexagonal Tech Shield Background */}
       <Path
-        d="M34 14C18 18 13.8 30.3 9.64 40.7L13.42 42L15.32 37.4C16.28 37.7 17.28 38 18.34 38C27.74 38 34.92 29.88 37.46 22.84C40 15.8 40 6 40 6C32.36 6 26.84 8.14 23.2 10.8"
+        d="M24 4L40 12V32L24 44L8 32V12L24 4Z"
         fill="url(#agriGreen)"
-        fillOpacity={0.25}
+        fillOpacity={0.15}
         stroke="url(#agriGreen)"
-        strokeWidth={3}
+        strokeWidth={2.5}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
 
-      {/* Main Vein with AI Circuit Node Connections */}
+      {/* Growing Sprout / Plant Leaf Structure */}
       <Path
-        d="M16 32C19 26 24 20 34 14"
+        d="M24 38V18"
         stroke="url(#aiGlow)"
-        strokeWidth={2.5}
+        strokeWidth={3}
         strokeLinecap="round"
       />
       <Path
-        d="M22 26L28 28"
-        stroke="url(#aiGlow)"
+        d="M24 26C20 23 14 24 14 24C14 24 15 30 24 32"
+        fill="url(#agriGreen)"
+        stroke="url(#agriGreen)"
         strokeWidth={2}
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
       <Path
-        d="M26 21L32 22"
+        d="M24 21C28 18 34 19 34 19C34 19 33 25 24 27"
+        fill="url(#aiGlow)"
         stroke="url(#aiGlow)"
         strokeWidth={2}
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
 
-      {/* AI Nodes */}
-      <Circle cx={34} cy={14} r={3.5} fill="#86EFAC" />
-      <Circle cx={28} cy={28} r={2.5} fill="#4ADE80" />
-      <Circle cx={32} cy={22} r={2.5} fill="#4ADE80" />
-      <Circle cx={16} cy={32} r={2.5} fill="#22C55E" />
+      {/* Golden Sunrise / AI Node Orbit */}
+      <Circle cx={24} cy={14} r={3.5} fill="url(#goldAccent)" />
+      <Circle cx={14} cy={24} r={2.5} fill="#34D399" />
+      <Circle cx={34} cy={19} r={2.5} fill="#34D399" />
+      <Circle cx={24} cy={38} r={3} fill="#059669" />
+
+      {/* Circuit Connections */}
+      <Path
+        d="M24 14C18 14 14 18 14 24"
+        stroke="url(#aiGlow)"
+        strokeWidth={1.5}
+        strokeDasharray="2,2"
+      />
+      <Path
+        d="M24 14C30 14 34 16 34 19"
+        stroke="url(#aiGlow)"
+        strokeWidth={1.5}
+        strokeDasharray="2,2"
+      />
     </Svg>
   );
 }

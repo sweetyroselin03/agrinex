@@ -34,7 +34,8 @@ export default function SetPasswordScreen() {
   const TEXT_MUTED = theme.textLight;
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { setPassword, isLoading } = useAuthStore();
+  const { setPassword, isLoading, user } = useAuthStore();
+  const targetEmail = (params.email as string) || user?.email || '';
 
   const [passwordVal, setPasswordVal] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -55,51 +56,74 @@ export default function SetPasswordScreen() {
     setToast({ visible: true, message, type });
   }, []);
 
-  const togglePassword = useCallback(() => setShowPassword(p => !p), []);
+  const togglePassword = useCallback(() => setShowPassword((p: boolean) => !p), []);
 
   const buttonScale = useSharedValue(1);
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: buttonScale.value }] }));
 
-  const email = params.email as string;
-
   useEffect(() => {
     let s = 0;
     if (passwordVal.length >= 8) s += 1;
+    if (/[A-Z]/.test(passwordVal)) s += 1;
+    if (/[a-z]/.test(passwordVal)) s += 1;
     if (/\d/.test(passwordVal)) s += 1;
     if (/[!@#$%^&*(),.?":{}|<>]/.test(passwordVal)) s += 1;
-    if (/[A-Z]/.test(passwordVal)) s += 1;
     setStrength(s);
   }, [passwordVal]);
 
   const requirements = [
     { label: '8+ Characters', met: passwordVal.length >= 8 },
+    { label: 'Uppercase Letter', met: /[A-Z]/.test(passwordVal) },
+    { label: 'Lowercase Letter', met: /[a-z]/.test(passwordVal) },
     { label: 'One Number', met: /\d/.test(passwordVal) },
     { label: 'Special Char', met: /[!@#$%^&*(),.?":{}|<>]/.test(passwordVal) },
-    { label: 'Uppercase', met: /[A-Z]/.test(passwordVal) },
+    { label: 'Passwords Match', met: passwordVal.length > 0 && confirmPassword === passwordVal },
   ];
 
+  const isPasswordValid = passwordVal.length >= 8 && /[A-Z]/.test(passwordVal) && /[a-z]/.test(passwordVal) && /\d/.test(passwordVal) && /[!@#$%^&*(),.?":{}|<>]/.test(passwordVal);
+  const passwordsMatch = passwordVal.length > 0 && confirmPassword === passwordVal;
+  const canSubmit = isPasswordValid && passwordsMatch && !isLoading;
+
   const getStrengthColor = () => {
-    if (strength <= 1) return '#EF4444';
-    if (strength <= 2) return '#F59E0B';
+    if (strength <= 2) return '#EF4444';
+    if (strength <= 4) return '#F59E0B';
     return PRIMARY;
   };
 
   const handleCompleteSetup = useCallback(async () => {
-    if (!email) { showToast('Session expired. Please try registering again.'); setTimeout(() => router.replace('/(auth)/register'), 1500); return; }
-    if (!passwordVal || !confirmPassword) { showToast('Please fill in all fields'); return; }
-    if (passwordVal !== confirmPassword) { showToast('Passwords do not match'); return; }
-    if (strength < 3) { showToast('Please use a stronger password'); return; }
+    if (!targetEmail) {
+      showToast('Session expired. Please try registering again.');
+      setTimeout(() => router.replace('/(auth)/register'), 1500);
+      return;
+    }
+    if (!passwordVal || !confirmPassword) {
+      showToast('Please fill in all fields');
+      return;
+    }
+    if (passwordVal !== confirmPassword) {
+      showToast('Passwords do not match');
+      return;
+    }
+    if (!isPasswordValid) {
+      showToast('Please meet all password security requirements');
+      return;
+    }
 
     try {
-      await setPassword(email, passwordVal);
+      await setPassword(targetEmail, passwordVal);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast('Setup complete! Welcome to AgriNex', 'success');
-      setTimeout(() => { InteractionManager.runAfterInteractions(() => { router.replace('/(tabs)'); }); }, 1000);
+      showToast('Your account is secured successfully.', 'success');
+      setTimeout(() => {
+        InteractionManager.runAfterInteractions(() => {
+          router.replace('/(tabs)');
+        });
+      }, 1000);
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast(e.response?.data?.detail || 'Failed to set password. Please try again.', 'error');
+      showToast(e.response?.data?.detail || e.message || 'Failed to set password. Please try again.', 'error');
     }
-  }, [email, passwordVal, confirmPassword, strength]);
+  }, [targetEmail, passwordVal, confirmPassword, isPasswordValid]);
+
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -212,7 +236,7 @@ export default function SetPasswordScreen() {
                   onSubmitEditing={handleCompleteSetup}
                   returnKeyType="done"
                 />
-                <TouchableOpacity onPress={() => setShowConfirmPassword(p => !p)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <TouchableOpacity onPress={() => setShowConfirmPassword((p: boolean) => !p)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   {showConfirmPassword
                     ? <EyeOff color={theme.textLight} size={18} />
                     : <Eye color={theme.textLight} size={18} />
@@ -232,16 +256,16 @@ export default function SetPasswordScreen() {
                 ))}
               </View>
 
-              <View style={[styles.primaryBtnShadow, { shadowColor: PRIMARY }]}>
+              <View style={[styles.primaryBtnShadow, { shadowColor: PRIMARY, opacity: canSubmit ? 1 : 0.5 }]}>
                 <Pressable
                   onPress={handleCompleteSetup}
-                  disabled={isLoading}
+                  disabled={!canSubmit}
                   style={styles.primaryBtn}
                 >
                   <LinearGradient colors={[PRIMARY, PRIMARY_END]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryGradient}>
                     {isLoading ? <ActivityIndicator color="white" /> : (
                       <View style={styles.btnContent}>
-                        <Text style={styles.primaryText}>Complete Setup</Text>
+                        <Text style={styles.primaryText}>Create Password</Text>
                         <ChevronRight color="white" size={18} />
                       </View>
                     )}

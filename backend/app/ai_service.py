@@ -331,7 +331,7 @@ class AIService:
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     # AgriGPT Chat Assistant
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    async def get_chat_response(self, message: str, history: list = [], scan_context: str = "") -> str:
+    async def get_chat_response(self, message: str, history: list = [], scan_context: str = "", language: str = None) -> str:
         """Delegates chat response to AgriGPT Reasoning Assistant Engine."""
         formatted_history = []
         for msg in history:
@@ -340,9 +340,9 @@ class AIService:
             elif isinstance(msg, dict):
                 formatted_history.append(msg)
 
-        return await self.agri_gpt.get_response(message, history=formatted_history, scan_context=scan_context)
+        return await self.agri_gpt.get_response(message, history=formatted_history, scan_context=scan_context, language=language)
 
-    async def get_chat_response_stream(self, message: str, history: list = [], scan_context: str = ""):
+    async def get_chat_response_stream(self, message: str, history: list = [], scan_context: str = "", language: str = None):
         """Delegates streaming chat response to AgriGPT Reasoning Assistant Engine."""
         formatted_history = []
         for msg in history:
@@ -351,7 +351,7 @@ class AIService:
             elif isinstance(msg, dict):
                 formatted_history.append(msg)
 
-        async for chunk in self.agri_gpt.get_response_stream(message, history=formatted_history, scan_context=scan_context):
+        async for chunk in self.agri_gpt.get_response_stream(message, history=formatted_history, scan_context=scan_context, language=language):
             yield chunk
 
 

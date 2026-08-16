@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import client from '../api/client';
 import { useAuthStore } from './useAuthStore';
+import { WS_BASE_URL } from '../config/api';
 
 export interface MessageAttachment {
   id: number;
@@ -489,10 +490,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (socket && socket.readyState === WebSocket.OPEN) return;
 
     isExplicitDisconnect = false;
-    const apiBase = import.meta.env.VITE_API_URL || 'https://agrinex.onrender.com';
-    const cleanHost = apiBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const protocol = apiBase.startsWith('https') ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${cleanHost}/ws/chat/${userId}`;
+    const wsUrl = `${WS_BASE_URL}/ws/chat/${userId}`;
 
     try {
       socket = new WebSocket(wsUrl);

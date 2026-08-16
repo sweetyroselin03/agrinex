@@ -8,13 +8,14 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   X, Zap, Image as ImageIcon, Droplet, AlertTriangle, CheckCircle2,
   Info, RefreshCw, FlaskConical, Circle, Shield, Bug, Bookmark, Share2, MessageCircle,
-  CloudRain, Leaf,
+  CloudRain, Leaf, Crop, Maximize2,
 } from 'lucide-react-native';
 import { MotiView, AnimatePresence } from 'moti';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useRouter } from 'expo-router';
 import { analyzeImage, getDiseaseColor, getConfidenceLabel, getSeverityColor, getSeverityEmoji, DiseaseResult } from '../../services/diseaseDetection';
+import MobileCropModal from '../../components/MobileCropModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -28,6 +29,9 @@ export default function ScanTab() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [image, setImage] = useState<string | null>(null);
+  const [rawImage, setRawImage] = useState<string | null>(null);
+  const [scanMode, setScanMode] = useState<'crop' | 'full'>('crop');
+  const [showCropModal, setShowCropModal] = useState(false);
   const [analysis, setAnalysis] = useState<DiseaseResult | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -37,10 +41,11 @@ export default function ScanTab() {
 
   if (!permission) return <View />;
 
-  // ─── resetScan function (was missing — caused crash) ───
   const resetScan = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setImage(null);
+    setRawImage(null);
+    setShowCropModal(false);
     setAnalysis(null);
     setSaved(false);
     setIsScanning(false);
@@ -63,12 +68,17 @@ export default function ScanTab() {
     if (cameraRef.current) {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setIsScanning(true);
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.6,
           skipProcessing: false,
         });
-        handleAnalyze(photo.uri);
+        setShowCamera(false);
+        setRawImage(photo.uri);
+        if (scanMode === 'crop') {
+          setShowCropModal(true);
+        } else {
+          handleAnalyze(photo.uri, 'full');
+        }
       } catch (error) {
         console.error('Capture failed', error);
         Alert.alert('Error', 'Failed to capture image. Please try again.');
@@ -86,11 +96,22 @@ export default function ScanTab() {
     });
     if (!result.canceled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      handleAnalyze(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setRawImage(uri);
+      if (scanMode === 'crop') {
+        setShowCropModal(true);
+      } else {
+        handleAnalyze(uri, 'full');
+      }
     }
   };
 
-  const handleAnalyze = async (uri: string) => {
+  const handleConfirmCrop = (croppedUri: string) => {
+    setShowCropModal(false);
+    handleAnalyze(croppedUri, 'crop');
+  };
+
+  const handleAnalyze = async (uri: string, mode: 'crop' | 'full' = scanMode) => {
     setImage(uri);
     setShowCamera(false);
     setIsScanning(true);
@@ -110,7 +131,7 @@ export default function ScanTab() {
     }, 300);
 
     try {
-      const result = await analyzeImage(uri);
+      const result = await analyzeImage(uri, mode);
       clearInterval(progressInterval);
       setScanProgress(100);
       setAnalysis(result);
@@ -183,60 +204,59 @@ export default function ScanTab() {
               ref={cameraRef}
               style={StyleSheet.absoluteFill}
               facing="back"
-            >
-              <SafeAreaView style={styles.cameraOverlay}>
-                <View style={styles.cameraHeader}>
-                  <TouchableOpacity 
-                    style={styles.closeBtn} 
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowCamera(false);
-                    }}
-                  >
-                    <X color="white" size={30} />
+            />
+            <SafeAreaView style={[styles.cameraOverlay, StyleSheet.absoluteFill]}>
+              <View style={styles.cameraHeader}>
+                <TouchableOpacity 
+                  style={styles.closeBtn} 
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowCamera(false);
+                  }}
+                >
+                  <X color="white" size={30} />
+                </TouchableOpacity>
+                <View style={styles.cameraHeaderActions}>
+                  <TouchableOpacity style={styles.iconBtn}>
+                    <Zap color="white" size={24} />
                   </TouchableOpacity>
-                  <View style={styles.cameraHeaderActions}>
-                    <TouchableOpacity style={styles.iconBtn}>
-                      <Zap color="white" size={24} />
-                    </TouchableOpacity>
-                  </View>
                 </View>
+              </View>
 
-                <View style={styles.scanAreaContainer}>
-                  <View style={styles.scanFrame}>
-                    <View style={[styles.corner, styles.topLeft]} />
-                    <View style={[styles.corner, styles.topRight]} />
-                    <View style={[styles.corner, styles.bottomLeft]} />
-                    <View style={[styles.corner, styles.bottomRight]} />
-                    
-                    <MotiView
-                      from={{ translateY: 0, opacity: 0.5 }}
-                      animate={{ translateY: width * 0.7, opacity: 0.8 }}
-                      transition={{ loop: true, duration: 2000, type: 'timing' }}
-                      style={styles.scanLine}
-                    />
-                  </View>
-                  <Text style={styles.scanTipText}>Align crop within the frame</Text>
-                  <View style={styles.cameraGuideOverlay}>
-                    <Text style={styles.cameraGuideText}>🌿 Leaf  •  🍎 Fruit  •  🌾 Stem  •  🔍 Spot</Text>
-                  </View>
+              <View style={styles.scanAreaContainer}>
+                <View style={styles.scanFrame}>
+                  <View style={[styles.corner, styles.topLeft]} />
+                  <View style={[styles.corner, styles.topRight]} />
+                  <View style={[styles.corner, styles.bottomLeft]} />
+                  <View style={[styles.corner, styles.bottomRight]} />
+                  
+                  <MotiView
+                    from={{ translateY: 0, opacity: 0.5 }}
+                    animate={{ translateY: width * 0.7, opacity: 0.8 }}
+                    transition={{ loop: true, duration: 2000, type: 'timing' }}
+                    style={styles.scanLine}
+                  />
                 </View>
+                <Text style={styles.scanTipText}>Align crop within the frame</Text>
+                <View style={styles.cameraGuideOverlay}>
+                  <Text style={styles.cameraGuideText}>🌿 Leaf  •  🍎 Fruit  •  🌾 Stem  •  🔍 Spot</Text>
+                </View>
+              </View>
 
-                <View style={styles.cameraFooter}>
-                  <TouchableOpacity style={styles.galleryBtnCam} onPress={() => { setShowCamera(false); pickImage(); }}>
-                    <ImageIcon color="white" size={24} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.captureBtn} onPress={handleCapture} disabled={isScanning}>
-                    <View style={styles.captureBtnOuter}>
-                      <View style={styles.captureBtnInner} />
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.infoBtnCam}>
-                    <Info color="white" size={24} />
-                  </TouchableOpacity>
-                </View>
-              </SafeAreaView>
-            </CameraView>
+              <View style={styles.cameraFooter}>
+                <TouchableOpacity style={styles.galleryBtnCam} onPress={() => { setShowCamera(false); pickImage(); }}>
+                  <ImageIcon color="white" size={24} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.captureBtn} onPress={handleCapture} disabled={isScanning}>
+                  <View style={styles.captureBtnOuter}>
+                    <View style={styles.captureBtnInner} />
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.infoBtnCam}>
+                  <Info color="white" size={24} />
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
           </MotiView>
         ) : (
           <MotiView
@@ -245,10 +265,58 @@ export default function ScanTab() {
             animate={{ opacity: 1 }}
             style={{ flex: 1 }}
           >
+            {/* Mobile Crop Modal */}
+            {rawImage && (
+              <MobileCropModal
+                visible={showCropModal}
+                imageUri={rawImage}
+                onConfirmCrop={handleConfirmCrop}
+                onCancel={() => setShowCropModal(false)}
+              />
+            )}
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
               <View style={styles.header}>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Crop Health Scanner</Text>
                 <Text style={[styles.headerSubtitle, { color: theme.textLight }]}>AI-powered disease detection</Text>
+              </View>
+
+              {/* Scan Mode Toggle selector */}
+              <View style={[styles.scanModeToggleCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.scanModeToggleLabel, { color: theme.textLight }]}>SCAN MODE SELECTION</Text>
+                <View style={styles.scanModeRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.scanModeBtn,
+                      scanMode === 'crop' && { backgroundColor: theme.mint, borderColor: theme.primary },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setScanMode('crop');
+                    }}
+                  >
+                    <Crop color={scanMode === 'crop' ? theme.primary : theme.textLight} size={18} />
+                    <Text style={[styles.scanModeText, scanMode === 'crop' && { color: theme.primary, fontWeight: '800' }]}>
+                      Crop Image
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.scanModeBtn,
+                      scanMode === 'full' && { backgroundColor: theme.mint, borderColor: theme.primary },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setScanMode('full');
+                    }}
+                  >
+                    <Maximize2 color={scanMode === 'full' ? theme.primary : theme.textLight} size={18} />
+                    <Text style={[styles.scanModeText, scanMode === 'full' && { color: theme.primary, fontWeight: '800' }]}>
+                      Full Image
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {!image && !isScanning ? (
@@ -262,7 +330,9 @@ export default function ScanTab() {
                   </View>
                   <Text style={[styles.uploadTitle, { color: theme.text }]}>Scan Your Crop</Text>
                   <Text style={[styles.uploadDesc, { color: theme.textLight }]}>
-                    Take a clear photo of the infected area for instant AI analysis.
+                    {scanMode === 'crop'
+                      ? 'Crop focused section of infected leaf or fruit for targeted diagnosis.'
+                      : 'Take a full photograph of your crop or plant for overall health scan.'}
                   </Text>
                   <View style={styles.buttonRow}>
                     <TouchableOpacity style={[styles.mainActionBtn, { backgroundColor: theme.primary }]} onPress={takePhoto}>
@@ -918,5 +988,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     lineHeight: 16,
+  },
+  // Scan Mode Selection Styles
+  scanModeToggleCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 10,
+  },
+  scanModeToggleLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  scanModeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  scanModeBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  scanModeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
   },
 });

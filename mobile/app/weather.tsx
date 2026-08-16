@@ -101,17 +101,32 @@ export default function WeatherScreen() {
       let targetLon = lon;
 
       if (!targetLat || !targetLon) {
-        setLocationStatus('Requesting GPS location...');
+        setLocationStatus('Acquiring high-accuracy GPS position...');
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (status === 'granted') {
             const loc = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-            });
+              accuracy: Location.Accuracy.High,
+            }).catch(() => 
+              Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+              })
+            );
             targetLat = loc.coords.latitude;
             targetLon = loc.coords.longitude;
             setSelectedRegion('GPS');
-            setLocationStatus('');
+
+            try {
+              const [address] = await Location.reverseGeocodeAsync({ latitude: targetLat, longitude: targetLon });
+              if (address) {
+                const placeName = address.city || address.subregion || address.district || address.region;
+                if (placeName) {
+                  regionName = `${placeName}, ${address.country || 'India'}`;
+                }
+              }
+            } catch (geoErr) {
+              console.log('[Weather] Reverse geocode note:', geoErr);
+            }
           } else {
             setErrorMsg('GPS location access denied. Using fallback region.');
             setSelectedRegion('Maharashtra, IN');
@@ -130,11 +145,11 @@ export default function WeatherScreen() {
         setSelectedRegion(regionName);
       }
 
-      setLocationStatus('Fetching live agricultural weather...');
+      setLocationStatus('Fetching local weather...');
       const response = await client.get(`/weather/current?lat=${targetLat}&lon=${targetLon}`);
       
       if (response.data) {
-        let loc = response.data.location || 'Maharashtra, India';
+        let loc = regionName || response.data.location || 'Maharashtra, India';
         if (loc.includes('India, India')) loc = loc.replace('India, India', 'India');
         const weatherData = { ...response.data, location: loc };
         setWeather(weatherData);

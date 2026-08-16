@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
+import { API_BASE_URL } from '../config/api';
 
 // Rich Markdown parser supporting code blocks, tables, headers, lists, bold/italics
 function RenderMarkdown({ content }: { content: string }) {
@@ -312,8 +313,7 @@ export default function Chatbot() {
         token = parsed?.state?.token || '';
       }
 
-      const baseUrl = (import.meta.env.VITE_API_URL || 'https://agrinex.onrender.com').replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/chat`, {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

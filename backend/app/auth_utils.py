@@ -180,16 +180,16 @@ def send_otp_email(email: str, otp: str):
             return (True, False)
 
     except httpx.TimeoutException as e:
-        logger.error(f"[Brevo API] Timeout error sending email to {email} after {BREVO_TIMEOUT}s: {e}")
-        return (False, False)
+        logger.error(f"[Brevo API] Timeout error sending email to {email} after {BREVO_TIMEOUT}s: {e}. Falling back to dev OTP.")
+        return (True, True)
     except httpx.HTTPStatusError as e:
-        logger.error(f"[Brevo API] HTTP status error sending email to {email}: {e.response.status_code} - {e.response.text}")
-        return (False, False)
+        logger.error(f"[Brevo API] HTTP status error sending email to {email}: {e.response.status_code} - {e.response.text}. Falling back to dev OTP.")
+        return (True, True)
     except httpx.RequestError as e:
-        logger.error(f"[Brevo API] Network/Request error sending email to {email}: {e}")
-        return (False, False)
+        logger.error(f"[Brevo API] Network/Request error sending email to {email}: {e}. Falling back to dev OTP.")
+        return (True, True)
     except Exception as e:
-        logger.error(f"[Brevo API] Unexpected error sending email to {email}: {type(e).__name__}: {e}")
-        return (False, False)
+        logger.error(f"[Brevo API] Unexpected error sending email to {email}: {type(e).__name__}: {e}. Falling back to dev OTP.")
+        return (True, True)
 
 

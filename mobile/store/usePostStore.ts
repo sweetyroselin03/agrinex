@@ -77,6 +77,14 @@ const getFriendlyError = (error: any, context: string): string => {
 /** Safely coerce a value to an array — handles null, undefined, and non-array shapes from stale persisted state */
 const safeArray = <T,>(v: T[] | null | undefined): T[] => (Array.isArray(v) ? v : []);
 
+/** Unwrap standardized API response envelopes ({ success, message, data, errors }) */
+const unwrapResponse = (data: any) => {
+  if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+    return data.data;
+  }
+  return data;
+};
+
 export const usePostStore = create<PostState>()(
   persist(
     (set, get) => ({
@@ -93,7 +101,8 @@ export const usePostStore = create<PostState>()(
         const attemptFetch = async (attempt: number): Promise<void> => {
           try {
             const response = await client.get('/posts');
-            const posts = Array.isArray(response.data) ? response.data : [];
+            const rawData = unwrapResponse(response.data);
+            const posts = Array.isArray(rawData) ? rawData : [];
             const savedIds = posts.filter((p: any) => p.is_saved).map((p: any) => p.id);
             set({ posts, savedPostIds: savedIds, isLoading: false, error: null });
           } catch (error: any) {
@@ -114,7 +123,8 @@ export const usePostStore = create<PostState>()(
       fetchSavedPosts: async () => {
         try {
           const response = await client.get('/posts/saved');
-          const savedPostsList: Post[] = Array.isArray(response.data) ? response.data : [];
+          const rawData = unwrapResponse(response.data);
+          const savedPostsList: Post[] = Array.isArray(rawData) ? rawData : [];
           const savedIds = savedPostsList.map((p: any) => p.id);
           set({ savedPosts: savedPostsList, savedPostIds: savedIds });
         } catch (error: any) {
@@ -124,7 +134,8 @@ export const usePostStore = create<PostState>()(
       fetchUserPosts: async () => {
         try {
           const response = await client.get('/posts/user');
-          set({ userPosts: Array.isArray(response.data) ? response.data : [] });
+          const rawData = unwrapResponse(response.data);
+          set({ userPosts: Array.isArray(rawData) ? rawData : [] });
         } catch (error: any) {
           console.warn('[PostStore] Fetch user posts failed:', error?.message);
         }
@@ -140,7 +151,7 @@ export const usePostStore = create<PostState>()(
             payload.image_url = image;
           }
           const response = await client.post('/posts', payload);
-          const newPost = response.data;
+          const newPost = unwrapResponse(response.data);
           set({ 
             posts: [newPost, ...safeArray(get().posts)],
             userPosts: [newPost, ...safeArray(get().userPosts)],
@@ -168,8 +179,9 @@ export const usePostStore = create<PostState>()(
 
         try {
           const response = await client.post(`/posts/${postId}/like`);
+          const resData = unwrapResponse(response.data);
           set({ 
-            posts: safeArray(get().posts).map(p => p.id === postId ? { ...p, likes_count: response.data.likes_count, is_liked: response.data.liked } : p) 
+            posts: safeArray(get().posts).map(p => p.id === postId ? { ...p, likes_count: resData.likes_count, is_liked: resData.liked } : p) 
           });
         } catch (error: any) {
           console.warn('[PostStore] Like post failed:', error?.message);

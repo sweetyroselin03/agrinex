@@ -436,7 +436,7 @@ export default function CommunityTab() {
       {!error && (!isLoading || searchQuery.trim().length > 0 || posts.length > 0) && (
         <FlatList
           data={filteredPosts}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          keyExtractor={(item, index) => item.id ? `post-${item.id}` : `post-idx-${index}`}
           renderItem={({ item, index }) => renderPost(item, index)}
           showsVerticalScrollIndicator={false}
           refreshControl={

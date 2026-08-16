@@ -48,7 +48,7 @@ import Colors from '../../constants/Colors';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { sendMessage, analyzeCropImage } from '../../services/groqService';
+import { sendMessage, analyzeCropImage } from '../../services/aiService';
 import Markdown from 'react-native-markdown-display';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -392,7 +392,7 @@ export default function ChatTab() {
       }
 
       const options = {
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'] as any,
         allowsEditing: true,
         quality: 0.75,
       };
@@ -491,12 +491,12 @@ export default function ChatTab() {
           .slice(-10)
           .map((m) => m.text);
 
-        // Instruct AI to reply in the selected language if not English
+        // Instruct AI to reply in the selected language
         const msgWithLanguage = selectedLanguage !== 'English'
           ? `${msgText} (Please reply in ${selectedLanguage})`
           : msgText;
 
-        aiResponseText = await sendMessage(msgWithLanguage, activeConversationId, undefined, chatHistory);
+        aiResponseText = await sendMessage(msgWithLanguage, activeConversationId, undefined, chatHistory, selectedLanguage);
       }
 
       const aiMsg: ChatMsg = {

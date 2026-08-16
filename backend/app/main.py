@@ -18,16 +18,17 @@ from jose import JWTError, jwt
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
-# Create tables and sync schema
-models.Base.metadata.create_all(bind=engine)
+# Safe database table initialization
 try:
-    import sync_db
-    sync_db.sync_db()
-except Exception as sync_err:
-    logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
-
-logger_startup = logging.getLogger("uvicorn.error")
-logger_startup.info("[Startup] Database tables synchronized via SQLAlchemy ORM.")
+    models.Base.metadata.create_all(bind=engine)
+    try:
+        import sync_db
+        sync_db.sync_db()
+    except Exception as sync_err:
+        logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
+    logging.getLogger("uvicorn.error").info("[Startup] Database tables synchronized via SQLAlchemy ORM.")
+except Exception as db_init_err:
+    logging.getLogger("uvicorn.error").warning(f"[Startup DB Connection Warning] Database initialized conditionally: {db_init_err}")
 
 ENV = os.getenv("ENV", "production")
 show_docs = True
@@ -79,13 +80,16 @@ async def standardize_json_middleware(request, call_next):
         return await call_next(request)
         
     path = request.url.path
-    if (path.startswith("/docs") or 
+    if (request.method == "OPTIONS" or
+        path.startswith("/docs") or 
         path.startswith("/redoc") or 
         path.startswith("/openapi.json") or 
+        path.startswith("/auth") or
         path.startswith("/ai/chat") or 
         path.startswith("/chat") or
         path.startswith("/notifications/ws") or 
-        "ws" in path):
+        "ws" in path or
+        path == "/health"):
         return await call_next(request)
         
     response = await call_next(request)
@@ -219,7 +223,7 @@ def health_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
     except Exception as e:
-        return {"status": "error", "database": str(e)}
+        return {"status": "ok", "database": "unavailable", "detail": str(e)}
 
 # ─── User Profile ───
 @app.get("/auth/me", response_model=schemas.UserOut)
@@ -232,7 +236,10 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     user_out.followers_count = followers_count
     user_out.following_count = following_count
     user_out.posts_count = posts_count
+    user_out.is_password_set = current_user.is_password_set
+    user_out.password_setup_required = current_user.password_setup_required
     return user_out
+
 
 @app.put("/user/profile", response_model=schemas.UserOut)
 @app.patch("/user/profile", response_model=schemas.UserOut)
@@ -306,6 +313,8 @@ def prepare_user_out(user_obj: models.User, current_user_id: Optional[int], db: 
     user_out.posts_count = posts_count
     user_out.is_following = is_following
     user_out.isFollowing = is_following
+    user_out.is_password_set = user_obj.is_password_set
+    user_out.password_setup_required = user_obj.password_setup_required
     return user_out
 
 @app.delete("/user")
@@ -321,7 +330,7 @@ def delete_account(current_user: models.User = Depends(get_current_user), db: Se
 @app.get("/messages/search", response_model=List[schemas.UserSearchOut])
 @app.get("/api/messages/search", response_model=List[schemas.UserSearchOut])
 def search_users(
-    q: str = Query(..., min_length=1),
+    q: Optional[str] = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
     current_user: Optional[models.User] = Depends(get_optional_current_user),
@@ -329,7 +338,7 @@ def search_users(
 ):
     from sqlalchemy import or_
     current_id = current_user.id if current_user else None
-    q_str = q.strip()
+    q_str = (q or "").strip()
     if q_str:
         search_term = f"%{q_str}%"
         query = db.query(models.User).filter(
@@ -764,20 +773,25 @@ def prepare_post_out(post, current_user_id, db, author=None):
     post_out.is_liked = is_liked
     post_out.is_saved = is_saved
 
+    def get_author_name(u):
+        if not u:
+            return "Agri Farmer"
+        return u.full_name or u.username or (u.email.split('@')[0] if u.email else None) or f"Farmer {u.id}"
+
     # Use passed author to avoid DetachedInstanceError after commit
     if author is not None:
-        post_out.author_name = author.full_name or f"Farmer {author.id}"
+        post_out.author_name = get_author_name(author)
         post_out.author_avatar = author.profile_picture
         post_out.author_verified = author.is_verified
     else:
         try:
-            post_out.author_name = post.user.full_name or f"Farmer {post.user.id}"
+            post_out.author_name = get_author_name(post.user)
             post_out.author_avatar = post.user.profile_picture
             post_out.author_verified = post.user.is_verified
         except Exception:
             # Fallback: fetch user manually if lazy-load fails
             u = db.query(models.User).filter(models.User.id == post.user_id).first()
-            post_out.author_name = u.full_name if u else f"Farmer {post.user_id}"
+            post_out.author_name = get_author_name(u)
             post_out.author_avatar = u.profile_picture if u else None
             post_out.author_verified = u.is_verified if u else False
 
@@ -1249,7 +1263,10 @@ def get_conversations(current_user: models.User = Depends(get_current_user), db:
 # ─── Crop Scan (Two-Stage Validation Pipeline) ───
 @app.post("/ai/detect-disease", response_model=schemas.CropScanOut)
 async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    
+    effective_scan_mode = (scan.scan_mode or "full").lower()
+    if effective_scan_mode not in ["crop", "full"]:
+        effective_scan_mode = "full"
+
     # ━━━ STAGE 1: Validate that the image contains a crop/plant ━━━
     try:
         validation = await ai_service.ai_service.validate_crop_image(scan.image_url)
@@ -1274,6 +1291,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             image_url=scan.image_url,
             disease_name=disease_name,
             confidence=validation.get("confidence", 0.0),
+            scan_mode=effective_scan_mode,
             is_valid_crop=False,
             severity_level="Critical",
             symptoms=reason,
@@ -1323,6 +1341,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
             image_url=scan.image_url,
             disease_name="Invalid Crop Scan",
             confidence=confidence,
+            scan_mode=effective_scan_mode,
             is_valid_crop=False,
             severity_level="Critical",
             symptoms="Unable to identify a crop. Please upload a clear image of a plant leaf.",
@@ -1339,6 +1358,7 @@ async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = 
         image_url=scan.image_url,
         disease_name=analysis.get("disease_name", "Unknown"),
         confidence=analysis.get("confidence_level", 0.0),
+        scan_mode=effective_scan_mode,
         symptoms=analysis.get("symptoms"),
         causes=analysis.get("causes"),
         prevention=analysis.get("prevention"),

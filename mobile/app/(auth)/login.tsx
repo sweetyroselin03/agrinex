@@ -200,6 +200,10 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   onSubmitEditing={() => { if (passwordRef.current) passwordRef.current.focus(); }}
                   returnKeyType="next"
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  textContentType="none"
+                  underlineColorAndroid="transparent"
                 />
               </Pressable>
 
@@ -229,6 +233,10 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   onSubmitEditing={handleLogin}
                   returnKeyType="done"
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  textContentType="none"
+                  underlineColorAndroid="transparent"
                 />
                 <TouchableOpacity onPress={togglePassword} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   {showPassword
