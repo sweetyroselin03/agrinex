@@ -1,7 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-// ─── Production Base URL ────────────────────────────────────────────────────────
-const BASE_URL = 'https://agrinex.onrender.com';
+const BASE_URL = 'http://10.0.2.2:5000';
 
 // ─── Exponential Backoff Configuration ──────────────────────────────────────────
 const MAX_RETRIES = 3;

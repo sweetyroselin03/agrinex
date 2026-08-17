@@ -42,27 +42,17 @@ async function validateImageQuality(imageUri: string): Promise<{ valid: boolean;
     }
 
     // Check file size — too small likely means very low quality or extremely poor lighting
-    const sizeKB = ((info as any).size || 0) / 1024;
-    if (sizeKB < 5) {
-      return { valid: false, issue: 'Image is too blurry or dark. Ensure good lighting and take the photo closer.' };
-    }
-
-    // Check if file size is suspiciously large
+    const fileSize = (info as any).size || 0;
+    const sizeKB = fileSize / 1024;
     const sizeMB = sizeKB / 1024;
-    if (sizeMB > 25) {
-      return { valid: false, issue: 'Image file size is too large.' };
+
+    // Ensure basic minimum size and presence
+    if (sizeKB > 0 && sizeKB < 1) {
+      return { valid: false, issue: 'Image file is empty or corrupted. Please retake the photo.' };
     }
 
-    // Aspect ratio check using react-native RNImage.getSize
-    const dims = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-      RNImage.getSize(imageUri, (w, h) => resolve({ width: w, height: h }), (err) => reject(err));
-    }).catch(() => null);
-
-    if (dims) {
-      const aspect = dims.width / dims.height;
-      if (aspect < 0.45 || aspect > 2.2) {
-        return { valid: false, issue: 'Invalid aspect ratio. Align the leaf centered inside the camera borders.' };
-      }
+    if (sizeMB > 25) {
+      return { valid: false, issue: 'Image file size exceeds the 25MB limit.' };
     }
 
     return { valid: true };
@@ -159,15 +149,6 @@ export async function analyzeImage(imageUri: string, scanMode: 'crop' | 'full' =
     const mimeType = filename.endsWith('.png') ? 'image/png' : filename.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
     const fileSize = (fileInfo as any).size || 0;
 
-    // Fetch actual image bytes as Blob if fetch is available
-    let blob: Blob | null = null;
-    try {
-      const fetchResp = await fetch(normalizedUri);
-      blob = await fetchResp.blob();
-    } catch (e) {
-      console.warn('[Mobile Scanner Debug] fetch blob fallback to FileSystem base64:', e);
-    }
-
     const base64 = await FileSystem.readAsStringAsync(normalizedUri, {
       encoding: 'base64',
     });
@@ -204,15 +185,9 @@ export async function analyzeImage(imageUri: string, scanMode: 'crop' | 'full' =
       // 1. Attempt Multipart FormData Upload first
       response = await client.post('/ai/detect-disease', formData, {
         headers: {
+          'Content-Type': 'multipart/form-data',
           'Accept': 'application/json',
         },
-        transformRequest: [(data, headers) => {
-          if (headers) {
-            delete headers['Content-Type'];
-            delete headers['content-type'];
-          }
-          return data;
-        }],
         signal: controller.signal,
         timeout: 30000,
       });

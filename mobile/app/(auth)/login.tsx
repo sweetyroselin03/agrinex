@@ -113,7 +113,7 @@ export default function LoginScreen() {
         await AsyncStorage.removeItem('agrinex_remembered_creds');
       }
       showToast('Login successful!', 'success');
-      setTimeout(() => { InteractionManager.runAfterInteractions(() => { router.replace('/(tabs)'); }); }, 800);
+      router.replace('/(tabs)');
     } catch (e: any) {
       let errorMsg = 'Please check your credentials and try again.';
       if (e.message === 'timeout') errorMsg = 'Server taking too long';
