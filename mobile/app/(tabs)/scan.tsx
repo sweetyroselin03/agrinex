@@ -91,8 +91,7 @@ export default function ScanTab() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
+      quality: 0.8,
     });
     if (!result.canceled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
