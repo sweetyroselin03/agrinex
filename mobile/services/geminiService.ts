@@ -266,15 +266,19 @@ export async function sendMessage(
   }
 }
 
-export async function sendGroqChatMessage(prompt: string, history: any[] = []): Promise<string> {
+export async function sendGeminiChatMessage(prompt: string, history: any[] = []): Promise<string> {
   return sendMessage(prompt, `conv_${Date.now()}`, undefined, history);
 }
 
-export async function streamGroqResponse(message: string, onChunk: (chunk: string) => void): Promise<string> {
+export async function streamGeminiResponse(message: string, onChunk: (chunk: string) => void): Promise<string> {
   const fullText = await sendMessage(message, `stream_${Date.now()}`);
   onChunk(fullText);
   return fullText;
 }
+
+// Legacy aliases for backward compatibility
+export const sendGroqChatMessage = sendGeminiChatMessage;
+export const streamGroqResponse = streamGeminiResponse;
 
 export async function generateTreatment(diseaseName: string, cropType: string): Promise<string> {
   try {

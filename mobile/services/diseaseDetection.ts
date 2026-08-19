@@ -1,8 +1,7 @@
 import client from '../api/client';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { analyzeCropImage, GeminiDiseaseResult } from './groqService';
-
+import { analyzeCropImage, GeminiDiseaseResult } from './geminiService';
 export interface DiseaseResult {
   disease_name: string;
   confidence: number;
@@ -133,8 +132,8 @@ export async function analyzeImage(imageUri: string, scanMode: 'crop' | 'full' =
       clearTimeout(timeoutId);
     }
 
-    const resPayload = (response.data && typeof response.data === 'object' && 'data' in response.data && response.data.data) 
-      ? response.data.data 
+    const resPayload = (response.data && typeof response.data === 'object' && 'data' in response.data && response.data.data)
+      ? response.data.data
       : response.data;
 
     if (resPayload && resPayload.disease_name) {
