@@ -8,9 +8,11 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { X, Zap, Image as ImageIcon, Scan, RefreshCcw, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import BottomNav from '../components/BottomNav';

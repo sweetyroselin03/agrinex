@@ -1440,7 +1440,7 @@ async def create_scan(
 
     # Only reject when Gemini clearly states the image is not a plant (is_valid_crop = False)
     if not analysis.get("is_valid_crop", True):
-        confidence = analysis.get("confidence_level", 0.0)
+        confidence = analysis.get("confidence") or analysis.get("confidence_level") or 0.0
         return schemas.CropScanOut(
             id=-1,
             user_id=current_user.id,
@@ -1459,30 +1459,36 @@ async def create_scan(
             created_at=datetime.now(timezone.utc)
         )
 
+    conf_val = analysis.get("confidence") or analysis.get("confidence_level") or 90.0
+    try:
+        conf_float = float(conf_val)
+    except Exception:
+        conf_float = 90.0
+
     db_scan = models.CropScan(
         user_id=current_user.id,
         image_url=image_url,
-        disease_name=analysis.get("disease_name", "Unknown"),
-        confidence=analysis.get("confidence_level", 0.0),
+        disease_name=analysis.get("disease_name", "Healthy Crop"),
+        confidence=conf_float,
         scan_mode=effective_scan_mode,
         symptoms=analysis.get("symptoms"),
         causes=analysis.get("causes"),
         prevention=analysis.get("prevention"),
-        pesticide_recommendations=analysis.get("pesticide_recommendations"),
+        pesticide_recommendations=analysis.get("pesticide_recommendations") or analysis.get("treatment"),
         organic_treatment=analysis.get("organic_treatment"),
         irrigation_recommendations=analysis.get("irrigation_recommendations"),
         fertilizer_recommendations=analysis.get("fertilizer_recommendations"),
         recovery_steps=analysis.get("recovery_steps"),
         estimated_recovery_time=analysis.get("estimated_recovery_time"),
-        severity_level=analysis.get("severity_level", "Warning"),
-        health_score=analysis.get("health_score"),
+        severity_level=analysis.get("severity_level", "Healthy"),
+        health_score=analysis.get("health_score", 85),
         yield_impact=analysis.get("yield_impact"),
         pro_tips=analysis.get("pro_tips"),
         prevention_tips=analysis.get("prevention_tips"),
         is_valid_crop=True,
-        detected_object=analysis.get("crop_type", "Unknown"),
+        detected_object=analysis.get("crop_type", "Crop"),
         rejection_reason="",
-        scientific_name=analysis.get("scientific_name")
+        scientific_name=analysis.get("scientific_name", "N/A")
     )
     db.add(db_scan)
     db.commit()

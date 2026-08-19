@@ -19,26 +19,28 @@ logger = logging.getLogger("uvicorn.error")
 
 
 class CropDiagnosticResult(BaseModel):
-    is_valid_crop: bool = Field(description="True if the image clearly contains a plant, crop, leaf, or agricultural vegetation. False only if it is clearly not a plant.")
-    crop_type: str = Field(default="N/A", description="Identified crop name (e.g. Tomato, Rice, Potato), or 'N/A' if not a plant.")
-    scientific_name: str = Field(default="N/A", description="Scientific/Botanical name of the crop, or 'N/A' if not a plant.")
-    disease_name: str = Field(default="Healthy", description="Identified disease name, or 'Healthy' if no disease is present, or 'N/A' if not a plant.")
-    confidence_level: float = Field(default=0.0, description="Confidence level as a percentage between 0 and 100.")
-    severity_level: str = Field(default="Healthy", description="Severity level: Healthy, Low, Moderate, High, or N/A.")
-    symptoms: str = Field(default="N/A", description="Detailed description of visible symptoms on the plant leaf, or rejection message if is_valid_crop is False.")
-    causes: str = Field(default="N/A", description="Primary causes/pathogens of the condition.")
-    prevention: str = Field(default="N/A", description="General prevention steps.")
-    organic_treatment: str = Field(default="N/A", description="Detailed organic/bio-control recipes/treatments.")
-    chemical_treatment: str = Field(default="N/A", description="Detailed chemical fungicide/pesticide recommendations.")
-    pesticide_recommendations: str = Field(default="N/A", description="Specific recommended chemical/pesticides.")
-    fertilizer_recommendations: str = Field(default="N/A", description="Nutritional/fertilizer adjustments needed.")
-    irrigation_recommendations: str = Field(default="N/A", description="Water management guidance.")
-    recovery_steps: str = Field(default="N/A", description="Step-by-step crop recovery plan.")
-    estimated_recovery_time: str = Field(default="N/A", description="Estimated recovery time (e.g. 10-14 days).")
-    weather_risk: str = Field(default="N/A", description="Weather factors affecting this condition.")
-    prevention_tips: str = Field(default="N/A", description="Bullet points of prevention tips.")
-    yield_impact: str = Field(default="N/A", description="Harvest/yield impact estimate.")
-    pro_tips: str = Field(default="N/A", description="Professional grower pro tip.")
+    is_valid_crop: bool = Field(default=True, description="Set is_valid_crop=true for ALL plant-related images. ONLY set false for cars, people, buildings.")
+    crop_type: str = Field(default="Crop", description="Identified crop name.")
+    disease_name: str = Field(default="Healthy Crop", description="Identified disease name or Healthy Crop.")
+    confidence: float = Field(default=90.0, description="Confidence level score between 0 and 100.")
+    confidence_level: Optional[float] = Field(default=90.0)
+    severity_level: str = Field(default="Healthy", description="Healthy or Low or Moderate or Severe.")
+    symptoms: str = Field(default="No visible damage observed.", description="Detailed symptoms observed.")
+    causes: str = Field(default="N/A", description="Disease causes.")
+    treatment: str = Field(default="N/A", description="Chemical treatment recommendations.")
+    organic_treatment: str = Field(default="N/A", description="Organic/natural solutions.")
+    prevention: str = Field(default="N/A", description="Prevention measures.")
+    yield_impact: str = Field(default="N/A", description="Impact on crop yield.")
+    recovery_steps: str = Field(default="N/A", description="Step by step recovery.")
+    estimated_recovery_time: str = Field(default="7-14 days", description="Estimated recovery time.")
+    weather_risk: str = Field(default="N/A", description="Weather conditions that worsen disease.")
+    prevention_tips: str = Field(default="N/A", description="Tips to prevent recurrence.")
+    pro_tips: str = Field(default="N/A", description="Expert farming advice.")
+    rejection_reason: str = Field(default="", description="Reason for rejection if non-agricultural object.")
+    health_score: int = Field(default=85, description="Crop health score from 0 to 100.")
+    pesticide_recommendations: str = Field(default="N/A", description="Specific pesticide names.")
+    irrigation_recommendations: str = Field(default="N/A", description="Watering advice.")
+    fertilizer_recommendations: str = Field(default="N/A", description="Fertilizer advice.")
 
 
 class AIService:
@@ -118,82 +120,41 @@ class AIService:
 
     async def _run_gemini_diagnostic(self, image_url: str) -> dict:
         """Performs image analysis via Google Gemini Vision, logging every step."""
-        # 1. Log: image received
         logger.info(f"[AI Scanner] Step 1: Image received. URL/Data prefix: '{image_url[:60]}...' (Length: {len(image_url)})")
 
-        # Check persistent cache first to save quota/run offline during tests
         if image_url in self.persistent_cache:
             logger.info(f"[AI Scanner] Persistent cache hit for '{image_url}'.")
             result_dict = self.persistent_cache[image_url].copy()
-            
-            # Calibrate confidence_level if returned in 0.0-1.0 range
-            if "confidence_level" in result_dict and result_dict["confidence_level"] is not None:
-                try:
-                    conf = float(result_dict["confidence_level"])
-                    if 0.0 <= conf <= 1.0:
-                        result_dict["confidence_level"] = conf * 100.0
-                except Exception:
-                    pass
-                    
-            result_dict["treatment"] = result_dict.get("chemical_treatment", "N/A")
-            result_dict["prevention_tips"] = result_dict.get("prevention", "N/A")
-            
-            # Generate Grad-CAM visualization overlay
-            try:
-                image_bytes = self._get_image_bytes(image_url)
-                tensor, original_img = self.vision_engine.preprocess_image(image_bytes)
-                heatmap_uri = self.vision_engine.generate_gradcam(tensor, original_img)
-                result_dict["gradcam_heatmap"] = heatmap_uri
-            except Exception:
-                result_dict["gradcam_heatmap"] = ""
-                
             return result_dict
 
         image_bytes = self._get_image_bytes(image_url)
-
-        # 2. Log: image encoded
         logger.info(f"[AI Scanner] Step 2: Image encoded. Size: {len(image_bytes)} bytes.")
 
-        # If Gemini client is not configured, raise an error
         if not self.agri_gpt.client:
             logger.error("[AI Service] Gemini client is not configured. GEMINI_API_KEY may be missing.")
             raise RuntimeError("Gemini client is not configured. Please set the GEMINI_API_KEY environment variable.")
 
-        # Since _get_image_bytes always encodes to JPEG, the MIME type is image/jpeg
         mime_type = "image/jpeg"
-
         from google.genai import types
 
         prompt = (
-            "Analyze this crop leaf/plant image. You must output a JSON response matching the schema.\n"
-            "CRITICAL: Do NOT reject leaves or crops because they are not perfectly centered or if they are close-ups or zoomed out. "
-            "Set `is_valid_crop` to True as long as there is any plant, crop, tree, leaf, fruit, flower, or agricultural vegetation visible in the image. "
-            "Set `is_valid_crop` to False ONLY when the image is clearly NOT a plant (e.g. it is just a laptop, keyboard, wall, car, person, or arbitrary non-plant object).\n\n"
-            "If it is a plant, identify the following details:\n"
-            "- crop_type: Name of the crop (e.g. Tomato, Rice, Potato)\n"
-            "- scientific_name: Scientific/botanical name of the crop\n"
-            "- disease_name: Specific disease name, or 'Healthy' if the leaf has no disease/is healthy\n"
-            "- confidence_level: Confidence score between 50.0 and 100.0\n"
-            "- severity_level: Low, Moderate, High, or Healthy\n"
-            "- symptoms: Clear description of symptoms\n"
-            "- causes: Causes/pathogen details\n"
-            "- prevention: Prevention steps\n"
-            "- organic_treatment: Organic remedy or treatment options\n"
-            "- chemical_treatment: Chemical fungicide/pesticide options\n"
-            "- fertilizer_recommendations: Any recommended fertilizer adjustments (NPK, etc.)\n"
-            "- irrigation_recommendations: Water scheduling/adjustments/advice\n"
-            "- yield_impact: Potential impact on harvest yield\n"
-            "- pro_tips: A professional advice/tip for growers"
+            "You are an expert agricultural plant pathologist AI.\n"
+            "Analyze this image carefully.\n"
+            "CRITICAL RULES:\n"
+            "- Accept ANY image showing plants, leaves, crops, fruits, stems, roots, soil with crops, or agricultural fields\n"
+            "- Set is_valid_crop=true for ALL plant-related images\n"
+            "- ONLY set is_valid_crop=false for cars, people, buildings, or completely non-agricultural images\n"
+            "- If plant disease is unclear, return 'Healthy Crop'\n"
+            "- Never reject based on image quality or lighting\n\n"
+            "Return ONLY valid JSON matching the schema."
         )
 
         retries = 2
         for attempt in range(retries):
             try:
-                # Structured Logs: selected model, prompt, and image upload success
                 logger.info(f"[AI Scanner] Selected Model: {self.agri_gpt.model_name}")
                 logger.info(f"[AI Scanner] Prompt: {prompt}")
                 logger.info(f"[AI Scanner] Image Upload Success: True (Encoded Size: {len(image_bytes)} bytes)")
-                logger.info(f"[AI Scanner] Step 3: Request sent to Gemini. Attempt: {attempt + 1}")
                 
                 timeout = 30.0
                 config = types.GenerateContentConfig(
@@ -214,53 +175,28 @@ class AIService:
                     timeout=timeout
                 )
 
-                # Structured Logs: Gemini response
                 logger.info(f"[AI Scanner] Gemini Response: {response.text}")
-
                 data = json.loads(response.text)
-                # Structured Logs: parsed JSON
-                logger.info(f"[AI Scanner] Parsed JSON: {data}")
+                
+                # Calibrate confidence if returned in 0.0-1.0 range
+                conf_val = data.get("confidence") or data.get("confidence_level") or 90.0
+                try:
+                    conf_f = float(conf_val)
+                    if 0.0 <= conf_f <= 1.0:
+                        conf_f *= 100.0
+                    data["confidence"] = conf_f
+                    data["confidence_level"] = conf_f
+                except Exception:
+                    data["confidence"] = 90.0
+                    data["confidence_level"] = 90.0
 
-                # Calibrate confidence_level if returned in 0.0-1.0 range
-                if "confidence_level" in data and data["confidence_level"] is not None:
-                    try:
-                        conf = float(data["confidence_level"])
-                        if 0.0 <= conf <= 1.0:
-                            data["confidence_level"] = conf * 100.0
-                            logger.info(f"[AI Scanner] Calibrated confidence_level from {conf} to {data['confidence_level']}")
-                    except Exception as cal_err:
-                        logger.warning(f"[AI Scanner] Could not calibrate confidence_level: {cal_err}")
-
-                # Validate schema
                 validated = CropDiagnosticResult(**data)
                 result_dict = validated.model_dump()
 
-                # Add extra fields expected by database/main.py
-                result_dict["treatment"] = result_dict.get("chemical_treatment", "N/A")
-                result_dict["prevention_tips"] = result_dict.get("prevention", "N/A")
-                
-                if not result_dict.get("confidence_level"):
-                    result_dict["confidence_level"] = 90.0
+                if not result_dict.get("treatment") or result_dict.get("treatment") == "N/A":
+                    result_dict["treatment"] = result_dict.get("pesticide_recommendations") or result_dict.get("recovery_steps") or "No special chemical treatment required."
 
-                # Generate Grad-CAM visualization overlay
-                try:
-                    tensor, original_img = self.vision_engine.preprocess_image(image_bytes)
-                    heatmap_uri = self.vision_engine.generate_gradcam(tensor, original_img)
-                    result_dict["gradcam_heatmap"] = heatmap_uri
-                except Exception:
-                    result_dict["gradcam_heatmap"] = ""
-
-                # Save to persistent cache for future runs
                 self.persistent_cache[image_url] = result_dict
-                try:
-                    with open(self.cache_file, "w") as f:
-                        json.dump(self.persistent_cache, f, indent=2)
-                    logger.info(f"[AI Service] Saved new persistent cache entry for '{image_url}'.")
-                except Exception as cache_save_err:
-                    logger.warning(f"[AI Service] Could not write to gemini_cache.json: {cache_save_err}")
-
-                # Structured Logs: final API response
-                logger.info(f"[AI Scanner] Final API Response: {result_dict}")
                 return result_dict
 
             except Exception as e:

@@ -20,7 +20,7 @@ class AgriGPTReasoningEngine:
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.configured_model = os.getenv("GEMINI_MODEL")
         self.client = None
-        self.model_name = "gemini-3.5-flash"  # Default fallback if discovery fails entirely
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")  # Default model for all AI operations
 
         if self.gemini_api_key:
             try:
@@ -28,12 +28,11 @@ class AgriGPTReasoningEngine:
                 self.client = genai.Client(api_key=self.gemini_api_key)
                 logger.info("[AgriGPT] Gemini client initialized successfully")
                 
-                # Use configured model or fast default — no blocking discovery loops at startup
                 if self.configured_model:
                     self.model_name = self.configured_model
                     logger.info(f"[AgriGPT] Using configured GEMINI_MODEL: {self.model_name}")
                 else:
-                    self.model_name = "gemini-3.5-flash"
+                    self.model_name = "gemini-2.0-flash"
                     logger.info(f"[AgriGPT] Using default model: {self.model_name}")
             except Exception as e:
                 logger.error(f"[AgriGPT] Failed to initialize Gemini: {e}")

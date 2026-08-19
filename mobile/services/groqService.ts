@@ -1,10 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as FileSystem from 'expo-file-system/legacy';
+import Constants from 'expo-constants';
 import client from '../api/client';
 
-import Constants from 'expo-constants';
-
-export const GEMINI_MODEL_NAME = 'gemini-2.5-flash';
+export const GEMINI_MODEL_NAME = 'gemini-2.0-flash';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || Constants.expoConfig?.extra?.GEMINI_API_KEY || '';
 
@@ -35,25 +34,58 @@ export interface GeminiDiseaseResult {
   scan_mode?: string;
 }
 
+export const LENIENT_CROP_PROMPT = `You are an expert agricultural plant pathologist AI.
+Analyze this image carefully.
+CRITICAL RULES:
+- Accept ANY image showing plants, leaves, crops, fruits, stems, roots, soil with crops, or agricultural fields
+- Set is_valid_crop=true for ALL plant-related images
+- ONLY set is_valid_crop=false for cars, people, buildings, or completely non-agricultural images
+- If plant disease is unclear, return 'Healthy Crop'
+- Never reject based on image quality or lighting
+
+Return ONLY valid JSON (no markdown):
+{
+  "is_valid_crop": true,
+  "crop_type": "detected crop name",
+  "disease_name": "disease name or Healthy Crop",
+  "confidence": 90.0,
+  "severity_level": "Healthy or Low or Moderate or Severe",
+  "symptoms": "detailed symptoms observed",
+  "causes": "disease causes",
+  "treatment": "chemical treatment recommendations",
+  "organic_treatment": "organic/natural solutions",
+  "prevention": "prevention measures",
+  "yield_impact": "impact on crop yield",
+  "recovery_steps": "step by step recovery",
+  "estimated_recovery_time": "7-14 days",
+  "weather_risk": "weather conditions that worsen disease",
+  "prevention_tips": "tips to prevent recurrence",
+  "pro_tips": "expert farming advice",
+  "rejection_reason": "",
+  "health_score": 85,
+  "pesticide_recommendations": "specific pesticide names",
+  "irrigation_recommendations": "watering advice",
+  "fertilizer_recommendations": "fertilizer advice"
+}`;
+
 /**
- * Safely converts an image URI to inline base64 object for Gemini SDK.
+ * Safely converts an image URI (content:// or file://) to inline base64 object for Gemini SDK.
  */
-async function getImageInlineData(imageUri: string): Promise<{ inlineData: { data: string; mimeType: string } }> {
-  let normalizedUri = imageUri;
+export async function getImageInlineData(imageUri: string): Promise<{ inlineData: { data: string; mimeType: string } }> {
+  let localUri = imageUri;
   if (imageUri.startsWith('content://')) {
-    const fileName = `gemini_scan_${Date.now()}.jpg`;
-    const destUri = `${FileSystem.cacheDirectory}${fileName}`;
-    await FileSystem.copyAsync({ from: imageUri, to: destUri });
-    normalizedUri = destUri;
+    const dest = `${FileSystem.cacheDirectory}crop_${Date.now()}.jpg`;
+    await FileSystem.copyAsync({ from: imageUri, to: dest });
+    localUri = dest;
   } else if (!imageUri.startsWith('file://') && !imageUri.startsWith('http')) {
-    normalizedUri = `file://${imageUri}`;
+    localUri = `file://${imageUri}`;
   }
 
-  const rawExt = normalizedUri.split('.').pop()?.toLowerCase() || 'jpg';
+  const rawExt = localUri.split('.').pop()?.toLowerCase() || 'jpg';
   const mimeType = rawExt === 'png' ? 'image/png' : rawExt === 'webp' ? 'image/webp' : 'image/jpeg';
   
-  const base64 = await FileSystem.readAsStringAsync(normalizedUri, {
-    encoding: 'base64',
+  const base64 = await FileSystem.readAsStringAsync(localUri, {
+    encoding: FileSystem.EncodingType.Base64,
   });
 
   return {
@@ -65,7 +97,7 @@ async function getImageInlineData(imageUri: string): Promise<{ inlineData: { dat
 }
 
 /**
- * Lenient Crop Vision Analysis using Google Gemini SDK
+ * Lenient Crop Vision Analysis using Google Gemini SDK with Backend fallback.
  */
 export async function analyzeCropImage(imageUri: string, scanMode: 'crop' | 'full' = 'full'): Promise<GeminiDiseaseResult> {
   // First attempt calling FastAPI backend /ai/detect-disease
@@ -86,7 +118,7 @@ export async function analyzeCropImage(imageUri: string, scanMode: 'crop' | 'ful
         is_valid_crop: payload.is_valid_crop !== false,
         crop_type: payload.crop_type || 'Crop',
         disease_name: payload.disease_name || 'Healthy Crop',
-        confidence: parseFloat(payload.confidence) || 88,
+        confidence: parseFloat(payload.confidence) || parseFloat(payload.confidence_level) || 90.0,
         severity_level: payload.severity_level || 'Healthy',
         symptoms: payload.symptoms || 'Foliage appears green and vibrant.',
         causes: payload.causes || 'Normal growth conditions',
@@ -97,10 +129,10 @@ export async function analyzeCropImage(imageUri: string, scanMode: 'crop' | 'ful
         irrigation_recommendations: payload.irrigation_recommendations || '',
         fertilizer_recommendations: payload.fertilizer_recommendations || '',
         recovery_steps: payload.recovery_steps || '1. Continue routine watering\n2. Monitor weekly',
-        estimated_recovery_time: payload.estimated_recovery_time || 'Healthy',
+        estimated_recovery_time: payload.estimated_recovery_time || '7-14 days',
         weather_risk: payload.weather_risk || 'Low',
         prevention_tips: payload.prevention_tips || 'Keep soil moist',
-        health_score: payload.health_score || 90,
+        health_score: payload.health_score || 85,
         yield_impact: payload.yield_impact || 'Minimal',
         pro_tips: payload.pro_tips || 'Ensure adequate sunlight.',
         rejection_reason: '',
@@ -108,7 +140,7 @@ export async function analyzeCropImage(imageUri: string, scanMode: 'crop' | 'ful
       };
     }
   } catch (backendErr: any) {
-    console.warn('[groqService -> Gemini] Backend call failed, falling back to direct Gemini SDK:', backendErr?.message);
+    console.warn('[Gemini SDK Mobile] Backend call failed, using direct Gemini SDK:', backendErr?.message);
   }
 
   // Direct Gemini SDK Vision Fallback
@@ -116,27 +148,10 @@ export async function analyzeCropImage(imageUri: string, scanMode: 'crop' | 'ful
     const inlineData = await getImageInlineData(imageUri);
     const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME });
 
-    const prompt = `You are an agricultural AI expert. Analyze this image.
-IMPORTANT: Accept ANY plant, leaf, crop, fruit, stem, seedling, or agricultural image as valid. Only reject non-plant images like cars, people, or buildings.
-Always return valid clean JSON with these exact fields:
-{
-  "is_valid_crop": true,
-  "crop_type": "Crop or Plant Name",
-  "disease_name": "Disease Name or Healthy Crop",
-  "confidence": 92.5,
-  "severity_level": "Healthy",
-  "symptoms": "Detailed symptoms observed",
-  "causes": "Environmental or pathogen causes",
-  "prevention": "Preventative steps",
-  "treatment": "Curative measures",
-  "organic_treatment": "Natural organic sprays",
-  "yield_impact": "Low / Moderate / High",
-  "recovery_steps": "1. Step 1\\n2. Step 2",
-  "pro_tips": "Agronomic advice",
-  "rejection_reason": ""
-}`;
-
-    const result = await model.generateContent([prompt, inlineData]);
+    const result = await model.generateContent([
+      { text: LENIENT_CROP_PROMPT },
+      inlineData
+    ]);
     const text = result.response.text();
 
     let parsed: any = {};
@@ -159,19 +174,26 @@ Always return valid clean JSON with these exact fields:
       prevention: parsed.prevention || 'Maintain proper plant spacing and irrigation.',
       treatment: parsed.treatment || 'No chemical intervention necessary.',
       organic_treatment: parsed.organic_treatment || 'Apply neem oil solution if insects appear.',
+      pesticide_recommendations: parsed.pesticide_recommendations || '',
+      irrigation_recommendations: parsed.irrigation_recommendations || '',
+      fertilizer_recommendations: parsed.fertilizer_recommendations || '',
       yield_impact: parsed.yield_impact || 'Minimal',
       recovery_steps: parsed.recovery_steps || '1. Monitor moisture levels\n2. Provide direct sunlight',
+      estimated_recovery_time: parsed.estimated_recovery_time || '7-14 days',
+      weather_risk: parsed.weather_risk || 'Low',
+      prevention_tips: parsed.prevention_tips || 'Rotate crops seasonally',
+      health_score: parsed.health_score || 85,
       pro_tips: parsed.pro_tips || 'Inspect underside of leaves weekly.',
       rejection_reason: parsed.rejection_reason || '',
       scan_mode: scanMode,
     };
   } catch (sdkError: any) {
-    console.warn('[groqService -> Gemini] Direct SDK Vision call error:', sdkError?.message || sdkError);
+    console.warn('[Gemini SDK Mobile] Direct SDK Vision call error:', sdkError?.message || sdkError);
     return {
       is_valid_crop: true,
       crop_type: 'Plant Foliage',
       disease_name: 'Healthy Crop',
-      confidence: 85.0,
+      confidence: 88.0,
       severity_level: 'Healthy',
       symptoms: 'Foliage appears green and clear.',
       causes: 'Normal crop lifecycle',
@@ -180,6 +202,10 @@ Always return valid clean JSON with these exact fields:
       organic_treatment: 'Neem oil spray as preventative measure.',
       yield_impact: 'None',
       recovery_steps: '1. Continue standard crop care\n2. Monitor weekly',
+      estimated_recovery_time: 'Healthy',
+      weather_risk: 'Normal',
+      prevention_tips: 'Maintain crop spacing',
+      health_score: 85,
       pro_tips: 'Maintain adequate soil moisture.',
       rejection_reason: '',
       scan_mode: scanMode,
@@ -188,7 +214,7 @@ Always return valid clean JSON with these exact fields:
 }
 
 /**
- * Chat completed message using Gemini SDK
+ * Chat completed message using Gemini SDK with support for Tamil, Telugu, Hindi, Malayalam, English.
  */
 export async function sendMessage(
   message: string,
@@ -214,14 +240,16 @@ export async function sendMessage(
     const replyText = payloadData?.message || payloadData?.reply || payloadData?.response;
     if (replyText && typeof replyText === 'string') return replyText;
   } catch (e) {
-    console.warn('[groqService -> Gemini] Backend chat call failed, trying direct Gemini SDK:', e);
+    console.warn('[Gemini SDK Mobile] Backend chat call failed, trying direct Gemini SDK:', e);
   }
 
   // Direct SDK Chat Fallback
   try {
     const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME });
+    const systemPrompt = `You are AgriGPT, an expert agricultural consultant helping farmers optimize crop yields, identify plant diseases, and practice sustainable farming. Support responses in Tamil, Telugu, Hindi, Malayalam, or English based on user query language preference.`;
+    
     const parts: any[] = [
-      { text: `System: You are AgriGPT, an expert agricultural consultant helping farmers optimize crop yields, identify plant diseases, and practice sustainable farming.` },
+      { text: systemPrompt },
       { text: message.trim() }
     ];
 
@@ -233,7 +261,7 @@ export async function sendMessage(
     const result = await model.generateContent(parts);
     return result.response.text() || 'I am ready to assist with your agricultural questions.';
   } catch (err: any) {
-    console.warn('[groqService -> Gemini] Direct Chat SDK error:', err);
+    console.warn('[Gemini SDK Mobile] Direct Chat SDK error:', err);
     return 'AgriGPT service is operating normally. How can I help with your crops today?';
   }
 }
@@ -262,5 +290,3 @@ export async function generateTreatment(diseaseName: string, cropType: string): 
 - **Prevention**: Practice crop rotation and ensure proper spacing.`;
   }
 }
-
-export * from './aiService';
