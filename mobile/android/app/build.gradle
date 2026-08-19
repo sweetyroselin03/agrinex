@@ -136,6 +136,12 @@ android {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
 
+    externalNativeBuild {
+        cmake {
+            buildStagingDirectory "C:/tmp/bld/app_cmake"
+        }
+    }
+
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
