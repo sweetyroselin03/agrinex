@@ -25,18 +25,36 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       staleTime: 1000 * 30, // 30 seconds
+      retry: (failureCount, error: any) => {
+        // Never retry on 401/403 — these are auth errors
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) return false;
+        return failureCount < 2;
+      },
     },
   },
 });
 
-// Protected Route Wrapper Component
+/**
+ * ProtectedRoute — guards authenticated pages.
+ *
+ * CRITICAL: Do NOT call checkAuth() on every route change.
+ * checkAuth() is called ONCE at app startup in AppRoutes.
+ * Repeated calls on navigation cause race conditions: if the backend
+ * is momentarily slow, the check can return an error and clear the session,
+ * logging the user out mid-session.
+ *
+ * The isHydrated flag ensures we wait for Zustand to restore from
+ * localStorage before making any routing decision.
+ */
 function ProtectedRoute({ children }: { children: React.JSX.Element }) {
-  const { isAuthenticated, user, checkAuth } = useAuthStore();
+  const { isAuthenticated, isHydrated, user } = useAuthStore();
   const location = useLocation();
 
-  useEffect(() => {
-    checkAuth();
-  }, [location.pathname]);
+  // While Zustand is restoring from localStorage, show nothing (avoids flicker to /login)
+  if (!isHydrated) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
@@ -52,7 +70,9 @@ function ProtectedRoute({ children }: { children: React.JSX.Element }) {
 
 // Password Setup Route Guard (allows authenticated users requiring password setup)
 function PasswordSetupRoute({ children }: { children: React.JSX.Element }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isHydrated, user } = useAuthStore();
+
+  if (!isHydrated) return null;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -65,9 +85,11 @@ function PasswordSetupRoute({ children }: { children: React.JSX.Element }) {
   return children;
 }
 
-// Redirect Route Wrapper for Auth (e.g. login/register) to prevent logged-in users from seeing them
+// Redirect Route Wrapper for Auth pages (login/register) — prevents authenticated users from seeing them
 function AuthRoute({ children }: { children: React.JSX.Element }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isHydrated, user } = useAuthStore();
+
+  if (!isHydrated) return null;
 
   if (isAuthenticated) {
     if (user && (user.password_setup_required === true || user.is_password_set === false)) {
@@ -92,25 +114,29 @@ function AppRoutes() {
   const location = useLocation();
   const { checkAuth } = useAuthStore();
 
+  // Run checkAuth ONCE on app startup.
+  // This syncs the stored token to memory and validates the session against /auth/me.
+  // It is intentionally NOT called on every route change to prevent race conditions
+  // where a slow backend response causes a spurious session invalidation.
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        
+
         {/* Splash and Onboarding */}
         <Route path="/" element={<Splash />} />
         <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
         <Route path="/welcome" element={<AuthRoute><Landing /></AuthRoute>} />
-        
+
         {/* Auth routes */}
         <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
         <Route path="/register" element={<AuthRoute><Signup /></AuthRoute>} />
         <Route path="/forgot-password" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
         <Route path="/set-password" element={<PasswordSetupRoute><SetPassword /></PasswordSetupRoute>} />
-        
+
         {/* Protected Dashboard Routes */}
         <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           <Route path="dashboard" element={<Dashboard />} />

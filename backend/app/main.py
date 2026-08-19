@@ -51,11 +51,20 @@ async def startup_db_init():
     asyncio.create_task(asyncio.to_thread(_init_db))
 
 @app.get("/")
+@app.head("/")
 def read_root():
     return {"status": "ok", "message": "AgriNex AI Enterprise Backend is online"}
 
 @app.get("/health")
+@app.head("/health")
 def health_check():
+    # Fast health check — does NOT query DB, Gemini, or PyTorch.
+    # This ensures Render's HTTP health probe passes immediately on port binding.
+    return {"status": "ok"}
+
+@app.get("/api/health")
+@app.head("/api/health")
+def api_health():
     return {"status": "ok"}
 
 # CORS configuration

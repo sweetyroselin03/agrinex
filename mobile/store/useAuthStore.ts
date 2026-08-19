@@ -447,7 +447,8 @@ export const useAuthStore = create<AuthState>()(
 
         checkAuthInFlight = (async () => {
           try {
-            const response = await client.get('/auth/me', { timeout: 5000 });
+            // Use a generous timeout to survive Render cold starts (up to 30s)
+            const response = await client.get('/auth/me', { timeout: 15000 });
             const userData = unwrapResponse(response.data);
             if (userData && userData.id) {
               set({ user: userData, isAuthenticated: true, isLoading: false });
@@ -455,12 +456,22 @@ export const useAuthStore = create<AuthState>()(
               set({ isAuthenticated: true, isLoading: false });
             }
           } catch (error: any) {
-            console.log('[AuthStore] checkAuth failed or timed out:', error?.message || error);
-            const { user: existingUser } = get();
-            if (existingUser && existingUser.id) {
-              set({ isAuthenticated: true, isLoading: false });
+            const httpStatus = error?.response?.status;
+            if (httpStatus === 401) {
+              // Genuine invalid token — clear session
+              console.warn('[AuthStore Mobile] checkAuth: 401 — clearing session.');
+              set({ isAuthenticated: false, isLoading: false, token: null, user: null });
             } else {
-              set({ isLoading: false });
+              // Transient error (5xx, timeout, network) — PRESERVE session.
+              // Backend may be cold-starting on Render. Keep user logged in.
+              console.warn(`[AuthStore Mobile] checkAuth: Non-auth error (${httpStatus || 'network'}) — keeping session alive.`);
+              const { user: existingUser, token: existingToken } = get();
+              set({
+                isAuthenticated: true,
+                isLoading: false,
+                user: existingUser,
+                token: existingToken,
+              });
             }
           } finally {
             checkAuthInFlight = null;

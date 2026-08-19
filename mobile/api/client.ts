@@ -2,36 +2,42 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://agrinex.onrender.com';
 
-// ─── Exponential Backoff Configuration ──────────────────────────────────────────
+// ─── Retry Configuration ─────────────────────────────────────────────────────
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 1000; // 1 second
-const MAX_RETRY_DELAY_MS = 8000;     // 8 seconds cap
+const INITIAL_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 8000;
 
-// Routes that should NOT be retried (idempotency-sensitive or heavy AI tasks)
+// Routes that should NOT be retried (idempotency-sensitive)
 const NO_RETRY_ROUTES = [
   '/auth/send-otp',
   '/auth/verify-otp',
   '/auth/register',
   '/auth/set-password',
-  '/posts',              // POST create
-  '/ai/detect-disease',  // Heavy AI vision inference
+  '/posts',
+  '/ai/detect-disease',
 ];
 
-/**
- * Sleep utility for exponential backoff
- */
+// Public auth routes — 401 here is expected and MUST NOT trigger logout
+const PUBLIC_AUTH_ROUTES = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/send-otp',
+  '/auth/verify-otp',
+  '/auth/check-account',
+  '/auth/set-password',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+];
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Calculate delay with exponential backoff + jitter
- */
 const getBackoffDelay = (attempt: number): number => {
   const base = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-  const jitter = Math.random() * 500; // 0-500ms jitter
+  const jitter = Math.random() * 500;
   return Math.min(base + jitter, MAX_RETRY_DELAY_MS);
 };
 
-// ─── Axios Instance ─────────────────────────────────────────────────────────────
+// ─── Axios Instance ───────────────────────────────────────────────────────────
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: 60000, // 60 seconds — handles Render cold starts
@@ -40,26 +46,31 @@ export const api = axios.create({
   },
 });
 
-// ─── Request Interceptor: Inject JWT ────────────────────────────────────────────
+// ─── Request Interceptor: Inject JWT ─────────────────────────────────────────
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     try {
       const { useAuthStore } = require('../store/useAuthStore');
       const state = useAuthStore.getState();
       const token = state.token;
-      // Only inject valid, non-empty tokens
-      if (token && typeof token === 'string' && token !== 'undefined' && token !== 'null' && token.length > 10) {
+      if (
+        token &&
+        typeof token === 'string' &&
+        token !== 'undefined' &&
+        token !== 'null' &&
+        token.length > 10
+      ) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (e) {
-      // AuthStore might not be initialized yet during app boot
+    } catch (_) {
+      // AuthStore might not be initialized yet during cold boot — safe to ignore
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ─── Response Interceptor: Auto-logout on 401, Exponential Backoff Retry ────────
+// ─── Response Interceptor: Smart 401 Handling + Exponential Backoff ───────────
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -70,55 +81,78 @@ api.interceptors.response.use(
 
     if (!config) return Promise.reject(error);
 
-    // ── Auto-logout on 401 (expired token) ──────────────────────────────────
-    if (error.response?.status === 401 && !config._isRetry) {
-      const reqUrl = config.url || '';
-      // Don't auto-logout for auth check or login routes — 401 is expected there
-      const isAuthRoute = reqUrl.includes('/auth/me') || reqUrl.includes('/auth/login') || reqUrl.includes('/auth/verify');
-      if (!isAuthRoute) {
+    const status = error.response?.status;
+    const url = config.url || '';
+
+    // ─── 401 Handling — STRICT POLICY ────────────────────────────────────────
+    // A 401 response ONLY invalidates the session when:
+    //   1. The route is NOT a public auth route
+    //   2. AND the token is genuinely missing (not just a race condition)
+    //   3. AND a retry with the existing token also returns 401
+    //
+    // NEVER logout for: 500, 502, 503, 504, timeout, network disconnection,
+    // Gemini 429, weather API failure, notifications failure, or scan history failure.
+    if (status === 401 && !config._isRetry) {
+      const isPublicRoute = PUBLIC_AUTH_ROUTES.some(route => url.includes(route));
+
+      if (!isPublicRoute) {
         try {
           const { useAuthStore } = require('../store/useAuthStore');
           const state = useAuthStore.getState();
-          if (state.isAuthenticated) {
-            console.log('[API] Token expired — logging out');
-            state.logout();
+          const currentToken = state.token;
+
+          if (currentToken && currentToken !== 'null' && currentToken !== 'undefined') {
+            // Token exists — could be a race condition. Retry once with current token.
+            console.warn(`[API Mobile] 401 on ${url} — token exists, retrying once.`);
+            config._isRetry = true;
+            config.headers.Authorization = `Bearer ${currentToken}`;
+            try {
+              return await api(config);
+            } catch (retryError: any) {
+              if (retryError?.response?.status === 401) {
+                // Token is genuinely expired or invalid — only NOW logout
+                console.warn(`[API Mobile] 401 confirmed after retry on ${url} — session expired.`);
+                state.logout();
+              }
+              return Promise.reject(retryError);
+            }
+          } else {
+            // No token at all — user was never authenticated for this session
+            console.warn(`[API Mobile] 401 on ${url} — no token found.`);
+            if (state.isAuthenticated) {
+              state.logout();
+            }
           }
-        } catch (e) {}
+        } catch (_) {}
       }
+
       return Promise.reject(error);
     }
 
-    // ── Skip retry for idempotency-sensitive routes ─────────────────────────
-    const url = config.url || '';
+    // ─── Skip retry for idempotency-sensitive routes ──────────────────────────
     const method = (config.method || 'get').toLowerCase();
     const isNoRetry = NO_RETRY_ROUTES.some(route => url.includes(route)) && method === 'post';
-    if (isNoRetry) {
-      return Promise.reject(error);
-    }
+    if (isNoRetry) return Promise.reject(error);
 
-    // ── Exponential Backoff Retry for network/timeout errors ────────────────
-    const isNetworkError = !error.response; // No response = network failure
+    // ─── Exponential Backoff Retry for 5xx / network / timeout ───────────────
+    // IMPORTANT: 5xx errors (backend cold start, Render restart) MUST be retried.
+    // They MUST NOT trigger logout — the backend will come back online.
+    const isNetworkError = !error.response;
     const isTimeout = error.code === 'ECONNABORTED';
-    const is5xx = error.response && error.response.status >= 500;
+    const is5xx = !!error.response && error.response.status >= 500;
 
     if ((isNetworkError || isTimeout || is5xx) && !config._isRetry) {
       config._retryCount = config._retryCount || 0;
-
       if (config._retryCount < MAX_RETRIES) {
         config._retryCount += 1;
         const delay = getBackoffDelay(config._retryCount - 1);
-
         console.log(
-          `[API] Retry ${config._retryCount}/${MAX_RETRIES} for ${config.url} ` +
-          `(${isTimeout ? 'timeout' : is5xx ? `${error.response?.status}` : 'network error'}) ` +
-          `— waiting ${Math.round(delay)}ms`
+          `[API Mobile] Retry ${config._retryCount}/${MAX_RETRIES} for ${url} ` +
+          `(${isTimeout ? 'timeout' : is5xx ? `${status}` : 'network'}) in ${Math.round(delay)}ms`
         );
-
         await sleep(delay);
         return api(config);
       }
-
-      console.log(`[API] All ${MAX_RETRIES} retries exhausted for ${config.url}`);
     }
 
     return Promise.reject(error);

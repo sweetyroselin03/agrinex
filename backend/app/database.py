@@ -31,10 +31,17 @@ else:
     # Production-optimized connection settings for Neon PostgreSQL
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL,
-        pool_pre_ping=True,       # Verifies connection health before using it
-        pool_recycle=300,         # Recycles connections every 5 min to prevent serverless database disconnects
+        pool_pre_ping=True,       # Verifies connection health before using it from pool
+        pool_recycle=180,         # Recycles connections every 3 min to prevent serverless disconnects
         pool_size=10,             # Maintains a pool of active connections
-        max_overflow=20           # Allows temporary overflow under peak loads
+        max_overflow=20,          # Allows temporary overflow under peak loads
+        connect_args={
+            "connect_timeout": 10,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5
+        }
     )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

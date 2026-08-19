@@ -17,6 +17,18 @@ const NO_RETRY_ROUTES = [
   '/posts',
 ];
 
+// Public auth routes — 401 here is expected and should NOT trigger session invalidation
+const PUBLIC_AUTH_ROUTES = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/send-otp',
+  '/auth/verify-otp',
+  '/auth/check-account',
+  '/auth/set-password',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+];
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getBackoffDelay = (attempt: number): number => {
@@ -25,10 +37,18 @@ const getBackoffDelay = (attempt: number): number => {
   return Math.min(base + jitter, MAX_RETRY_DELAY_MS);
 };
 
+// ─── In-memory token (single source of truth for the current request cycle) ────
 let memoryToken: string | null = null;
 
 export const setMemoryToken = (token: string | null) => {
-  if (token && typeof token === 'string' && token.trim() !== '' && token !== 'null' && token !== 'undefined' && !token.includes('\0')) {
+  if (
+    token &&
+    typeof token === 'string' &&
+    token.trim() !== '' &&
+    token !== 'null' &&
+    token !== 'undefined' &&
+    !token.includes('\0')
+  ) {
     memoryToken = token.trim();
   } else {
     memoryToken = null;
@@ -36,10 +56,8 @@ export const setMemoryToken = (token: string | null) => {
 };
 
 export const getLocalToken = (): string | null => {
-  // 1. In-memory cache
-  if (memoryToken) {
-    return memoryToken;
-  }
+  // 1. In-memory cache — fastest, available immediately after login
+  if (memoryToken) return memoryToken;
 
   // 2. Direct localStorage 'agrinex_token' key
   try {
@@ -51,9 +69,9 @@ export const getLocalToken = (): string | null => {
         return trimmed;
       }
     }
-  } catch (e) {}
+  } catch (_) {}
 
-  // 3. Zustand store in-memory state
+  // 3. Zustand store in-memory state (via global ref)
   try {
     const storeToken = (window as any)?.__AGRINEX_STORE__?.getState()?.token;
     if (storeToken && typeof storeToken === 'string') {
@@ -63,7 +81,7 @@ export const getLocalToken = (): string | null => {
         return trimmed;
       }
     }
-  } catch (e) {}
+  } catch (_) {}
 
   // 4. Persisted Zustand localStorage fallback
   try {
@@ -79,7 +97,7 @@ export const getLocalToken = (): string | null => {
         }
       }
     }
-  } catch (e) {}
+  } catch (_) {}
 
   return null;
 };
@@ -92,41 +110,29 @@ export const api = axios.create({
   },
 });
 
-// Request Interceptor: Inject JWT Token & Safe Logging
+// ─── Request Interceptor: Inject JWT Token ────────────────────────────────────
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getLocalToken();
     if (token) {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
-      if (typeof (config.headers as any).set === 'function') {
-        (config.headers as any).set('Authorization', `Bearer ${token}`);
-      }
     }
-    const hasAuthHeader = !!(
-      config.headers.Authorization || 
-      (typeof (config.headers as any).get === 'function' && (config.headers as any).get('Authorization'))
-    );
-    console.log(`[API INTERCEPTOR] Request: ${config.method?.toUpperCase()} ${config.url}`, {
-      baseURL: config.baseURL,
-      tokenFound: !!token,
-      tokenLength: token ? token.length : 0,
-      tokenPrefix: token ? `${token.substring(0, 12)}...` : null,
-      authHeaderAttached: hasAuthHeader
-    });
     return config;
   },
-  (error) => {
-    console.error(`[API INTERCEPTOR] Request Error:`, error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Auto-logout on 401 & Exponential Backoff & Envelope Unwrapping
+// ─── Response Interceptor: Smart 401 Handling & Exponential Backoff ───────────
 api.interceptors.response.use(
   (response) => {
-    console.log(`[API DEBUG] Response Success: ${response.config.method?.toUpperCase()} ${response.config.url} - Status ${response.status} ${response.statusText}`);
-    if (response.data && typeof response.data === 'object' && 'success' in response.data && 'data' in response.data) {
+    // Transparent envelope unwrapping for { success, message, data, errors } pattern
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      'success' in response.data &&
+      'data' in response.data
+    ) {
       const envelope = response.data;
       const innerData = envelope.data;
       if (innerData !== undefined && innerData !== null) {
@@ -142,7 +148,7 @@ api.interceptors.response.use(
             success: envelope.success,
             message: envelope.message,
             errors: envelope.errors,
-            data: innerData
+            data: innerData,
           };
         } else {
           response.data = innerData;
@@ -157,61 +163,66 @@ api.interceptors.response.use(
       _isRetry?: boolean;
     };
 
-    const status = error.response?.status;
-    const statusText = error.response?.statusText;
-    const errorType = !error.response ? 'Network/CORS/Offline/CORS-Blocked Error' : error.code === 'ECONNABORTED' ? 'Timeout Error' : 'HTTP Error';
-    console.error(`[API DEBUG] Response Error: ${config?.method?.toUpperCase()} ${config?.url} - ${errorType} - Status: ${status || 'N/A'} ${statusText || ''}`, {
-      message: error.message,
-      code: error.code
-    });
-
     if (!config) return Promise.reject(error);
 
-    // Auto-logout on 401 Unauthorized (exclude public auth endpoints)
-    const isAuthRoute = config.url && (
-      config.url.includes('/auth/login') || 
-      config.url.includes('/auth/register') || 
-      config.url.includes('/auth/send-otp') || 
-      config.url.includes('/auth/verify-otp') ||
-      config.url.includes('/auth/check-account') ||
-      config.url.includes('/auth/set-password')
-    );
-    if (error.response?.status === 401 && !config._isRetry && !isAuthRoute) {
-      console.warn('[API] Session expired (401) — logging out...');
-      try {
-        setMemoryToken(null);
-        localStorage.removeItem('agrinex_token');
-        localStorage.removeItem('agrinex-web-auth');
-        window.location.href = '/login';
-      } catch (e) {}
+    const status = error.response?.status;
+    const url = config.url || '';
+
+    // ─── 401 Handling — STRICT SESSION INVALIDATION POLICY ─────────────────────
+    // A 401 should only clear the session when:
+    //   1. The request URL is NOT a public auth route (login, register, OTP, etc.)
+    //   2. AND the token in memory is genuinely missing or invalid
+    //   3. AND this is not a retry caused by a transient server error
+    //
+    // DO NOT logout for: 502, 503, 504, timeout, network error, or non-auth 401
+    // caused by a race condition (e.g., localStorage not yet persisted after login).
+    if (status === 401 && !config._isRetry) {
+      const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some((route) => url.includes(route));
+
+      if (!isPublicAuthRoute) {
+        // Attempt to recover the token from persistent storage before giving up
+        const recoveredToken = getLocalToken();
+        if (recoveredToken) {
+          // Token exists — this 401 is likely a race condition. Retry once with token.
+          console.warn(`[API] 401 on ${url} — token recovered (${recoveredToken.substring(0, 12)}...), retrying once.`);
+          config._isRetry = true;
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${recoveredToken}`;
+          try {
+            return await api(config);
+          } catch (retryError: any) {
+            if (retryError?.response?.status === 401) {
+              // Token is genuinely invalid — clear session
+              console.warn(`[API] 401 confirmed after retry on ${url} — clearing session.`);
+              _performLogout();
+            }
+            return Promise.reject(retryError);
+          }
+        } else {
+          // No token at all — session is genuinely invalid
+          console.warn(`[API] 401 on ${url} — no token found, clearing session.`);
+          _performLogout();
+        }
+      }
       return Promise.reject(error);
     }
 
-    // Skip retry on post/sensitive actions
-    const url = config.url || '';
+    // ─── Skip retry for idempotency-sensitive routes ─────────────────────────
     const method = (config.method || 'get').toLowerCase();
     const isNoRetry = NO_RETRY_ROUTES.some((route) => url.includes(route)) && method === 'post';
-    
-    if (isNoRetry) {
-      return Promise.reject(error);
-    }
+    if (isNoRetry) return Promise.reject(error);
 
-    // Exponential Backoff Retry for timeout / network / 5xx errors
+    // ─── Exponential Backoff Retry for 5xx / network / timeout errors ─────────
     const isNetworkError = !error.response;
     const isTimeout = error.code === 'ECONNABORTED';
-    const is5xx = error.response && error.response.status >= 500;
+    const is5xx = !!error.response && error.response.status >= 500;
 
     if ((isNetworkError || isTimeout || is5xx) && !config._isRetry) {
       config._retryCount = config._retryCount || 0;
-
       if (config._retryCount < MAX_RETRIES) {
         config._retryCount += 1;
         const delay = getBackoffDelay(config._retryCount - 1);
-
-        console.log(
-          `[API] Retrying ${config._retryCount}/${MAX_RETRIES} for ${config.url} in ${Math.round(delay)}ms...`
-        );
-
+        console.log(`[API] Retry ${config._retryCount}/${MAX_RETRIES} for ${url} in ${Math.round(delay)}ms`);
         await sleep(delay);
         return api(config);
       }
@@ -220,5 +231,25 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Performs a clean session logout. Only called when authentication is
+ * PROVEN invalid (401 confirmed after retry with existing token, or no token at all).
+ * NEVER called for 5xx errors, timeouts, Gemini failures, or network disconnections.
+ */
+function _performLogout() {
+  try {
+    setMemoryToken(null);
+    localStorage.removeItem('agrinex_token');
+    // Update Zustand store state without triggering navigation — let the router handle redirect
+    const store = (window as any)?.__AGRINEX_STORE__;
+    if (store) {
+      store.setState({ token: null, user: null, isAuthenticated: false });
+    } else {
+      // Fallback: clear persisted state so ProtectedRoute redirects to login
+      localStorage.removeItem('agrinex-web-auth');
+    }
+  } catch (_) {}
+}
 
 export default api;

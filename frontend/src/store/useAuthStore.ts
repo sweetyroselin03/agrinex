@@ -31,6 +31,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isHydrated: boolean;
   error: string | null;
 
   // Actions
@@ -51,34 +52,29 @@ interface AuthState {
 // Custom error formatter
 const formatError = (error: any, defaultMsg: string): string => {
   if (!error) return defaultMsg;
-  console.error('[Auth Error]', error);
 
-  // Network / CORS / Timeout errors
+  // Network / CORS / Timeout errors — do NOT expose these as auth errors
   if (!error.response) {
     if (error.code === 'ECONNABORTED') {
       return 'Request Timeout: The server took too long to respond. Please try again.';
     }
-    // Check online status to distinguish local network issues from server CORS/offline issues
     if (typeof window !== 'undefined' && !window.navigator.onLine) {
       return 'Network Error: You appear to be offline. Please check your internet connection.';
     }
-    return 'Server Connection Error: Unable to reach backend server. Please verify backend server status or CORS settings.';
+    return 'Server Connection Error: Unable to reach backend server. Please try again.';
   }
 
   const status = error.response.status;
 
   if (status === 401) {
-    return 'Invalid credentials (401 Unauthorized). Please check your email or password.';
+    return 'Invalid credentials. Please check your email or password.';
   }
-
   if (status === 403) {
-    return 'Access Denied (403 Forbidden). You do not have permission to access this resource.';
+    return 'Access Denied. You do not have permission to access this resource.';
   }
-
   if (status === 404) {
-    return 'Not Found (404). The requested API endpoint was not found on the server.';
+    return 'Not Found. The requested resource was not found.';
   }
-
   if (status === 422) {
     const detail = error.response?.data?.detail;
     if (Array.isArray(detail)) {
@@ -88,46 +84,23 @@ const formatError = (error: any, defaultMsg: string): string => {
           if (fieldLoc === 'email') return 'Email address is required';
           if (fieldLoc === 'full_name') return 'Full Name is required';
           if (fieldLoc === 'password') return 'Password is required';
-          if (fieldLoc === 'confirm_password' || fieldLoc === 'confirmPassword') return 'Confirm Password is required';
-          if (fieldLoc === 'otp' || fieldLoc === 'code') return 'OTP code is required';
           return fieldLoc ? `${fieldLoc.replace('_', ' ')} is required` : 'Field required';
         }
         return `${fieldLoc ? fieldLoc.replace('_', ' ') + ': ' : ''}${e.msg}`;
       });
-      return `Validation Error (422): ${messages.join(', ')}`;
+      return `Validation Error: ${messages.join(', ')}`;
     }
-    return typeof detail === 'string' ? `Validation Error (422): ${detail}` : 'Validation Error (422): Invalid input format.';
+    return typeof detail === 'string' ? detail : 'Validation Error: Invalid input format.';
   }
-
-  if (status === 409) {
-    const detail = error.response?.data?.detail;
-    return typeof detail === 'string' ? detail : 'Conflict (409): Account already exists.';
-  }
-
   if (status === 500 || status === 503) {
-    return `Server Error (${status}). The backend server is currently experiencing issues. Please try again shortly.`;
+    return `Server Error (${status}). The backend is temporarily unavailable. Please try again.`;
   }
 
   const detail = error.response?.data?.detail;
   if (detail) {
-    if (typeof detail === 'string') {
-      if (detail === 'Field required') return 'Please fill in all required fields.';
-      return detail;
-    }
+    if (typeof detail === 'string') return detail === 'Field required' ? 'Please fill in all required fields.' : detail;
     if (Array.isArray(detail)) {
-      const messages = detail.map((e: any) => {
-        const fieldLoc = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : '';
-        if (e.msg === 'Field required' || !e.msg) {
-          if (fieldLoc === 'email') return 'Email address is required.';
-          if (fieldLoc === 'full_name') return 'Full Name is required.';
-          if (fieldLoc === 'password') return 'Password is required.';
-          if (fieldLoc === 'confirm_password' || fieldLoc === 'confirmPassword') return 'Confirm Password is required.';
-          if (fieldLoc === 'otp' || fieldLoc === 'code') return 'OTP code is required.';
-          return fieldLoc ? `${fieldLoc.replace('_', ' ')} is required.` : 'Field required.';
-        }
-        return e.msg || e.detail || JSON.stringify(e);
-      });
-      return messages.join(', ');
+      return detail.map((e: any) => e.msg || e.detail || JSON.stringify(e)).join(', ');
     }
   }
   if (error.response?.data?.message) return error.response.data.message;
@@ -142,24 +115,15 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      isHydrated: false,
       error: null,
 
       checkAccount: async (identifier) => {
         set({ isLoading: true, error: null });
-        const finalEndpoint = `${API_BASE_URL}/auth/check-account`;
-        console.log("API_BASE_URL:", API_BASE_URL);
-        console.log("Check account endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/check-account', { identifier });
           return response.data;
         } catch (error: any) {
-          console.error('[REGISTRATION DIAGNOSTICS] Check account error:', {
-            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
-            status: error.response?.status || 'N/A',
-            responseBody: error.response?.data,
-            errorCode: error.code,
-            message: error.message,
-          });
           const msg = formatError(error, 'Check account failed');
           set({ error: msg });
           throw error;
@@ -170,20 +134,10 @@ export const useAuthStore = create<AuthState>()(
 
       sendOTP: async (email) => {
         set({ isLoading: true, error: null });
-        const finalEndpoint = `${API_BASE_URL}/auth/send-otp`;
-        console.log("API_BASE_URL:", API_BASE_URL);
-        console.log("OTP endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/send-otp', { email });
           return response.data;
         } catch (error: any) {
-          console.error('[REGISTRATION DIAGNOSTICS] Send OTP error:', {
-            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
-            status: error.response?.status || 'N/A',
-            responseBody: error.response?.data,
-            errorCode: error.code,
-            message: error.message,
-          });
           const msg = formatError(error, 'Failed to send OTP');
           set({ error: msg });
           throw error;
@@ -194,20 +148,10 @@ export const useAuthStore = create<AuthState>()(
 
       verifyOTP: async (email, otp) => {
         set({ isLoading: true, error: null });
-        const finalEndpoint = `${API_BASE_URL}/auth/verify-otp`;
-        console.log("API_BASE_URL:", API_BASE_URL);
-        console.log("Verify OTP endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/verify-otp', { email, otp });
           return response.data;
         } catch (error: any) {
-          console.error('[REGISTRATION DIAGNOSTICS] Verify OTP error:', {
-            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
-            status: error.response?.status || 'N/A',
-            responseBody: error.response?.data,
-            errorCode: error.code,
-            message: error.message,
-          });
           const msg = formatError(error, 'Invalid OTP code');
           set({ error: msg });
           throw error;
@@ -218,20 +162,10 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (userData) => {
         set({ isLoading: true, error: null });
-        const finalEndpoint = `${API_BASE_URL}/auth/register`;
-        console.log("API_BASE_URL:", API_BASE_URL);
-        console.log("Register endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/register', userData);
           return response.data;
         } catch (error: any) {
-          console.error('[REGISTRATION DIAGNOSTICS] Register error:', {
-            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
-            status: error.response?.status || 'N/A',
-            responseBody: error.response?.data,
-            errorCode: error.code,
-            message: error.message,
-          });
           const msg = formatError(error, 'Registration failed');
           set({ error: msg });
           throw error;
@@ -245,13 +179,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/set-password', { email, password });
           const { access_token, user } = response.data;
+          // Immediately inject into memory token so all subsequent requests have it
           setMemoryToken(access_token);
-          try { localStorage.setItem('agrinex_token', access_token); } catch (e) {}
-          set({
-            token: access_token,
-            user,
-            isAuthenticated: true,
-          });
+          try { localStorage.setItem('agrinex_token', access_token); } catch (_) {}
+          set({ token: access_token, user, isAuthenticated: true });
         } catch (error: any) {
           const msg = formatError(error, 'Failed to set password');
           set({ error: msg });
@@ -265,27 +196,15 @@ export const useAuthStore = create<AuthState>()(
         const state = get();
         if (state.isLoading) return;
         set({ isLoading: true, error: null });
-        const finalEndpoint = `${API_BASE_URL}/auth/login`;
-        console.log("API_BASE_URL:", API_BASE_URL);
-        console.log("Login endpoint:", finalEndpoint);
         try {
           const response = await api.post('/auth/login', credentials);
           const { access_token, user } = response.data;
+          // Set memory token BEFORE updating Zustand state to prevent
+          // the window between "Zustand updated" and "localStorage persisted"
           setMemoryToken(access_token);
-          try { localStorage.setItem('agrinex_token', access_token); } catch (e) {}
-          set({
-            token: access_token,
-            user,
-            isAuthenticated: true,
-          });
+          try { localStorage.setItem('agrinex_token', access_token); } catch (_) {}
+          set({ token: access_token, user, isAuthenticated: true });
         } catch (error: any) {
-          console.error('[LOGIN DIAGNOSTICS] Login error:', {
-            requestURL: error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : finalEndpoint,
-            status: error.response?.status || 'N/A',
-            responseBody: error.response?.data,
-            errorCode: error.code,
-            message: error.message,
-          });
           const msg = formatError(error, 'Login failed');
           set({ error: msg });
           throw error;
@@ -349,37 +268,72 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-
+      /**
+       * checkAuth — validates the current stored session.
+       *
+       * CRITICAL POLICY:
+       * - If /auth/me succeeds → session is valid, update user data.
+       * - If /auth/me returns 401 → JWT is genuinely invalid, clear session.
+       * - If /auth/me fails for ANY OTHER reason (500, 502, 503, timeout, network)
+       *   → DO NOT clear session. The backend might be starting up. Keep the user
+       *   authenticated with their existing stored profile data.
+       */
       checkAuth: async () => {
         const storeToken = get().token;
-        const activeToken = storeToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('agrinex_token') : null);
-        if (!activeToken) {
-          set({ isAuthenticated: false, user: null });
+        const activeToken =
+          storeToken ||
+          (typeof localStorage !== 'undefined' ? localStorage.getItem('agrinex_token') : null);
+
+        if (!activeToken || activeToken === 'null' || activeToken === 'undefined') {
+          set({ isAuthenticated: false, user: null, isHydrated: true });
           return;
         }
+
+        // Sync memory token so all in-flight requests have it
         setMemoryToken(activeToken);
+
         try {
           const response = await api.get('/auth/me');
-          set({ token: activeToken, user: response.data, isAuthenticated: true });
-        } catch (error) {
-          // Token expired or invalid
-          setMemoryToken(null);
-          try { localStorage.removeItem('agrinex_token'); } catch (e) {}
-          set({ token: null, user: null, isAuthenticated: false });
+          set({ token: activeToken, user: response.data, isAuthenticated: true, isHydrated: true });
+        } catch (error: any) {
+          const httpStatus = error?.response?.status;
+          if (httpStatus === 401) {
+            // Genuine invalid token — clear session
+            console.warn('[AuthStore] checkAuth: 401 Unauthorized — clearing session.');
+            setMemoryToken(null);
+            try { localStorage.removeItem('agrinex_token'); } catch (_) {}
+            set({ token: null, user: null, isAuthenticated: false, isHydrated: true });
+          } else {
+            // Transient error (500, 502, 503, 504, network down, Render cold start)
+            // PRESERVE the authenticated state — the backend will come back online.
+            console.warn(`[AuthStore] checkAuth: Non-auth error (${httpStatus || 'network'}) — keeping session alive.`);
+            const existingUser = get().user;
+            set({
+              isAuthenticated: true,
+              user: existingUser,
+              token: activeToken,
+              isHydrated: true,
+            });
+          }
         }
       },
 
       logout: () => {
         setMemoryToken(null);
-        try { localStorage.removeItem('agrinex_token'); } catch (e) {}
-        set({ token: null, user: null, isAuthenticated: false, error: null });
+        try { localStorage.removeItem('agrinex_token'); } catch (_) {}
+        set({ token: null, user: null, isAuthenticated: false, error: null, isHydrated: true });
         try {
           Object.keys(localStorage).forEach((key) => {
-            if (key.includes('agrinex') || key.includes('chat') || key.includes('post') || key.includes('user')) {
+            if (
+              key.includes('agrinex') ||
+              key.includes('chat') ||
+              key.includes('post') ||
+              key.includes('user')
+            ) {
               localStorage.removeItem(key);
             }
           });
-        } catch (e) {}
+        } catch (_) {}
       },
 
       clearError: () => set({ error: null }),
@@ -387,10 +341,19 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'agrinex-web-auth',
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        // Immediately sync memory token from persisted state after hydration
+        if (state?.token) {
+          setMemoryToken(state.token);
+        }
+        // Mark store as hydrated once rehydration completes
+        state?.isHydrated !== undefined && (state.isHydrated = true);
+      },
     }
   )
 );
 
+// Expose store globally for the API client to access token without circular imports
 if (typeof window !== 'undefined') {
   (window as any).__AGRINEX_STORE__ = useAuthStore;
 }
