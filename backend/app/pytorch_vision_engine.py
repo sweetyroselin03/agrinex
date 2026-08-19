@@ -108,8 +108,13 @@ class PyTorchVisionEngine:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(PyTorchVisionEngine, cls).__new__(cls)
-            cls._instance._initialize()
+            cls._instance._is_initialized = False
         return cls._instance
+
+    def _ensure_initialized(self):
+        if not getattr(self, "_is_initialized", False):
+            self._initialize()
+            self._is_initialized = True
 
     def _initialize(self):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -159,6 +164,7 @@ class PyTorchVisionEngine:
             logger.warning(f"[PyTorch Vision Engine] Model warmup failed: {warmup_err}")
 
     def preprocess_image(self, image_bytes: bytes) -> Tuple[torch.Tensor, Image.Image]:
+        self._ensure_initialized()
         from PIL import ImageEnhance
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         
@@ -190,6 +196,7 @@ class PyTorchVisionEngine:
         Generates a Grad-CAM heatmap visualization over the infected crop leaf area.
         Returns base64 data URI of the heatmap overlay.
         """
+        self._ensure_initialized()
         try:
             # Register forward/backward hooks on final feature layer
             target_layer = self.model.backbone.features[-1]
@@ -242,6 +249,7 @@ class PyTorchVisionEngine:
         Executes two-stage diagnostic inference.
         Returns detailed pathology dictionary with confidence calibration.
         """
+        self._ensure_initialized()
         start_time = time.time()
         tensor, original_img = self.preprocess_image(image_bytes)
 

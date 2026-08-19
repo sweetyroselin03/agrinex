@@ -22,18 +22,6 @@ from jose import JWTError, jwt
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
-# Safe database table initialization
-try:
-    models.Base.metadata.create_all(bind=engine)
-    try:
-        import sync_db
-        sync_db.sync_db()
-    except Exception as sync_err:
-        logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
-    logging.getLogger("uvicorn.error").info("[Startup] Database tables synchronized via SQLAlchemy ORM.")
-except Exception as db_init_err:
-    logging.getLogger("uvicorn.error").warning(f"[Startup DB Connection Warning] Database initialized conditionally: {db_init_err}")
-
 ENV = os.getenv("ENV", "production")
 show_docs = True
 
@@ -43,6 +31,31 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+
+@app.on_event("startup")
+async def startup_db_init():
+    import asyncio
+    def _init_db():
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            try:
+                import sync_db
+                sync_db.sync_db()
+            except Exception as sync_err:
+                logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
+            logging.getLogger("uvicorn.error").info("[Startup] Database tables synchronized via SQLAlchemy ORM.")
+        except Exception as db_init_err:
+            logging.getLogger("uvicorn.error").warning(f"[Startup DB Connection Warning] Database initialized conditionally: {db_init_err}")
+
+    asyncio.create_task(asyncio.to_thread(_init_db))
+
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "AgriNex AI Enterprise Backend is online"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 # CORS configuration
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "")

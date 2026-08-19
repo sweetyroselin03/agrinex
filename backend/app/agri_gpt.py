@@ -22,13 +22,14 @@ class AgriGPTReasoningEngine:
         self.client = None
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")  # Default model for all AI operations
 
+        valid_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-flash-latest"]
         if self.gemini_api_key:
             try:
                 from google import genai
                 self.client = genai.Client(api_key=self.gemini_api_key)
                 logger.info("[AgriGPT] Gemini client initialized successfully")
                 
-                if self.configured_model:
+                if self.configured_model and self.configured_model in valid_models:
                     self.model_name = self.configured_model
                     logger.info(f"[AgriGPT] Using configured GEMINI_MODEL: {self.model_name}")
                 else:
