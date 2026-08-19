@@ -19,7 +19,7 @@ import {
   X,
   Menu
 } from 'lucide-react';
-import api from '../api/client';
+import api, { getLocalToken } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import { API_BASE_URL } from '../config/api';
 
@@ -306,16 +306,7 @@ export default function Chatbot() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      let token = useAuthStore.getState().token || '';
-      if (!token) {
-        try {
-          const raw = localStorage.getItem('agrinex-web-auth');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            token = parsed?.state?.token || '';
-          }
-        } catch (e) {}
-      }
+      const token = getLocalToken() || '';
 
       let successStream = false;
       try {

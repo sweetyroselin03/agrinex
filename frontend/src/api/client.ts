@@ -25,14 +25,47 @@ const getBackoffDelay = (attempt: number): number => {
   return Math.min(base + jitter, MAX_RETRY_DELAY_MS);
 };
 
-const getLocalToken = (): string | null => {
+let memoryToken: string | null = null;
+
+export const setMemoryToken = (token: string | null) => {
+  if (token && typeof token === 'string' && token.trim() !== '' && token !== 'null' && token !== 'undefined' && !token.includes('\0')) {
+    memoryToken = token.trim();
+  } else {
+    memoryToken = null;
+  }
+};
+
+export const getLocalToken = (): string | null => {
+  if (memoryToken) {
+    return memoryToken;
+  }
+
+  try {
+    const storeToken = (window as any)?.__AGRINEX_STORE__?.getState()?.token;
+    if (storeToken && typeof storeToken === 'string') {
+      const trimmed = storeToken.trim();
+      if (trimmed && trimmed !== 'null' && trimmed !== 'undefined' && !trimmed.includes('\0')) {
+        memoryToken = trimmed;
+        return trimmed;
+      }
+    }
+  } catch (e) {}
+
   try {
     const raw = localStorage.getItem('agrinex-web-auth');
     if (raw) {
       const parsed = JSON.parse(raw);
-      return parsed?.state?.token || null;
+      const token = parsed?.state?.token;
+      if (token && typeof token === 'string') {
+        const trimmed = token.trim();
+        if (trimmed && trimmed !== 'null' && trimmed !== 'undefined' && !trimmed.includes('\0')) {
+          memoryToken = trimmed;
+          return trimmed;
+        }
+      }
     }
   } catch (e) {}
+
   return null;
 };
 

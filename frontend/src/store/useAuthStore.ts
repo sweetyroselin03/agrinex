@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import api from '../api/client';
+import api, { setMemoryToken } from '../api/client';
 import { API_BASE_URL } from '../config/api';
 
 export interface User {
@@ -245,6 +245,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/set-password', { email, password });
           const { access_token, user } = response.data;
+          setMemoryToken(access_token);
           set({
             token: access_token,
             user,
@@ -269,6 +270,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/login', credentials);
           const { access_token, user } = response.data;
+          setMemoryToken(access_token);
           set({
             token: access_token,
             user,
@@ -352,16 +354,19 @@ export const useAuthStore = create<AuthState>()(
           set({ isAuthenticated: false, user: null });
           return;
         }
+        setMemoryToken(token);
         try {
           const response = await api.get('/auth/me');
           set({ user: response.data, isAuthenticated: true });
         } catch (error) {
           // Token expired or invalid
+          setMemoryToken(null);
           set({ token: null, user: null, isAuthenticated: false });
         }
       },
 
       logout: () => {
+        setMemoryToken(null);
         set({ token: null, user: null, isAuthenticated: false, error: null });
         try {
           Object.keys(localStorage).forEach((key) => {
@@ -380,3 +385,7 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+if (typeof window !== 'undefined') {
+  (window as any).__AGRINEX_STORE__ = useAuthStore;
+}
