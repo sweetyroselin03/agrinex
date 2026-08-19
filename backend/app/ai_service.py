@@ -9,6 +9,7 @@ import logging
 import asyncio
 import base64
 import io
+from typing import Optional, Dict, Any, List
 from PIL import Image
 from pydantic import BaseModel, Field
 
@@ -21,6 +22,7 @@ logger = logging.getLogger("uvicorn.error")
 class CropDiagnosticResult(BaseModel):
     is_valid_crop: bool = Field(default=True, description="Set is_valid_crop=true for ALL plant-related images. ONLY set false for cars, people, buildings.")
     crop_type: str = Field(default="Crop", description="Identified crop name.")
+    scientific_name: Optional[str] = Field(default="Plantae", description="Scientific name of crop.")
     disease_name: str = Field(default="Healthy Crop", description="Identified disease name or Healthy Crop.")
     confidence: float = Field(default=90.0, description="Confidence level score between 0 and 100.")
     confidence_level: Optional[float] = Field(default=90.0)
@@ -28,6 +30,7 @@ class CropDiagnosticResult(BaseModel):
     symptoms: str = Field(default="No visible damage observed.", description="Detailed symptoms observed.")
     causes: str = Field(default="N/A", description="Disease causes.")
     treatment: str = Field(default="N/A", description="Chemical treatment recommendations.")
+    chemical_treatment: Optional[str] = Field(default="N/A", description="Chemical treatment recommendations.")
     organic_treatment: str = Field(default="N/A", description="Organic/natural solutions.")
     prevention: str = Field(default="N/A", description="Prevention measures.")
     yield_impact: str = Field(default="N/A", description="Impact on crop yield.")
@@ -119,7 +122,7 @@ class AIService:
             return raw_bytes
 
     async def _run_gemini_diagnostic(self, image_url: str) -> dict:
-        """Performs image analysis via Google Gemini Vision, logging every step."""
+        """Performs image analysis via Google Gemini Vision (gemini-3.5-flash-lite), with local PyTorch fallback."""
         logger.info(f"[AI Scanner] Step 1: Image received. URL/Data prefix: '{image_url[:60]}...' (Length: {len(image_url)})")
 
         if image_url in self.persistent_cache:
@@ -131,8 +134,8 @@ class AIService:
         logger.info(f"[AI Scanner] Step 2: Image encoded. Size: {len(image_bytes)} bytes.")
 
         if not self.agri_gpt.client:
-            logger.error("[AI Service] Gemini client is not configured. GEMINI_API_KEY may be missing.")
-            raise RuntimeError("Gemini client is not configured. Please set the GEMINI_API_KEY environment variable.")
+            logger.warning("[AI Service] Gemini client is not configured. Falling back to local PyTorch Vision engine.")
+            return self.vision_engine.run_inference(image_bytes)
 
         mime_type = "image/jpeg"
         from google.genai import types
@@ -149,14 +152,14 @@ class AIService:
             "Return ONLY valid JSON matching the schema."
         )
 
+        model_to_use = self.agri_gpt.model_name or "gemini-3.5-flash-lite"
         retries = 2
         for attempt in range(retries):
             try:
-                logger.info(f"[AI Scanner] Selected Model: {self.agri_gpt.model_name}")
-                logger.info(f"[AI Scanner] Prompt: {prompt}")
-                logger.info(f"[AI Scanner] Image Upload Success: True (Encoded Size: {len(image_bytes)} bytes)")
+                logger.info(f"[AI Scanner] Selected Model: {model_to_use}")
+                logger.info(f"[AI Scanner] Image Upload Success: True (Encoded Size: {len(image_bytes)} bytes, MIME: {mime_type})")
                 
-                timeout = 30.0
+                timeout = 25.0
                 config = types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=CropDiagnosticResult,
@@ -165,7 +168,7 @@ class AIService:
 
                 response = await asyncio.wait_for(
                     self.agri_gpt.client.aio.models.generate_content(
-                        model=self.agri_gpt.model_name,
+                        model=model_to_use,
                         contents=[
                             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                             prompt
@@ -175,7 +178,7 @@ class AIService:
                     timeout=timeout
                 )
 
-                logger.info(f"[AI Scanner] Gemini Response: {response.text}")
+                logger.info(f"[AI Scanner] Gemini Response ({model_to_use}): {response.text}")
                 data = json.loads(response.text)
                 
                 # Calibrate confidence if returned in 0.0-1.0 range
@@ -201,18 +204,17 @@ class AIService:
 
             except Exception as e:
                 err_str = str(e)
-                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str or "quota" in err_str.lower():
-                    logger.error(f"[AI Scanner Error] Gemini API Quota Exceeded (429): {e}")
-                    raise HTTPException(
-                        status_code=429,
-                        detail="Gemini API quota is temporarily exhausted. Please try again later."
-                    )
-                logger.error(f"[AI Scanner Attempt {attempt + 1} Failed] Error: {e}")
-                if attempt < retries - 1:
-                    await asyncio.sleep(0.5)
-                else:
-                    logger.error(f"[AI Scanner Error] All Gemini diagnostic attempts failed: {e}")
-                    raise e
+                is_quota_err = any(kw in err_str.lower() for kw in ["429", "resource_exhausted", "quota exceeded", "quota"])
+                
+                if is_quota_err:
+                    logger.warning(f"[AI Scanner Fallback] Gemini API Quota Exceeded (429): {e}. Stopping retries and executing PyTorch MobileNetV3 local model fallback.")
+                    return self.vision_engine.run_inference(image_bytes)
+
+                logger.warning(f"[AI Scanner Attempt {attempt + 1} Failed] Error: {e}")
+                if attempt >= retries - 1:
+                    logger.warning(f"[AI Scanner Fallback] Gemini diagnostic attempt failed ({e}). Executing local PyTorch MobileNetV3 model fallback.")
+                    return self.vision_engine.run_inference(image_bytes)
+                await asyncio.sleep(0.3)
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     # STAGE 1 — Crop Image Validation (Plant vs Non-Plant)

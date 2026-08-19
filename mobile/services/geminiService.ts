@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
 import client from '../api/client';
 
-export const GEMINI_MODEL_NAME = 'gemini-2.0-flash';
+export const GEMINI_MODEL_NAME = 'gemini-3.5-flash-lite';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || Constants.expoConfig?.extra?.GEMINI_API_KEY || '';
 

@@ -9,6 +9,7 @@ import sys
 import json
 import logging
 from typing import List, Dict, Any, Optional
+from fastapi import HTTPException
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -20,9 +21,9 @@ class AgriGPTReasoningEngine:
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.configured_model = os.getenv("GEMINI_MODEL")
         self.client = None
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")  # Default model for all AI operations
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")  # Primary model for all AI operations
 
-        valid_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-flash-latest"]
+        valid_models = ["gemini-3.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-flash-latest"]
         if self.gemini_api_key:
             try:
                 from google import genai
@@ -33,7 +34,7 @@ class AgriGPTReasoningEngine:
                     self.model_name = self.configured_model
                     logger.info(f"[AgriGPT] Using configured GEMINI_MODEL: {self.model_name}")
                 else:
-                    self.model_name = "gemini-2.0-flash"
+                    self.model_name = "gemini-3.5-flash-lite"
                     logger.info(f"[AgriGPT] Using default model: {self.model_name}")
             except Exception as e:
                 logger.error(f"[AgriGPT] Failed to initialize Gemini: {e}")
@@ -329,14 +330,11 @@ class AgriGPTReasoningEngine:
             except Exception as e:
                 err_str = str(e)
                 if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str or "quota" in err_str.lower():
-                    logger.error(f"[AgriGPT Chat Error] Gemini API Quota Exceeded (429): {e}")
-                    raise HTTPException(
-                        status_code=429,
-                        detail="Gemini API quota is temporarily exhausted. Please try again later."
-                    )
+                    logger.warning(f"[AgriGPT Chat Fallback] Gemini API Quota Exceeded (429): {e}. Using domain reasoning fallback.")
+                    return self.generate_domain_reasoning(message, scan_context=scan_context)
                 logger.error(f"[AgriGPT Chat Attempt {attempt + 1} Failed] Error: {e}")
                 if attempt < retries - 1:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.3)
 
         logger.error("[AgriGPT Chat Error] All Gemini attempts failed. Fallback reasoning activated.")
         fallback_text = self.generate_domain_reasoning(message, scan_context=scan_context)
