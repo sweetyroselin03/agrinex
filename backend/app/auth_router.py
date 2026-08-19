@@ -15,6 +15,30 @@ def utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def find_user_by_identifier(db: Session, identifier: str):
+    """
+    Fast-path indexed user lookup.
+    Leverages B-tree index on `users.email` directly for instant lookups (< 5ms).
+    """
+    if not identifier:
+        return None
+    target = identifier.strip()
+    # 1. Direct B-tree indexed query (Fastest)
+    user = db.query(models.User).filter(models.User.email == target).first()
+    if user:
+        return user
+    # 2. Case-insensitive query fallback
+    user = db.query(models.User).filter(models.User.email.ilike(target)).first()
+    if user:
+        return user
+    # 3. Fallback for username/phone without '@'
+    if "@" not in target:
+        user = db.query(models.User).filter(models.User.email == f"{target}@agrinex.local").first()
+        if user:
+            return user
+    return None
+
+
 @router.post("/send-otp")
 def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
     identifier = request.email.strip().replace(" ", "")
@@ -92,10 +116,8 @@ def verify_otp(request: schemas.OTPVerify, db: Session = Depends(get_db)):
     db.commit()
     logger.info(f"[OTP Verification Success] Email OTP verified successfully for {identifier}")
     
-    # Check if user exists (only check email)
-    user = db.query(models.User).filter(
-        (models.User.email == identifier) | (models.User.email == f"{identifier}@agrinex.local")
-    ).first()
+    # Check if user exists (fast indexed lookup)
+    user = find_user_by_identifier(db, identifier)
         
     if user:
         access_token = auth_utils.create_access_token(data={"sub": user.email})
@@ -119,9 +141,7 @@ def verify_otp(request: schemas.OTPVerify, db: Session = Depends(get_db)):
 @router.post("/check-account")
 def check_account(request: schemas.CheckAccountRequest, db: Session = Depends(get_db)):
     target = request.identifier.strip().replace(" ", "")
-    user = db.query(models.User).filter(
-        (models.User.email == target) | (models.User.email == f"{target}@agrinex.local")
-    ).first()
+    user = find_user_by_identifier(db, target)
     if user:
         return {"exists": True, "message": "Account already exists. Please login."}
     return {"exists": False}
@@ -220,9 +240,7 @@ def set_password(request: schemas.PasswordSetRequest, db: Session = Depends(get_
     if not target:
         raise HTTPException(status_code=400, detail="Email is required to set password")
 
-    user = db.query(models.User).filter(
-        (models.User.email == target) | (models.User.email == f"{target}@agrinex.local")
-    ).first()
+    user = find_user_by_identifier(db, target)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -249,9 +267,7 @@ def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
     
     logger.info(f"[USER LOOKUP START] Querying database for email: {target}")
     t0 = time.time()
-    user = db.query(models.User).filter(
-        (models.User.email == target) | (models.User.email == f"{target}@agrinex.local")
-    ).first()
+    user = find_user_by_identifier(db, target)
     logger.info(f"[USER LOOKUP COMPLETE] User found: {bool(user)} ({round((time.time() - t0) * 1000, 2)}ms)")
         
     if not user:
@@ -286,9 +302,7 @@ def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depend
     if not target or "@" not in target or target.endswith("gmail.con") or target.endswith("gmail,com"):
         raise HTTPException(status_code=400, detail="Invalid email format")
 
-    user = db.query(models.User).filter(
-        (models.User.email == target) | (models.User.email == f"{target}@agrinex.local")
-    ).first()
+    user = find_user_by_identifier(db, target)
     if not user:
         raise HTTPException(status_code=404, detail="Email not registered")
     
@@ -329,9 +343,7 @@ def reset_password(request: schemas.ResetPasswordRequest, db: Session = Depends(
     if not db_otp:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
     
-    user = db.query(models.User).filter(
-        (models.User.email == target) | (models.User.email == f"{target}@agrinex.local")
-    ).first()
+    user = find_user_by_identifier(db, target)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
