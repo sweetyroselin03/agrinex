@@ -200,6 +200,13 @@ class AIService:
                 return result_dict
 
             except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str or "quota" in err_str.lower():
+                    logger.error(f"[AI Scanner Error] Gemini API Quota Exceeded (429): {e}")
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Gemini API quota is temporarily exhausted. Please try again later."
+                    )
                 logger.error(f"[AI Scanner Attempt {attempt + 1} Failed] Error: {e}")
                 if attempt < retries - 1:
                     await asyncio.sleep(0.5)
@@ -233,7 +240,15 @@ class AIService:
             else:
                 res = await self._run_gemini_diagnostic(image_url)
                 self._scan_cache[image_url] = res
+        except HTTPException as http_err:
+            raise http_err
         except Exception as gemini_err:
+            err_str = str(gemini_err)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str or "quota" in err_str.lower():
+                raise HTTPException(
+                    status_code=429,
+                    detail="Gemini API quota is temporarily exhausted. Please try again later."
+                )
             logger.warning(f"[AI Service] Gemini diagnostic check failed, using local model fallback: {gemini_err}")
             image_bytes = self._get_image_bytes(image_url)
             res = self.vision_engine.run_inference(image_bytes)

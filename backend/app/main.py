@@ -1760,21 +1760,61 @@ async def get_weather(
     lon: Optional[float] = Query(default=72.8777, description="Longitude"),
 ):
     """Fetch real weather data from Open-Meteo API with farming insights."""
+    data = None
+    retries = 2
+    for attempt in range(retries):
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as http_client:
+                url = (
+                    f"https://api.open-meteo.com/v1/forecast?"
+                    f"latitude={lat}&longitude={lon}"
+                    f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,"
+                    f"weather_code,wind_speed_10m,surface_pressure"
+                    f"&daily=temperature_2m_max,temperature_2m_min,weather_code,"
+                    f"precipitation_probability_max,uv_index_max,sunrise,sunset"
+                    f"&timezone=auto&forecast_days=7"
+                )
+                resp = await http_client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+                break
+        except Exception as retry_err:
+            if attempt < retries - 1:
+                await asyncio.sleep(0.3)
+            else:
+                logger.warning(f"[Weather API Warning] Open-Meteo API unavailable ({retry_err}). Returning seasonal estimate fallback.")
+
+    if not data:
+        # Fallback structured response when Open-Meteo returns 503 or is unavailable
+        return {
+            "temp": 32,
+            "feels_like": 34,
+            "condition": "Partly Cloudy",
+            "humidity": 55,
+            "wind": 12,
+            "uv_index": 6.5,
+            "rain_probability": 20,
+            "pressure": 1013,
+            "visibility": 10.0,
+            "location": f"{lat:.2f}° N, {lon:.2f}° E",
+            "sunrise": "05:42 AM",
+            "sunset": "06:54 PM",
+            "daily_high": 35,
+            "daily_low": 24,
+            "soil_moisture": "Moderate — Monitor irrigation needs",
+            "farming_suitability": "Good — Most activities suitable",
+            "alerts": [{"type": "info", "severity": "low", "message": "ℹ️ Real-time weather sync paused temporarily. Displaying regional seasonal estimate.", "icon": "CloudSun"}],
+            "forecast": [
+                {"day": "Mon", "temp": 31, "condition": "Sunny", "icon": "Sun"},
+                {"day": "Tue", "temp": 29, "condition": "Cloudy", "icon": "CloudIcon"},
+                {"day": "Wed", "temp": 28, "condition": "Rain", "icon": "CloudRain"},
+                {"day": "Thu", "temp": 30, "condition": "Sunny", "icon": "Sun"},
+                {"day": "Fri", "temp": 32, "condition": "Sunny", "icon": "Sun"}
+            ],
+            "weather_available": False
+        }
+
     try:
-        async with httpx.AsyncClient(timeout=8.0) as http_client:
-            url = (
-                f"https://api.open-meteo.com/v1/forecast?"
-                f"latitude={lat}&longitude={lon}"
-                f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,"
-                f"weather_code,wind_speed_10m,surface_pressure"
-                f"&daily=temperature_2m_max,temperature_2m_min,weather_code,"
-                f"precipitation_probability_max,uv_index_max,sunrise,sunset"
-                f"&timezone=auto&forecast_days=7"
-            )
-            resp = await http_client.get(url)
-            resp.raise_for_status()
-            data = resp.json()
-        
         current = data.get("current", {})
         daily = data.get("daily", {})
         
@@ -1879,7 +1919,6 @@ async def get_weather(
         }
     except Exception as e:
         logger.error(f"Weather API error: {e}")
-        # Fallback to realistic mock data
         return {
             "temp": 32,
             "feels_like": 34,

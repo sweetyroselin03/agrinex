@@ -327,6 +327,13 @@ class AgriGPTReasoningEngine:
                     raise ValueError("Empty response received from Gemini.")
 
             except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str or "quota" in err_str.lower():
+                    logger.error(f"[AgriGPT Chat Error] Gemini API Quota Exceeded (429): {e}")
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Gemini API quota is temporarily exhausted. Please try again later."
+                    )
                 logger.error(f"[AgriGPT Chat Attempt {attempt + 1} Failed] Error: {e}")
                 if attempt < retries - 1:
                     await asyncio.sleep(0.5)
@@ -429,6 +436,11 @@ class AgriGPTReasoningEngine:
                 return
 
             except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str or "quota" in err_str.lower():
+                    logger.error(f"[AgriGPT Stream Error] Gemini API Quota Exceeded (429): {e}")
+                    yield "Gemini API quota is temporarily exhausted. Please try again later."
+                    return
                 logger.error(f"[AgriGPT Stream Attempt {attempt + 1} Failed] Error: {e}")
                 if attempt < retries - 1:
                     await asyncio.sleep(0.5)

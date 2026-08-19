@@ -124,7 +124,11 @@ export default function Scanner() {
       setResult(response.data);
       fetchScanHistory();
     } catch (e: any) {
-      alert(e.response?.data?.detail || 'Foliage diagnosis failed. Please check network and try again.');
+      if (e.response?.status === 429 || e.response?.data?.error_type === 'GEMINI_QUOTA_EXCEEDED' || (e.response?.data?.detail && e.response.data.detail.includes('quota'))) {
+        alert("AI disease analysis is temporarily unavailable because the Gemini API quota has been reached. Please try again later.");
+      } else {
+        alert(e.response?.data?.detail || e.response?.data?.message || 'Foliage diagnosis failed. Please check network and try again.');
+      }
     } finally {
       setScanning(false);
     }
