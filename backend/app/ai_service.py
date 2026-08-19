@@ -69,7 +69,7 @@ class AIService:
         raw_bytes = None
         try:
             if image_url.startswith("data:image"):
-                base64_data = image_url.split(",")[1]
+                base64_data = image_url.split(",", 1)[1] if "," in image_url else image_url
                 raw_bytes = base64.b64decode(base64_data)
             elif image_url.startswith("http"):
                 # Mock or fetch URL bytes
@@ -83,6 +83,11 @@ class AIService:
                 buf = io.BytesIO()
                 img.save(buf, format="JPEG")
                 raw_bytes = buf.getvalue()
+            else:
+                try:
+                    raw_bytes = base64.b64decode(image_url)
+                except Exception:
+                    pass
         except Exception as e:
             logger.warning(f"[AI Service] Error parsing raw image bytes: {e}")
 

@@ -246,6 +246,7 @@ export const useAuthStore = create<AuthState>()(
           const response = await api.post('/auth/set-password', { email, password });
           const { access_token, user } = response.data;
           setMemoryToken(access_token);
+          try { localStorage.setItem('agrinex_token', access_token); } catch (e) {}
           set({
             token: access_token,
             user,
@@ -271,6 +272,7 @@ export const useAuthStore = create<AuthState>()(
           const response = await api.post('/auth/login', credentials);
           const { access_token, user } = response.data;
           setMemoryToken(access_token);
+          try { localStorage.setItem('agrinex_token', access_token); } catch (e) {}
           set({
             token: access_token,
             user,
@@ -349,24 +351,27 @@ export const useAuthStore = create<AuthState>()(
 
 
       checkAuth: async () => {
-        const { token } = get();
-        if (!token) {
+        const storeToken = get().token;
+        const activeToken = storeToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('agrinex_token') : null);
+        if (!activeToken) {
           set({ isAuthenticated: false, user: null });
           return;
         }
-        setMemoryToken(token);
+        setMemoryToken(activeToken);
         try {
           const response = await api.get('/auth/me');
-          set({ user: response.data, isAuthenticated: true });
+          set({ token: activeToken, user: response.data, isAuthenticated: true });
         } catch (error) {
           // Token expired or invalid
           setMemoryToken(null);
+          try { localStorage.removeItem('agrinex_token'); } catch (e) {}
           set({ token: null, user: null, isAuthenticated: false });
         }
       },
 
       logout: () => {
         setMemoryToken(null);
+        try { localStorage.removeItem('agrinex_token'); } catch (e) {}
         set({ token: null, user: null, isAuthenticated: false, error: null });
         try {
           Object.keys(localStorage).forEach((key) => {

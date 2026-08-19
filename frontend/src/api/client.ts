@@ -36,10 +36,24 @@ export const setMemoryToken = (token: string | null) => {
 };
 
 export const getLocalToken = (): string | null => {
+  // 1. In-memory cache
   if (memoryToken) {
     return memoryToken;
   }
 
+  // 2. Direct localStorage 'agrinex_token' key
+  try {
+    const directToken = localStorage.getItem('agrinex_token');
+    if (directToken && typeof directToken === 'string') {
+      const trimmed = directToken.trim();
+      if (trimmed && trimmed !== 'null' && trimmed !== 'undefined' && !trimmed.includes('\0')) {
+        memoryToken = trimmed;
+        return trimmed;
+      }
+    }
+  } catch (e) {}
+
+  // 3. Zustand store in-memory state
   try {
     const storeToken = (window as any)?.__AGRINEX_STORE__?.getState()?.token;
     if (storeToken && typeof storeToken === 'string') {
@@ -51,6 +65,7 @@ export const getLocalToken = (): string | null => {
     }
   } catch (e) {}
 
+  // 4. Persisted Zustand localStorage fallback
   try {
     const raw = localStorage.getItem('agrinex-web-auth');
     if (raw) {
@@ -71,11 +86,10 @@ export const getLocalToken = (): string | null => {
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000, // Reduced from 60s to 30s as requested
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
-  // withCredentials: false (Omitted/disabled as cookies are not used; auth relies on Bearer headers)
 });
 
 // Request Interceptor: Inject JWT Token & Safe Logging
@@ -83,19 +97,27 @@ api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getLocalToken();
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
-    }
-    console.log(`[API DEBUG] Request: ${config.method?.toUpperCase()} ${config.url}`, {
-      baseURL: config.baseURL,
-      headers: { 
-        'Content-Type': config.headers['Content-Type'],
-        Authorization: config.headers.Authorization ? 'Bearer [REDACTED]' : undefined 
+      if (typeof (config.headers as any).set === 'function') {
+        (config.headers as any).set('Authorization', `Bearer ${token}`);
       }
+    }
+    const hasAuthHeader = !!(
+      config.headers.Authorization || 
+      (typeof (config.headers as any).get === 'function' && (config.headers as any).get('Authorization'))
+    );
+    console.log(`[API INTERCEPTOR] Request: ${config.method?.toUpperCase()} ${config.url}`, {
+      baseURL: config.baseURL,
+      tokenFound: !!token,
+      tokenLength: token ? token.length : 0,
+      tokenPrefix: token ? `${token.substring(0, 12)}...` : null,
+      authHeaderAttached: hasAuthHeader
     });
     return config;
   },
   (error) => {
-    console.error(`[API DEBUG] Request Error:`, error);
+    console.error(`[API INTERCEPTOR] Request Error:`, error);
     return Promise.reject(error);
   }
 );
@@ -157,8 +179,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !config._isRetry && !isAuthRoute) {
       console.warn('[API] Session expired (401) — logging out...');
       try {
+        setMemoryToken(null);
+        localStorage.removeItem('agrinex_token');
         localStorage.removeItem('agrinex-web-auth');
-        // Force reload to redirect to login and clear state
         window.location.href = '/login';
       } catch (e) {}
       return Promise.reject(error);

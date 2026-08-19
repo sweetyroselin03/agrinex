@@ -1327,31 +1327,44 @@ async def create_scan(
 
             b64_str = base64.b64encode(image_bytes).decode("utf-8")
             image_url = f"data:{file_mime};base64,{b64_str}"
-        elif form.get("image_url"):
-            image_url = str(form.get("image_url"))
+        elif form.get("image_url") or form.get("image") or form.get("file"):
+            image_url = str(form.get("image_url") or form.get("image") or form.get("file"))
     else:
         try:
             body = await request.json()
-            image_url = body.get("image_url", "")
+            image_url = (
+                body.get("image_url") or 
+                body.get("image") or 
+                body.get("file") or 
+                body.get("data") or 
+                ""
+            )
+            if isinstance(image_url, str):
+                image_url = image_url.strip()
+
             scan_mode = body.get("scan_mode", "full")
-            logger.info(f"[AI Endpoint] Received JSON request. Image URL prefix: '{image_url[:40]}...' (Length: {len(image_url)})")
+            logger.info(f"[AI Endpoint] JSON request parsed. Payload keys: {list(body.keys())}, image_url length: {len(image_url)}, scan_mode: {scan_mode}")
+            
+            if image_url and not image_url.startswith("http") and not image_url.startswith("data:image"):
+                if "," in image_url:
+                    image_url = f"data:image/jpeg;base64,{image_url.split(',', 1)[1]}"
+                else:
+                    image_url = f"data:image/jpeg;base64,{image_url}"
+
             if image_url.startswith("data:image"):
                 try:
-                    b64_part = image_url.split(",")[1]
+                    b64_part = image_url.split(",", 1)[1] if "," in image_url else image_url
                     image_bytes = base64.b64decode(b64_part)
-                    print("Image byte size:", len(image_bytes))
                     img = Image.open(io.BytesIO(image_bytes))
-                    print("- width:", img.width)
-                    print("- height:", img.height)
-                    print("- mode:", img.mode)
-                    print("- format:", getattr(img, "format", "JPEG"))
-                except Exception:
-                    pass
+                    logger.info(f"[AI Endpoint] Base64 image verified via PIL: {img.width}x{img.height}, format={getattr(img, 'format', 'JPEG')}, size={len(image_bytes)} bytes")
+                except Exception as b64_err:
+                    logger.warning(f"[AI Endpoint Warning] Could not decode Base64 preview via PIL: {b64_err}")
         except Exception as json_err:
             logger.error(f"[AI Endpoint Error] Failed to parse JSON request body: {json_err}")
-            raise HTTPException(status_code=400, detail="Invalid JSON body")
+            raise HTTPException(status_code=400, detail=f"Invalid JSON body format: {json_err}")
 
     if not image_url:
+        logger.error("[AI Endpoint Error] Missing required image_url or image file payload")
         raise HTTPException(status_code=400, detail="Missing required image_url or image file payload.")
 
     effective_scan_mode = (scan_mode or "full").lower()
