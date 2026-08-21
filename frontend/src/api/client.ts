@@ -4,16 +4,18 @@ import { API_BASE_URL } from '../config/api';
 
 const BASE_URL = API_BASE_URL;
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 1000;
-const MAX_RETRY_DELAY_MS = 8000;
+const INITIAL_RETRY_DELAY_MS = 2000;
+const MAX_RETRY_DELAY_MS = 12000;
 
-// Routes that should NOT be retried on failure (idempotency-sensitive)
+// Routes that should NOT be retried when a real HTTP response was already received
+// (idempotency-sensitive: duplicate OTP sends, duplicate registrations, duplicate posts)
+// NOTE: login/register are only blocked if they received a response (2xx or 4xx).
+// Cold-start timeouts (no response at all) are ALWAYS retried on all routes.
 const NO_RETRY_ROUTES = [
   '/auth/send-otp',
   '/auth/verify-otp',
   '/auth/register',
   '/auth/set-password',
-  '/auth/login',
   '/posts',
 ];
 
@@ -104,7 +106,7 @@ export const getLocalToken = (): string | null => {
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
+  timeout: 60000, // 60s — accommodates Render free-tier cold starts (~30-50s)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -207,22 +209,30 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // ─── Skip retry for idempotency-sensitive routes ─────────────────────────
+    // ─── Skip retry ONLY when a real HTTP response was already received ─────────
+    // Idempotency risk only applies when the server processed the request (got a response).
+    // Timeouts and network errors mean the server never responded — safe to retry.
+    const isNetworkError = !error.response;
+    const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.code === 'ETIMEDOUT';
+    const is5xx = !!error.response && error.response.status >= 500;
+    const isColdStartFailure = isNetworkError || isTimeout;
+
     const method = (config.method || 'get').toLowerCase();
-    const isNoRetry = NO_RETRY_ROUTES.some((route) => url.includes(route)) && method === 'post';
+    // Only block retries if: it's a POST route that got a real response (not a cold-start timeout)
+    const isNoRetry =
+      NO_RETRY_ROUTES.some((route) => url.includes(route)) &&
+      method === 'post' &&
+      !isColdStartFailure; // Always allow retry when the server never responded
+
     if (isNoRetry) return Promise.reject(error);
 
     // ─── Exponential Backoff Retry for 5xx / network / timeout errors ─────────
-    const isNetworkError = !error.response;
-    const isTimeout = error.code === 'ECONNABORTED';
-    const is5xx = !!error.response && error.response.status >= 500;
-
-    if ((isNetworkError || isTimeout || is5xx) && !config._isRetry) {
+    if ((isColdStartFailure || is5xx) && !config._isRetry) {
       config._retryCount = config._retryCount || 0;
       if (config._retryCount < MAX_RETRIES) {
         config._retryCount += 1;
         const delay = getBackoffDelay(config._retryCount - 1);
-        console.log(`[API] Retry ${config._retryCount}/${MAX_RETRIES} for ${url} in ${Math.round(delay)}ms`);
+        console.log(`[API] Retry ${config._retryCount}/${MAX_RETRIES} for ${url} in ${Math.round(delay)}ms (cold-start/network)`);
         await sleep(delay);
         return api(config);
       }
