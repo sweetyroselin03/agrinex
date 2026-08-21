@@ -23,6 +23,34 @@ import api, { getLocalToken } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import { API_BASE_URL } from '../config/api';
 
+// ─── Language Detection ───
+// Detects Tamil, Hindi, Telugu, Malayalam from Unicode script blocks and common keywords.
+// Falls back to null (let backend auto-detect) for English or unrecognised input.
+function detectLanguage(text: string): string | null {
+  if (!text || !text.trim()) return null;
+
+  // Tamil: U+0B80–U+0BFF
+  if (/[\u0B80-\u0BFF]/.test(text)) return 'Tamil';
+
+  // Telugu: U+0C00–U+0C7F
+  if (/[\u0C00-\u0C7F]/.test(text)) return 'Telugu';
+
+  // Malayalam: U+0D00–U+0D7F
+  if (/[\u0D00-\u0D7F]/.test(text)) return 'Malayalam';
+
+  // Hindi / Devanagari: U+0900–U+097F
+  if (/[\u0900-\u097F]/.test(text)) return 'Hindi';
+
+  // Keyword-based fallback (romanised common greetings)
+  const lower = text.toLowerCase();
+  if (/\b(vanakkam|nandri|enna|yenna|epdi|ungal|unnai|katchi)\b/.test(lower)) return 'Tamil';
+  if (/\b(namaste|namaskar|kisan|fasal|bhoomi|kheti|khad|beej)\b/.test(lower)) return 'Hindi';
+  if (/\b(namaskaram|vanakkam|njan|ingane|ente|vivarikkuka)\b/.test(lower)) return 'Malayalam';
+  if (/\b(mee|meeru|meeru \w+|panta|rayitu|bhoomi)\b/.test(lower)) return 'Telugu';
+
+  return null; // default: backend auto-detects
+}
+
 // Rich Markdown parser supporting code blocks, tables, headers, lists, bold/italics
 function RenderMarkdown({ content }: { content: string }) {
   if (!content) return null;
@@ -308,6 +336,8 @@ export default function Chatbot() {
     try {
       const token = getLocalToken() || '';
 
+      const detectedLang = detectLanguage(messageText);
+
       let successStream = false;
       try {
         const response = await fetch(`${API_BASE_URL}/ai/chat`, {
@@ -321,7 +351,8 @@ export default function Chatbot() {
             message: messageText || 'Please analyze this crop leaf image.',
             image_url: imagePayload,
             conversation_id: activeConvId,
-            stream: true
+            stream: true,
+            ...(detectedLang ? { language: detectedLang } : {})
           })
         });
 
@@ -399,7 +430,8 @@ export default function Chatbot() {
           message: messageText || 'Please analyze this crop leaf image.',
           image_url: imagePayload,
           conversation_id: activeConvId,
-          stream: false
+          stream: false,
+          ...(detectedLang ? { language: detectedLang } : {})
         });
 
         const reply = res.data?.reply || res.data?.message || res.data?.response || 'I received your query.';
