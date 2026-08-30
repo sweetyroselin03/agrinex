@@ -9,6 +9,11 @@ coverage.xml
 junit.xml
 frontend/test-results/
 .env
+.env.*
+*.env
+backend/.env
+frontend/.env
+mobile/.env
 dist/
 build/
 .venv/
@@ -23,3 +28,12 @@ coverage/
 security-artifacts/
 vulnerability-reports/
 load-test-reports/
+
+# ML model weights
+*.pth
+*.pt
+*.onnx
+# Expo local settings
+.expo/
+# APK build artifacts
+*.apk

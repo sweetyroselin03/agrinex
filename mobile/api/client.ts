@@ -40,7 +40,7 @@ const getBackoffDelay = (attempt: number): number => {
 // ─── Axios Instance ───────────────────────────────────────────────────────────
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 60000, // 60 seconds — handles Render cold starts
+  timeout: 30000, // 30 seconds
   headers: {
     'Content-Type': 'application/json',
   },

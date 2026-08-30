@@ -78,7 +78,7 @@ export default function Layout() {
     if (!initialSegment || initialSegment === 'splash') return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    const currentScreen = segments[1] as string | undefined;
+    const currentScreen = (segments as string[])[1] as string | undefined;
     const { user } = useAuthStore.getState();
 
     if (

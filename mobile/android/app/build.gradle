@@ -2,10 +2,9 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-
+buildDir = new File("C:/tmp/agrinex_app_build")
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
-
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -98,10 +97,13 @@ android {
         versionCode 3
         versionName "1.0.0"
 
-        buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
-        ndk {
-            abiFilters "arm64-v8a", "x86_64"
+        externalNativeBuild {
+            cmake {
+                arguments "-DCMAKE_OBJECT_PATH_MAX=260"
+            }
         }
+
+        buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
     signingConfigs {
         debug {
@@ -129,19 +131,13 @@ android {
     }
     packagingOptions {
         jniLibs {
-            useLegacyPackaging true
+            def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
+            useLegacyPackaging enableLegacyPackaging.toBoolean()
         }
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
-
-    externalNativeBuild {
-        cmake {
-            buildStagingDirectory "C:/tmp/bld/app_cmake"
-        }
-    }
-
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
@@ -192,16 +188,3 @@ dependencies {
         implementation jscFlavor
     }
 }
-
-tasks.withType(com.facebook.react.tasks.GenerateCodegenSchemaTask).configureEach {
-    doNotTrackState("Windows path compatibility")
-}
-
-afterEvaluate {
-    tasks.named("createBundleReleaseJsAndAssets").configure {
-        doNotTrackState("Windows path compatibility")
-    }
-}
-
-
-

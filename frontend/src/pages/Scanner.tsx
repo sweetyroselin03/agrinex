@@ -108,6 +108,8 @@ export default function Scanner() {
     setCroppedImage(null);
   };
 
+  const [scanError, setScanError] = useState<string | null>(null);
+
   // Triggers backend disease detection
   const handleStartScan = async () => {
     const activeImage = scanMode === 'crop' ? (croppedImage || originalImage) : originalImage;
@@ -115,6 +117,7 @@ export default function Scanner() {
 
     setScanning(true);
     setResult(null);
+    setScanError(null);
 
     try {
       const response = await api.post('/ai/detect-disease', {
@@ -124,11 +127,8 @@ export default function Scanner() {
       setResult(response.data);
       fetchScanHistory();
     } catch (e: any) {
-      if (e.response?.status === 429 || e.response?.data?.error_type === 'GEMINI_QUOTA_EXCEEDED' || (e.response?.data?.detail && e.response.data.detail.includes('quota'))) {
-        alert("AI disease analysis is temporarily unavailable because the Gemini API quota has been reached. Please try again later.");
-      } else {
-        alert(e.response?.data?.detail || e.response?.data?.message || 'Foliage diagnosis failed. Please check network and try again.');
-      }
+      const errorMsg = e.response?.data?.detail || e.response?.data?.message || 'Foliage diagnosis failed. Please check network and try again.';
+      setScanError(errorMsg);
     } finally {
       setScanning(false);
     }
@@ -307,7 +307,33 @@ export default function Scanner() {
         {/* RIGHT COLUMN: RESULTS PANEL (6 Cols) */}
         <div className="lg:col-span-6 space-y-6">
           <AnimatePresence mode="wait">
-            {!result && !scanning && (
+            {scanError && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="glass-card p-6 border-rose/20 bg-rose/5 space-y-4"
+              >
+                <div className="flex gap-3">
+                  <ShieldAlert className="w-6 h-6 text-rose shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-rose text-sm">Diagnosis Failed</h4>
+                    <p className="text-xs text-textSec mt-1 leading-relaxed">{scanError}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleStartScan}
+                  disabled={scanning}
+                  className="w-full py-2.5 rounded-xl bg-rose text-white font-bold text-xs hover:bg-rose/90 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Retry Scan
+                </button>
+              </motion.div>
+            )}
+
+            {!result && !scanning && !scanError && (
               // Guides placeholder
               <motion.div 
                 key="guide"

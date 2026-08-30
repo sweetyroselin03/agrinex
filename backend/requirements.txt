@@ -9,6 +9,7 @@ python-multipart
 bcrypt>=4.0.1
 httpx
 google-genai
+google-generativeai
 gunicorn
 Pillow
 numpy

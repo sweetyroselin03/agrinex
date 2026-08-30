@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
+from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 import random
@@ -27,11 +28,15 @@ def find_user_by_identifier(db: Session, identifier: str):
     user = db.query(models.User).filter(models.User.email == target).first()
     if user:
         return user
-    # 2. Case-insensitive query fallback
+    # 2. Case-insensitive email query fallback
     user = db.query(models.User).filter(models.User.email.ilike(target)).first()
     if user:
         return user
-    # 3. Fallback for username/phone without '@'
+    # 3. Username query fallback
+    user = db.query(models.User).filter(models.User.username.ilike(target)).first()
+    if user:
+        return user
+    # 4. Fallback for username/phone without '@'
     if "@" not in target:
         user = db.query(models.User).filter(models.User.email == f"{target}@agrinex.local").first()
         if user:
@@ -259,13 +264,48 @@ def set_password(request: schemas.PasswordSetRequest, db: Session = Depends(get_
 
 
 @router.post("/login", response_model=schemas.Token)
-def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
+async def login(
+    request: Request,
+    username: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    grant_type: Optional[str] = Form(None),
+    scope: Optional[str] = Form(None),
+    client_id: Optional[str] = Form(None),
+    client_secret: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
     t_start = time.time()
     logger.info("[LOGIN START] Login request received")
     
-    target = request.email.strip()
-    
-    logger.info(f"[USER LOOKUP START] Querying database for email: {target}")
+    target = ""
+    pwd = ""
+
+    if username or password:
+        target = str(username or "").strip()
+        pwd = str(password or "")
+    else:
+        content_type = request.headers.get("content-type", "")
+        if "x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            try:
+                form = await request.form()
+                target = str(form.get("username") or form.get("email") or "").strip()
+                pwd = str(form.get("password") or "")
+            except Exception:
+                pass
+        
+        if not target and not pwd:
+            try:
+                body = await request.json()
+                if isinstance(body, dict):
+                    target = str(body.get("email") or body.get("username") or "").strip()
+                    pwd = str(body.get("password") or "")
+            except Exception as json_err:
+                logger.error(f"[LOGIN ERROR] Failed to parse JSON request body: {json_err}")
+
+    if not target or not pwd:
+        raise HTTPException(status_code=400, detail="Username/Email and Password are required.")
+
+    logger.info(f"[USER LOOKUP START] Querying database for email/username: {target}")
     t0 = time.time()
     user = find_user_by_identifier(db, target)
     logger.info(f"[USER LOOKUP COMPLETE] User found: {bool(user)} ({round((time.time() - t0) * 1000, 2)}ms)")
@@ -276,7 +316,7 @@ def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
     
     logger.info("[PASSWORD VERIFY START] Verifying bcrypt password hash")
     t1 = time.time()
-    is_valid = auth_utils.verify_password(request.password, user.hashed_password)
+    is_valid = auth_utils.verify_password(pwd, user.hashed_password)
     logger.info(f"[PASSWORD VERIFY COMPLETE] Hash valid: {is_valid} ({round((time.time() - t1) * 1000, 2)}ms)")
     
     if not is_valid:

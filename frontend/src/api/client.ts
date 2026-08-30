@@ -117,8 +117,7 @@ api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getLocalToken();
     if (token) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.set('Authorization', `Bearer ${token}`);
     }
     return config;
   },
@@ -188,8 +187,7 @@ api.interceptors.response.use(
           // Token exists — this 401 is likely a race condition. Retry once with token.
           console.warn(`[API] 401 on ${url} — token recovered (${recoveredToken.substring(0, 12)}...), retrying once.`);
           config._isRetry = true;
-          config.headers = config.headers || {};
-          config.headers.Authorization = `Bearer ${recoveredToken}`;
+          config.headers.set('Authorization', `Bearer ${recoveredToken}`);
           try {
             return await api(config);
           } catch (retryError: any) {
