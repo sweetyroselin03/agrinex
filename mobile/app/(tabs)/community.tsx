@@ -46,8 +46,16 @@ import Colors from '../../constants/Colors';
 import * as ImagePicker from 'expo-image-picker';
 
 import * as FileSystem from 'expo-file-system/legacy';
-import { useRouter } from 'expo-router';
-import client from '../../api/client';
+import client, { BASE_URL } from '../../api/client';
+
+const resolveImageUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const cleanBase = (BASE_URL || 'https://agrinex.onrender.com').replace(/\/$/, '');
+  return `${cleanBase}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const { width } = Dimensions.get('window');
 const CAROUSEL_IMAGE_WIDTH = width - 80;
@@ -254,7 +262,8 @@ export default function CommunityTab() {
   };
 
   const renderPost = (post: any, index: number) => {
-    const postImages: string[] = (post.images && post.images.length > 0) ? post.images : (post.image_url ? [post.image_url] : []);
+    const rawImages: string[] = (post.images && post.images.length > 0) ? post.images : (post.image_url ? [post.image_url] : []);
+    const postImages = rawImages.map(resolveImageUrl);
 
     return (
       <MotiView

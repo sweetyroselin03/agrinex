@@ -143,14 +143,28 @@ export const usePostStore = create<PostState>()(
       createPost: async (content, image, images) => {
         set({ isLoading: true, error: null });
         try {
-          const payload: any = { content };
-          if (images && images.length > 0) {
-            payload.images = images;
-            payload.image_url = images[0];
-          } else if (image) {
-            payload.image_url = image;
+          const formData = new FormData();
+          formData.append('content', content);
+
+          const imgUri = (images && images.length > 0) ? images[0] : image;
+          if (imgUri) {
+            const filename = imgUri.split('/').pop() || 'photo.jpg';
+            const match = /\.(\w+)$/.exec(filename);
+            const ext = match ? match[1].toLowerCase() : 'jpg';
+            const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+            formData.append('image', {
+              uri: imgUri,
+              name: filename,
+              type: mimeType,
+            } as any);
           }
-          const response = await client.post('/posts', payload);
+
+          const response = await client.post('/posts', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
           const newPost = unwrapResponse(response.data);
           set({ 
             posts: [newPost, ...safeArray(get().posts)],

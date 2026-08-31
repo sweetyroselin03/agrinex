@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File, Request, Form
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,7 +9,7 @@ import logging
 import httpx
 import json
 import os
-from datetime import datetime, timedelta
+import uuid
 from . import models, schemas, ai_service, auth_utils, auth_router, moderation_service
 from .pytorch_vision_engine import vision_engine
 from .database import engine, get_db
@@ -40,6 +41,16 @@ app = FastAPI(
     docs_url="/docs" if show_docs else None,
     redoc_url="/redoc" if show_docs else None,
 )
+
+# Upload directory configuration & static mount
+UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+POSTS_UPLOAD_DIR = os.path.join(UPLOAD_DIR, "posts")
+os.makedirs(POSTS_UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
 # CORS configuration
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "")
@@ -442,18 +453,45 @@ def create_notification(db, user_id: int, actor_id: int, notif_type: str, messag
 
 # ─── Community Posts ───
 @app.post("/posts", response_model=schemas.PostOut)
-def create_post(post: schemas.PostCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def create_post(
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    saved_file_path: Optional[str] = None
     try:
         logger.info(f"[CreatePost] User {current_user.id} creating post")
-        post_dict = post.dict()
-        images_list = post_dict.pop("images", None)
+        content_type = request.headers.get("content-type", "").lower()
 
-        content = post_dict.get("content", "").strip()
-        # Validate content
+        content = ""
+        location = None
+        image_url = None
+        uploaded_file: Optional[UploadFile] = None
+
+        if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+            form = await request.form()
+            content = str(form.get("content") or "").strip()
+            loc_val = form.get("location")
+            if loc_val:
+                location = str(loc_val).strip()
+
+            file_val = form.get("image")
+            if isinstance(file_val, UploadFile) and file_val.filename:
+                uploaded_file = file_val
+        else:
+            # Fallback to JSON payload
+            try:
+                json_body = await request.json()
+                content = str(json_body.get("content") or "").strip()
+                location = json_body.get("location")
+                image_url = json_body.get("image_url")
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid request payload format")
+
         if not content:
             raise HTTPException(status_code=400, detail="Post content cannot be empty")
 
-        # NLP Moderation Check BEFORE Database Insert
+        # NLP Moderation Check BEFORE Database Insert or File Retention
         mod_result = moderation_service.moderation_service.moderate_text(content)
         if not mod_result["allowed"]:
             logger.warning(f"[Moderation Block] User {current_user.id} post blocked: {mod_result['reason']}")
@@ -462,23 +500,58 @@ def create_post(post: schemas.PostCreate, current_user: models.User = Depends(ge
                 detail="This post cannot be published because it contains offensive or inappropriate content. Please edit your message and try again."
             )
 
-        # Serialize images list to JSON string
-        images_json = json.dumps(images_list) if images_list is not None else None
+        # Process & validate uploaded image file if present
+        if uploaded_file:
+            filename = uploaded_file.filename or ""
+            ext = os.path.splitext(filename)[1].lower()
 
-        # Set image_url to first image for backward compatibility
-        if not post_dict.get("image_url") and images_list:
-            post_dict["image_url"] = images_list[0]
+            if ext not in ALLOWED_IMAGE_EXTENSIONS or (uploaded_file.content_type and uploaded_file.content_type.lower() not in ALLOWED_IMAGE_TYPES):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file type. Only JPG, JPEG, PNG, and WEBP image files are allowed."
+                )
 
-        db_post = models.Post(**post_dict, images=images_json, user_id=current_user.id)
+            contents = await uploaded_file.read()
+            if len(contents) > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Image file size exceeds the 5 MB limit. Please select a smaller photo."
+                )
+
+            # Generate safe unique filename
+            unique_filename = f"{uuid.uuid4().hex}{ext}"
+            saved_file_path = os.path.join(POSTS_UPLOAD_DIR, unique_filename)
+
+            with open(saved_file_path, "wb") as f:
+                f.write(contents)
+
+            image_url = f"/uploads/posts/{unique_filename}"
+
+        db_post = models.Post(
+            content=content,
+            location=location,
+            image_url=image_url,
+            user_id=current_user.id
+        )
         db.add(db_post)
         db.commit()
         db.refresh(db_post)
         logger.info(f"[CreatePost] Post {db_post.id} created successfully for user {current_user.id}")
-        # Pass current_user directly to avoid DetachedInstanceError on lazy-loaded relationship
         return prepare_post_out(db_post, current_user.id, db, author=current_user)
-    except HTTPException:
-        raise
+
+    except HTTPException as http_e:
+        if saved_file_path and os.path.exists(saved_file_path):
+            try:
+                os.remove(saved_file_path)
+            except Exception:
+                pass
+        raise http_e
     except Exception as e:
+        if saved_file_path and os.path.exists(saved_file_path):
+            try:
+                os.remove(saved_file_path)
+            except Exception:
+                pass
         logger.error(f"[CreatePost] Error creating post for user {current_user.id}: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create post: {str(e)}")

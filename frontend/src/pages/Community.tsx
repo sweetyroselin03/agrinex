@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -20,9 +20,18 @@ import {
   UserCheck
 } from 'lucide-react';
 import api from '../api/client';
+import { API_BASE_URL } from '../config/api';
 import { useAuthStore } from '../store/useAuthStore';
 import UserSearchBar from '../components/UserSearchBar';
 import FollowButton from '../components/FollowButton';
+
+const getImageUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 export default function Community() {
   const navigate = useNavigate();
@@ -32,7 +41,10 @@ export default function Community() {
   
   // Post publisher states
   const [newContent, setNewContent] = useState('');
-  const [newImage, setNewImage] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedModalImage, setSelectedModalImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newLocation, setNewLocation] = useState('');
   const [showPublisher, setShowPublisher] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -43,6 +55,36 @@ export default function Community() {
   const [newCommentVal, setNewCommentVal] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const validExts = ['jpg', 'jpeg', 'png', 'webp'];
+
+    if (!validTypes.includes(file.type) && !validExts.includes(ext || '')) {
+      alert('Invalid file format. Please upload a JPG, JPEG, PNG, or WEBP photo.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image file size exceeds 5 MB. Please select a smaller photo.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setSelectedFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   // React Query for Suggested Farmers
   const { data: suggestedFarmers = [], isLoading: loadingSuggested } = useQuery({
@@ -80,14 +122,25 @@ export default function Community() {
     setPublishing(true);
 
     try {
-      await api.post('/posts', {
-        content: newContent.trim(),
-        image_url: newImage.trim() || null,
-        location: newLocation.trim() || null
+      const formData = new FormData();
+      formData.append('content', newContent.trim());
+      if (newLocation.trim()) {
+        formData.append('location', newLocation.trim());
+      }
+      if (selectedFile) {
+        formData.append('image', selectedFile);
+      }
+
+      await api.post('/posts', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
       setNewContent('');
-      setNewImage('');
+      setSelectedFile(null);
+      setImagePreview(null);
       setNewLocation('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setShowPublisher(false);
       fetchFeed();
     } catch (err: any) {
@@ -215,18 +268,40 @@ export default function Community() {
                   onChange={(e) => setNewContent(e.target.value)}
                 />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <ImageIcon className="w-4 h-4" />
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                  <div>
                     <input
-                      type="url"
-                      placeholder="Image URL (optional)"
-                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
-                      value={newImage}
-                      onChange={(e) => setNewImage(e.target.value)}
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      onChange={handleFileSelect}
+                      className="hidden"
                     />
+                    {!imagePreview ? (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-2.5 px-4 rounded-xl border border-dashed border-slate-300 hover:border-primary text-xs font-bold text-slate-600 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100/80 transition-all"
+                      >
+                        <ImageIcon className="w-4 h-4 text-primary" />
+                        <span>Upload Photo (Max 5 MB)</span>
+                      </button>
+                    ) : (
+                      <div className="relative rounded-xl overflow-hidden border border-slate-200 group h-20 bg-slate-900 flex items-center justify-center">
+                        <img src={imagePreview} alt="Preview" className="h-full w-full object-cover opacity-90" />
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-rose transition-all shadow-md"
+                          title="Remove photo"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="absolute bottom-2 left-2 text-[10px] font-semibold text-white bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[180px]">
+                          {selectedFile?.name}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="relative">
@@ -236,7 +311,7 @@ export default function Community() {
                     <input
                       type="text"
                       placeholder="Location (optional)"
-                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
                     />
@@ -350,9 +425,10 @@ export default function Community() {
                   {post.image_url && (
                     <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96">
                       <img
-                        src={post.image_url}
+                        src={getImageUrl(post.image_url)}
                         alt="Post media"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                        onClick={() => setSelectedModalImage(getImageUrl(post.image_url))}
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -581,9 +657,35 @@ export default function Community() {
                   {submittingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </form>
-
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Enlarged Image Preview Modal */}
+      <AnimatePresence>
+        {selectedModalImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setSelectedModalImage(null)}
+          >
+            <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl">
+              <button
+                onClick={() => setSelectedModalImage(null)}
+                className="absolute top-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-rose transition-all z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={selectedModalImage}
+                alt="Enlarged Post Preview"
+                className="max-w-full max-h-[85vh] object-contain rounded-xl"
+              />
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

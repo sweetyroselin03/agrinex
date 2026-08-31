@@ -380,28 +380,6 @@ export default function CreatePostScreen() {
         setImages(prev => prev.filter((_, i) => i !== index));
     };
 
-    // ── Upload image to Cloudinary ────────────────────────────────────────────
-    // ⚠️  Replace YOUR_CLOUD_NAME with your Cloudinary cloud name
-    // ⚠️  Create a free unsigned upload preset named 'agrinex_posts' in:
-    //     Cloudinary Dashboard → Settings → Upload → Upload presets → Add preset
-    const uploadToCloudinary = async (uri: string): Promise<string> => {
-        const CLOUD_NAME = 'dc6wv28ke';
-        const UPLOAD_PRESET = 'agrinex_posts';
-        const form = new FormData();
-        form.append('file', { uri, type: 'image/jpeg', name: 'photo.jpg' } as any);
-        form.append('upload_preset', UPLOAD_PRESET);
-        const res = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-            { method: 'POST', body: form }
-        );
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err?.error?.message ?? 'Image upload failed');
-        }
-        const data = await res.json();
-        return data.secure_url as string;
-    };
-
     // ── Submit post ────────────────────────────────────────────────────────────
     const submitPost = async () => {
         if (!caption.trim() && images.length === 0) {
@@ -419,19 +397,29 @@ export default function CreatePostScreen() {
 
         setPosting(true);
         try {
-            // Step 1: Upload all local images to Cloudinary → get https:// URLs
-            let imageUrls: string[] = [];
+            const formData = new FormData();
+            formData.append('content', caption.trim());
+
             if (images.length > 0) {
-                imageUrls = await Promise.all(images.map(uri => uploadToCloudinary(uri)));
+                const localUri = images[0];
+                const filename = localUri.split('/').pop() || 'photo.jpg';
+                const match = /\.(\w+)$/.exec(filename);
+                const ext = match ? match[1].toLowerCase() : 'jpg';
+                const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+                formData.append('image', {
+                    uri: localUri,
+                    name: filename,
+                    type: mimeType,
+                } as any);
             }
 
-            console.log('[CreatePost] Publishing with', imageUrls.length, 'images');
+            console.log('[CreatePost] Submitting post via multipart/form-data to FastAPI backend');
 
-            // Step 2: POST JSON to backend (matches your schemas.PostCreate)
-            await api.post('/posts', {
-                content: caption.trim(),
-                images: imageUrls,
-                image_url: imageUrls[0] ?? null,
+            await api.post('/posts', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
             // Trigger feed refresh in PostStore
