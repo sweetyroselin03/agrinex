@@ -11,7 +11,8 @@ import {
   Check,
   ChevronRight
 } from 'lucide-react';
-import api from '../api/client';
+import api, { getLocalToken } from '../api/client';
+import { API_BASE_URL } from '../config/api';
 import { useAuthStore } from '../store/useAuthStore';
 
 // Enhanced Markdown renderer to display structured Llama AI agronomist responses
@@ -49,6 +50,92 @@ const formatMessageText = (text: string) => {
 
   return <div dangerouslySetInnerHTML={{ __html: formatted }} className="space-y-1 text-xs text-slate-700 leading-relaxed" />;
 };
+
+// Streaming SSE consumer helper
+async function fetchChatStream(
+  messageText: string,
+  conversationId: string,
+  onToken: (token: string) => void,
+  onDone: (data: any) => void,
+  onError: (errorMsg: string) => void
+) {
+  const token = getLocalToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        message: messageText,
+        conversation_id: conversationId,
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => null);
+      const msg = errData?.detail || errData?.message || 'Connection error to AI service.';
+      onError(msg);
+      return;
+    }
+
+    if (!response.body) {
+      onError('No response body returned from server');
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6);
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.error) {
+              onError(parsed.error);
+              return;
+            }
+            if (parsed.token) {
+              onToken(parsed.token);
+            }
+            if (parsed.done) {
+              onDone(parsed);
+              return;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    if (buffer.trim().startsWith('data: ')) {
+      const jsonStr = buffer.trim().slice(6);
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.token) onToken(parsed.token);
+        if (parsed.done) onDone(parsed);
+      } catch (_) {}
+    }
+  } catch (err: any) {
+    onError('Sorry, I encountered a connection error. Please verify your connection to Render cloud service and try again.');
+  }
+}
 
 export default function Chatbot() {
   const { user } = useAuthStore();
@@ -125,7 +212,6 @@ export default function Chatbot() {
     setInput('');
     setSending(true);
 
-    // Generate temporary conversation ID if none selected
     const activeConvId = selectedConvId || `conv_${Date.now()}`;
 
     // Append user message locally
@@ -137,47 +223,64 @@ export default function Chatbot() {
     };
     setMessages(prev => [...prev, userMsg]);
 
-    try {
-      const res = await api.post(
-        '/chat',
-        {
-          message: messageText,
-          conversation_id: activeConvId
-        },
-        { timeout: 180000 }
-      );
+    // Append assistant placeholder message with typing indicator
+    const aiMsgId = Date.now() + 1;
+    const assistantPlaceholder = {
+      id: aiMsgId,
+      message: '',
+      is_ai: true,
+      is_typing: true,
+      created_at: new Date()
+    };
+    setMessages(prev => [...prev, assistantPlaceholder]);
 
-      // Update active selection and fetch list updates
-      if (!selectedConvId) {
-        setSelectedConvId(activeConvId);
-        fetchConversations();
+    fetchChatStream(
+      messageText,
+      activeConvId,
+      (token) => {
+        setMessages(prev => prev.map(m => {
+          if (m.id === aiMsgId) {
+            return {
+              ...m,
+              message: m.message + token,
+              is_typing: false
+            };
+          }
+          return m;
+        }));
+      },
+      (data) => {
+        setMessages(prev => prev.map(m => {
+          if (m.id === aiMsgId) {
+            return {
+              ...m,
+              id: data.id || m.id,
+              message: data.message || m.message,
+              is_typing: false
+            };
+          }
+          return m;
+        }));
+        if (!selectedConvId) {
+          setSelectedConvId(activeConvId);
+          fetchConversations();
+        }
+        setSending(false);
+      },
+      (errorMsg) => {
+        setMessages(prev => prev.map(m => {
+          if (m.id === aiMsgId) {
+            return {
+              ...m,
+              message: errorMsg,
+              is_typing: false
+            };
+          }
+          return m;
+        }));
+        setSending(false);
       }
-
-      // Append response message
-      const aiMsg = {
-        id: res.data.id || Date.now() + 1,
-        message: res.data.message || res.data.response,
-        is_ai: true,
-        created_at: new Date()
-      };
-      setMessages(prev => [...prev, aiMsg]);
-    } catch (err: any) {
-      const errorMsg =
-        err?.response?.data?.message ||
-        err?.response?.data?.detail ||
-        (err?.code === 'ECONNABORTED'
-          ? 'AGRIGPT is taking longer than expected to respond. Please try again.'
-          : 'Sorry, I encountered a connection error. Please verify your connection to Render cloud service and try again.');
-
-      setMessages(prev => [...prev, {
-        id: Date.now() + 2,
-        message: errorMsg,
-        is_ai: true,
-        created_at: new Date()
-      }]);
-    } finally {
-      setSending(false);
-    }
+    );
   };
 
   const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
@@ -348,33 +451,27 @@ export default function Chatbot() {
                       ? 'bg-white border border-borderDark text-brandDark rounded-tl-sm border-l-4 border-l-primary'
                       : 'bg-brandDark text-white rounded-tr-sm font-semibold'
                   }`}>
-                    {isAI ? formatMessageText(m.message) : m.message}
+                    {isAI ? (
+                      (m.is_typing && !m.message) ? (
+                        <div className="flex items-center gap-1.5 py-1 px-1">
+                          {[0, 1, 2].map((i) => (
+                            <motion.span 
+                              key={i} 
+                              className="w-2 h-2 bg-emerald-500 rounded-full" 
+                              animate={{ y: [0, -5, 0] }}
+                              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.2 }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        formatMessageText(m.message)
+                      )
+                    ) : m.message}
                   </div>
                 </div>
               </div>
             );
           })}
-
-          {/* Typing Indicator */}
-          {sending && (
-            <div className="flex justify-start">
-              <div className="flex gap-3 max-w-[80%]">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-primary/20 text-xs bg-white">
-                  🤖
-                </div>
-                <div className="p-4 rounded-2xl bg-white border border-borderDark rounded-tl-sm border-l-4 border-l-primary flex items-center gap-1">
-                  {[0, 1, 2].map((i) => (
-                    <motion.span 
-                      key={i} 
-                      className="w-2 h-2 bg-slate-350 rounded-full" 
-                      animate={{ y: [0, -5, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.2 }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           <div ref={messagesEndRef} />
         </div>

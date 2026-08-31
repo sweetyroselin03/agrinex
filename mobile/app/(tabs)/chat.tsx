@@ -48,7 +48,7 @@ import Colors from '../../constants/Colors';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { sendMessage, analyzeCropImage } from '../../services/aiService';
+import { sendMessage, analyzeCropImage, streamChatMessage } from '../../services/aiService';
 import Markdown from 'react-native-markdown-display';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -428,7 +428,15 @@ export default function ChatTab() {
       imageUri: selectedImage || undefined,
     };
 
-    const updatedMsgs = [...messages, userMsg];
+    const aiMsgId = 'msg_ai_' + Date.now();
+    const aiPlaceholder: ChatMsg = {
+      id: aiMsgId,
+      text: '',
+      sender: 'ai',
+      time: new Date().toISOString(),
+    };
+
+    const updatedMsgs = [...messages, userMsg, aiPlaceholder];
     setMessages(updatedMsgs);
     setInput('');
     const imgToSend = selectedImage;
@@ -450,23 +458,11 @@ export default function ChatTab() {
     setConversations(updatedConvs);
     saveConversations(updatedConvs);
 
-    try {
-      let aiResponseText = '';
-      const chatHistory = updatedMsgs
-        .filter((m) => m.sender === 'user' && m.id !== userMsg.id)
-        .slice(-10)
-        .map((m) => m.text);
-
-      const msgWithLanguage = selectedLanguage !== 'English'
-        ? `${msgText} (Please reply in ${selectedLanguage})`
-        : msgText;
-
-      aiResponseText = await sendMessage(msgWithLanguage, activeConversationId, imgToSend || undefined, chatHistory, selectedLanguage);
-
-      if ((!aiResponseText || aiResponseText.includes('AI service temporarily unavailable')) && imgToSend) {
-        // Fallback to direct vision crop analysis
+    // If an image is attached, run crop vision analysis first
+    if (imgToSend) {
+      try {
         const result = await analyzeCropImage(imgToSend);
-
+        let aiResponseText = '';
         if (result.is_valid_crop === false) {
           aiResponseText = `⚠️ **Invalid Crop Scan**\n\n${result.rejection_reason || 'The image provided is not clear or does not contain a crop leaf. Please retake the photo and try again.'}`;
         } else {
@@ -494,38 +490,49 @@ export default function ChatTab() {
               `💡 **Pro Tip**: ${result.pro_tips || 'Rotate crops next season.'}`;
           }
         }
-      }
 
-      const aiMsg: ChatMsg = {
-        id: 'msg_ai_' + Date.now(),
-        text: aiResponseText || "Sorry, I couldn't process that. Please try again.",
-        sender: 'ai',
-        time: new Date().toISOString(),
-      };
-
-      const finalMsgs = [...updatedMsgs, aiMsg];
-      setMessages(finalMsgs);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      const finalConvs = updatedConvs.map((c) => {
-        if (c.id === activeConversationId) {
-          return {
-            ...c,
-            messages: finalMsgs,
-            preview: aiMsg.text.slice(0, 80),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return c;
-      });
-      setConversations(finalConvs);
-      saveConversations(finalConvs);
-    } catch (error: any) {
-      console.log(error);
-      showToast("Unable to connect to AI server");
-    } finally {
-      setIsLoading(false);
+        const finalMsgs = updatedMsgs.map(m => m.id === aiMsgId ? { ...m, text: aiResponseText } : m);
+        setMessages(finalMsgs);
+        setIsLoading(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        return;
+      } catch (_) {}
     }
+
+    const msgWithLanguage = selectedLanguage !== 'English'
+      ? `${msgText} (Please reply in ${selectedLanguage})`
+      : msgText;
+
+    streamChatMessage(
+      msgWithLanguage,
+      activeConversationId,
+      (token) => {
+        setMessages((prevMsgs) =>
+          prevMsgs.map((m) =>
+            m.id === aiMsgId ? { ...m, text: m.text + token } : m
+          )
+        );
+      },
+      (fullText) => {
+        setMessages((prevMsgs) =>
+          prevMsgs.map((m) =>
+            m.id === aiMsgId ? { ...m, text: fullText || m.text } : m
+          )
+        );
+        setIsLoading(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      },
+      (errorMsg) => {
+        setMessages((prevMsgs) =>
+          prevMsgs.map((m) =>
+            m.id === aiMsgId ? { ...m, text: errorMsg } : m
+          )
+        );
+        setIsLoading(false);
+        showToast(errorMsg);
+      },
+      selectedLanguage
+    );
   };
 
   const copyToClipboard = async (text: string, id: string) => {
@@ -790,7 +797,7 @@ export default function ChatTab() {
               </View>
             }
             ListFooterComponent={
-              isLoading ? (
+              isLoading && messages.length > 0 && messages[messages.length - 1]?.sender === 'ai' && !messages[messages.length - 1]?.text ? (
                 <MotiView from={{ opacity: 0 }} animate={{ opacity: 1 }} style={[styles.msgRow, styles.aiRow]}>
                   <View style={[styles.avatar, { backgroundColor: theme.mint }]}>
                     <Bot color={theme.primary} size={15} />

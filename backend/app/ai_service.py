@@ -5,6 +5,7 @@ import socket
 import urllib.request
 import urllib.error
 import asyncio
+import httpx
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -41,8 +42,89 @@ class AIService:
             raise e
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # AI Chat — Ollama /api/generate ONLY
+    # AI Chat — Streaming & Non-Streaming Ollama /api/generate
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    async def stream_chat_response(self, message: str, history: list = [], scan_context: str = ""):
+        """
+        Streams response tokens from Ollama /api/generate with stream=true.
+        Yields individual token strings.
+        Handles timeout (180s), connection failures, and error messages cleanly.
+        """
+        system_block = (
+            "You are AgriNex AI, an expert agricultural advisory assistant. "
+            "You provide detailed, practical, farmer-friendly advice on crop diseases, "
+            "symptoms, treatments, prevention, fertilizers, irrigation, soil health, "
+            "pests, organic farming, and yield optimization.\n\n"
+            "Formatting Guidelines:\n"
+            "- Structure responses using Markdown headers (#, ##, ###), bold text, and bullet points.\n"
+            "- Provide actionable steps, specific product names/dosages, and timings when applicable.\n"
+            "- Keep advice practical, warm, and clear for farmers.\n"
+            "- Detect and respond in the user's language: English, Tamil, Telugu, Hindi, or Malayalam.\n"
+        )
+
+        if scan_context:
+            system_block += f"\nContext (User's recent crop scans):\n{scan_context}\n"
+
+        history_text = ""
+        for msg in history[-10:]:
+            role = "Assistant" if getattr(msg, "is_ai", False) else "User"
+            msg_text = getattr(msg, "message", str(msg))
+            history_text += f"{role}: {msg_text}\n"
+
+        prompt = (
+            f"SYSTEM:\n{system_block}\n"
+            f"{history_text}"
+            f"User: {message}\n"
+            f"Assistant:"
+        )
+
+        url = f"{self.ollama_base_url}/api/generate"
+        payload = {
+            "model": self.ollama_model,
+            "prompt": prompt,
+            "stream": True
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=10.0)) as client:
+                async with client.stream(
+                    "POST",
+                    url,
+                    json=payload,
+                    headers={"cfNoInterrupt": "1", "Content-Type": "application/json"}
+                ) as response:
+                    if response.status_code != 200:
+                        yield "AGRIGPT is temporarily unavailable because the Llama model service is offline."
+                        return
+
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                            token = data.get("response", "")
+                            if token:
+                                yield token
+                            if data.get("done", False):
+                                break
+                        except Exception:
+                            continue
+
+        except httpx.ConnectError as ce:
+            logger.error(f"[AgriNex AI Stream Error] Connection failure: {ce}")
+            yield "AGRIGPT is temporarily unavailable because the Llama model service is offline."
+        except (httpx.TimeoutException, asyncio.TimeoutError):
+            logger.error("[AgriNex AI Stream Error] Request timed out after 180s")
+            yield "AGRIGPT is taking longer than expected to respond. Please try again."
+        except Exception as e:
+            err_str = str(e).lower()
+            if "timeout" in err_str or "timed out" in err_str:
+                logger.error(f"[AgriNex AI Stream Error] Timeout: {e}")
+                yield "AGRIGPT is taking longer than expected to respond. Please try again."
+            else:
+                logger.error(f"[AgriNex AI Stream Error] Exception: {e}")
+                yield "AGRIGPT is temporarily unavailable because the Llama model service is offline."
+
     async def get_chat_response(self, message: str, history: list = [], scan_context: str = "") -> str:
         try:
             system_block = (

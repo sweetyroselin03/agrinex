@@ -92,3 +92,98 @@ export async function generateTreatment(diseaseName: string, cropType: string): 
 - **Organic Pathways**: Spray organic neem oil or copper soap.
 - **Prevention**: Rotate crops regularly and maintain good spacing.`;
 }
+
+export function streamChatMessage(
+  message: string,
+  conversationId: string,
+  onToken: (token: string) => void,
+  onDone: (fullText: string) => void,
+  onError: (errorMsg: string) => void,
+  language?: string
+) {
+  const baseURL = process.env.EXPO_PUBLIC_API_URL || 'https://agrinex.onrender.com';
+  let token: string | null = null;
+  try {
+    const { useAuthStore } = require('../store/useAuthStore');
+    token = useAuthStore.getState().token;
+  } catch (_) {}
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `${baseURL}/chat`);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  if (token && typeof token === 'string' && token.length > 10) {
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+  }
+
+  let processedLength = 0;
+  let fullText = '';
+  let isCompleted = false;
+
+  xhr.onprogress = () => {
+    const chunk = xhr.responseText.substring(processedLength);
+    processedLength = xhr.responseText.length;
+
+    const lines = chunk.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('data: ')) {
+        const jsonStr = trimmed.slice(6);
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.error) {
+            isCompleted = true;
+            onError(parsed.error);
+            return;
+          }
+          if (parsed.token) {
+            fullText += parsed.token;
+            onToken(parsed.token);
+          }
+          if (parsed.done) {
+            isCompleted = true;
+            onDone(fullText);
+            return;
+          }
+        } catch (_) {}
+      }
+    }
+  };
+
+  xhr.onload = () => {
+    if (!isCompleted) {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onDone(fullText);
+      } else {
+        onError('⚠️ AI service temporarily unavailable.');
+      }
+    }
+  };
+
+  xhr.onerror = () => {
+    if (!isCompleted) {
+      onError('⚠️ Unable to connect to AI server. Please check your network connection.');
+    }
+  };
+
+  xhr.ontimeout = () => {
+    if (!isCompleted) {
+      onError('AGRIGPT is taking longer than expected to respond. Please try again.');
+    }
+  };
+
+  xhr.timeout = 180000;
+  xhr.send(
+    JSON.stringify({
+      message,
+      conversation_id: conversationId,
+      language,
+      stream: true,
+    })
+  );
+
+  return () => {
+    try {
+      xhr.abort();
+    } catch (_) {}
+  };
+}

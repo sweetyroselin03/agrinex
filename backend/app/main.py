@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
@@ -946,8 +947,7 @@ def is_following_user(user_id: int, current_user: models.User = Depends(get_curr
     return {"is_following": following, "isFollowing": following}
 
 # ─── Chat AI ───
-@app.post("/ai/chat", response_model=schemas.ChatMessage)
-async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def _execute_non_streaming_chat(chat: schemas.ChatMessageCreate, current_user: models.User, db: Session):
     user_msg = models.ChatMessage(
         user_id=current_user.id,
         conversation_id=chat.conversation_id,
@@ -957,7 +957,6 @@ async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.Use
     db.add(user_msg)
     db.commit()
 
-    # Get history for context, filter by conversation_id if provided
     query = db.query(models.ChatMessage).filter(models.ChatMessage.user_id == current_user.id)
     if chat.conversation_id:
         query = query.filter(models.ChatMessage.conversation_id == chat.conversation_id)
@@ -967,7 +966,6 @@ async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.Use
     history = query.order_by(models.ChatMessage.created_at.desc()).limit(10).all()
     history.reverse()
 
-    # Fetch last 3 scans for smart context memory
     scans = db.query(models.CropScan).filter(
         models.CropScan.user_id == current_user.id,
         models.CropScan.is_valid_crop == True
@@ -993,18 +991,95 @@ async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.Use
     db.refresh(ai_msg)
     return ai_msg
 
+@app.post("/ai/chat")
+async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if chat.stream is False:
+        return await _execute_non_streaming_chat(chat, current_user, db)
+
+    # Save user message optimistic
+    user_msg = models.ChatMessage(
+        user_id=current_user.id,
+        conversation_id=chat.conversation_id,
+        message=chat.message,
+        is_ai=False
+    )
+    db.add(user_msg)
+    db.commit()
+
+    query = db.query(models.ChatMessage).filter(models.ChatMessage.user_id == current_user.id)
+    if chat.conversation_id:
+        query = query.filter(models.ChatMessage.conversation_id == chat.conversation_id)
+    else:
+        query = query.filter(models.ChatMessage.conversation_id == None)
+
+    history = query.order_by(models.ChatMessage.created_at.desc()).limit(10).all()
+    history.reverse()
+
+    scans = db.query(models.CropScan).filter(
+        models.CropScan.user_id == current_user.id,
+        models.CropScan.is_valid_crop == True
+    ).order_by(models.CropScan.created_at.desc()).limit(3).all()
+    
+    scan_context = ""
+    if scans:
+        scan_context = "User's recent crop scans:\n"
+        for scan in scans:
+            crop_name = scan.detected_object or "Crop"
+            scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name}, Severity: {scan.severity_level}, Date: {scan.created_at.strftime('%Y-%m-%d')}\n"
+
+    async def event_generator():
+        full_text = ""
+        error_occurred = False
+        try:
+            async for token in ai_service.ai_service.stream_chat_response(chat.message, history, scan_context=scan_context):
+                if token.startswith("AGRIGPT is temporarily unavailable") or token.startswith("AGRIGPT is taking longer"):
+                    error_occurred = True
+                    yield f"data: {json.dumps({'error': token, 'token': token, 'done': True})}\n\n"
+                    full_text = token
+                    break
+                full_text += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
+
+            if not error_occurred:
+                ai_msg = models.ChatMessage(
+                    user_id=current_user.id,
+                    conversation_id=chat.conversation_id,
+                    message=full_text,
+                    is_ai=True
+                )
+                db.add(ai_msg)
+                db.commit()
+                db.refresh(ai_msg)
+                yield f"data: {json.dumps({'done': True, 'id': ai_msg.id, 'conversation_id': chat.conversation_id, 'message': full_text})}\n\n"
+        except Exception as e:
+            logger.error(f"[Chat Stream Error] {e}")
+            err_msg = "AGRIGPT is temporarily unavailable because the Llama model service is offline."
+            yield f"data: {json.dumps({'error': err_msg, 'token': err_msg, 'done': True})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 @app.post("/chat")
 async def chat_legacy(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    res = await chat_with_ai(chat, current_user, db)
-    return {
-        "response": res.message,
-        "message": res.message,
-        "reply": res.message,
-        "id": res.id,
-        "conversation_id": res.conversation_id,
-        "is_ai": res.is_ai,
-        "created_at": res.created_at
-    }
+    if chat.stream is False:
+        res = await _execute_non_streaming_chat(chat, current_user, db)
+        return {
+            "response": res.message,
+            "message": res.message,
+            "reply": res.message,
+            "id": res.id,
+            "conversation_id": res.conversation_id,
+            "is_ai": res.is_ai,
+            "created_at": res.created_at
+        }
+    return await chat_with_ai(chat, current_user, db)
 
 @app.get("/chat/history", response_model=List[schemas.ChatMessage])
 def get_chat_history(conversation_id: Optional[str] = None, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
