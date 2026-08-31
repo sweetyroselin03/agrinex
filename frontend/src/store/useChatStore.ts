@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import client from '../api/client';
-import { useAuthStore } from './useAuthStore';
 import { WS_BASE_URL } from '../config/api';
 
 export interface MessageAttachment {
@@ -24,7 +23,6 @@ export interface Message {
   sender_name?: string;
   sender_avatar?: string;
   content?: string;
-  client_msg_id?: string;
   reply_to_id?: number;
   reply_to_content?: string;
   reply_to_sender?: string;
@@ -66,7 +64,6 @@ export interface Conversation {
 }
 
 export interface BlockStatus {
-  id?: number;
   is_blocked: boolean;
   blocked_by_me: boolean;
   blocked_by_them: boolean;
@@ -82,19 +79,12 @@ interface ChatState {
   isWebSocketConnected: boolean;
   isLoadingConversations: boolean;
   isLoadingMessages: boolean;
-  offlineQueue: {
-    conversationId: number;
-    content?: string;
-    attachments: string[];
-    replyToId?: number;
-    clientMsgId: string;
-  }[];
 
   fetchConversations: () => Promise<Conversation[]>;
   startConversation: (targetUserId: number) => Promise<Conversation>;
   selectConversation: (conversationId: number) => Promise<void>;
   fetchMessages: (conversationId: number) => Promise<Message[]>;
-  sendMessage: (conversationId: number, content?: string, attachments?: string[], replyToId?: number, clientMsgId?: string) => Promise<Message>;
+  sendMessage: (conversationId: number, content?: string, attachments?: string[], replyToId?: number) => Promise<Message>;
   editMessage: (messageId: number, content: string) => Promise<Message>;
   deleteMessage: (messageId: number, deleteType: 'for_me' | 'everyone') => Promise<void>;
   toggleReaction: (messageId: number, emoji: string) => Promise<Message>;
@@ -107,6 +97,7 @@ interface ChatState {
   unblockUser: (userId: number) => Promise<void>;
   uploadMedia: (file: File) => Promise<string>;
 
+
   connectWebSocket: (userId: number) => void;
   disconnectWebSocket: () => void;
   sendTypingSignal: (conversationId: number, isTyping: boolean, senderName: string) => void;
@@ -114,10 +105,6 @@ interface ChatState {
 
 let socket: WebSocket | null = null;
 let typingTimeoutMap: Record<number, ReturnType<typeof setTimeout>> = {};
-let heartbeatInterval: any = null;
-let reconnectTimer: any = null;
-let isExplicitDisconnect = false;
-let reconnectAttemptsCount = 0;
 
 export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
@@ -127,7 +114,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isWebSocketConnected: false,
   isLoadingConversations: false,
   isLoadingMessages: false,
-  offlineQueue: [],
 
   fetchConversations: async () => {
     set({ isLoadingConversations: true });
@@ -198,55 +184,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (conversationId: number, content?: string, attachments: string[] = [], replyToId?: number, clientMsgId?: string) => {
-    const tempClientMsgId = clientMsgId || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const currentUserId = useAuthStore?.getState()?.user?.id || 0;
-    
-    // Construct optimistic message
-    const tempId = -Date.now();
-    const tempMsg: Message = {
-      id: tempId,
-      conversation_id: conversationId,
-      sender_id: currentUserId,
-      content: content?.trim() || undefined,
-      client_msg_id: tempClientMsgId,
-      is_edited: false,
-      is_deleted_everyone: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      status: 'sent',
-      attachments: attachments.map((url, idx) => ({
-        id: -Date.now() - idx,
-        url,
-        file_type: url.includes('data:audio/') ? 'audio' : 'image',
-        created_at: new Date().toISOString(),
-      })),
-      reactions: [],
-    };
-
-    // Optimistically add to state if not already present
-    set((state) => {
-      const existing = state.messages[conversationId] || [];
-      const alreadyExists = existing.some(m => m.client_msg_id === tempClientMsgId);
-      if (alreadyExists) return {};
-      return {
-        messages: { ...state.messages, [conversationId]: [...existing, tempMsg] },
-        conversations: state.conversations.map((c) =>
-          c.id === conversationId ? { ...c, last_message: tempMsg, updated_at: tempMsg.created_at } : c
-        ),
-      };
-    });
-
-    const payload = {
-      conversation_id: conversationId,
-      content: content?.trim() || null,
-      attachments,
-      reply_to_id: replyToId || null,
-      client_msg_id: tempClientMsgId,
-    };
-
+  sendMessage: async (conversationId: number, content?: string, attachments: string[] = [], replyToId?: number) => {
     try {
       let res;
+      const payload = {
+        conversation_id: conversationId,
+        content: content?.trim() || null,
+        attachments,
+        reply_to_id: replyToId || null,
+      };
       try {
         res = await client.post('/messages/send', payload);
       } catch (e) {
@@ -254,14 +200,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       const newMsg: Message = res.data;
 
-      // Replace optimistic message in state
+      // Update in local state
       set((state) => {
-        const list = state.messages[conversationId] || [];
-        const updatedList = list.map((m) =>
-          m.client_msg_id === tempClientMsgId ? newMsg : m
-        );
+        const existing = state.messages[conversationId] || [];
         return {
-          messages: { ...state.messages, [conversationId]: updatedList },
+          messages: { ...state.messages, [conversationId]: [...existing, newMsg] },
           conversations: state.conversations.map((c) =>
             c.id === conversationId ? { ...c, last_message: newMsg, updated_at: newMsg.created_at } : c
           ),
@@ -269,17 +212,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
 
       return newMsg;
-    } catch (err: any) {
-      // If it is a network failure/offline, queue it
-      const isNetworkError = !err.response;
-      if (isNetworkError) {
-        const queueItem = { conversationId, content, attachments, replyToId, clientMsgId: tempClientMsgId };
-        set((state) => {
-          const existsInQueue = state.offlineQueue.some(item => item.clientMsgId === tempClientMsgId);
-          if (existsInQueue) return {};
-          return { offlineQueue: [...state.offlineQueue, queueItem] };
-        });
-      }
+    } catch (err) {
       throw err;
     }
   },
@@ -489,7 +422,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   connectWebSocket: (userId: number) => {
     if (socket && socket.readyState === WebSocket.OPEN) return;
 
-    isExplicitDisconnect = false;
     const wsUrl = `${WS_BASE_URL}/ws/chat/${userId}`;
 
     try {
@@ -497,29 +429,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       socket.onopen = () => {
         set({ isWebSocketConnected: true });
-        reconnectAttemptsCount = 0;
-        if (reconnectTimer) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-        }
-
-        // Start heartbeat ping-pong
-        if (heartbeatInterval) clearInterval(heartbeatInterval);
-        heartbeatInterval = setInterval(() => {
-          if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 30000);
-
-        // Process offline queue messages sequentially
-        const queue = get().offlineQueue;
-        if (queue.length > 0) {
-          set({ offlineQueue: [] });
-          queue.forEach((item) => {
-            get().sendMessage(item.conversationId, item.content, item.attachments, item.replyToId, item.clientMsgId)
-              .catch(() => {}); // handle retries gracefully
-          });
-        }
       };
 
       socket.onmessage = (event) => {
@@ -531,24 +440,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
             set((state) => {
               const cid = newMsg.conversation_id;
               const existingMsgs = state.messages[cid] || [];
-              
-              // Check if we already have the message by server ID or client_msg_id
-              const clientMsgIdMatchIdx = existingMsgs.findIndex(
-                (m) => (newMsg.client_msg_id && m.client_msg_id === newMsg.client_msg_id) || m.id === newMsg.id
-              );
-
-              let updatedMsgs: Message[];
-              if (clientMsgIdMatchIdx !== -1) {
-                updatedMsgs = [...existingMsgs];
-                updatedMsgs[clientMsgIdMatchIdx] = newMsg;
-              } else {
-                updatedMsgs = [...existingMsgs, newMsg];
-              }
+              const alreadyHas = existingMsgs.some((m) => m.id === newMsg.id);
 
               return {
                 messages: {
                   ...state.messages,
-                  [cid]: updatedMsgs,
+                  [cid]: alreadyHas ? existingMsgs : [...existingMsgs, newMsg],
                 },
                 conversations: state.conversations.map((c) =>
                   c.id === cid
@@ -603,7 +500,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               return {
                 messages: {
                   ...state.messages,
-                  [cid]: list.map((m) => (m.id === updatedMsg.id || (updatedMsg.client_msg_id && m.client_msg_id === updatedMsg.client_msg_id) ? updatedMsg : m)),
+                  [cid]: list.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)),
                 },
               };
             });
@@ -634,19 +531,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       socket.onclose = () => {
         set({ isWebSocketConnected: false });
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-          heartbeatInterval = null;
-        }
-
-        // Exponential backoff reconnection
-        if (!isExplicitDisconnect) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsCount), 16000);
-          reconnectAttemptsCount++;
-          reconnectTimer = setTimeout(() => {
-            get().connectWebSocket(userId);
-          }, delay);
-        }
       };
     } catch (err) {
       set({ isWebSocketConnected: false });
@@ -654,20 +538,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   disconnectWebSocket: () => {
-    isExplicitDisconnect = true;
-    if (heartbeatInterval) {
-      clearInterval(heartbeatInterval);
-      heartbeatInterval = null;
-    }
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
     if (socket) {
       socket.close();
       socket = null;
+      set({ isWebSocketConnected: false });
     }
-    set({ isWebSocketConnected: false });
   },
 
   sendTypingSignal: (conversationId: number, isTyping: boolean, senderName: string) => {

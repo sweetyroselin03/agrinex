@@ -14,15 +14,6 @@ engine = create_engine(DATABASE_URL)
 def clear_tables():
     # Ordered dependencies first to avoid constraint issues during standard deletes
     tables = [
-        "message_reads",
-        "message_reactions",
-        "message_attachments",
-        "message_deleted_for_users",
-        "messages",
-        "participants",
-        "conversations",
-        "blocked_users",
-        "user_online_status",
         "chat_messages",
         "crop_scans",
         "notifications",
@@ -35,13 +26,6 @@ def clear_tables():
         "otp_codes"
     ]
     with engine.connect() as conn:
-        # Disable foreign keys temporarily if sqlite
-        if "sqlite" in str(engine.url):
-            try:
-                conn.execute(text("PRAGMA foreign_keys = OFF;"))
-            except Exception:
-                pass
-
         for table in tables:
             try:
                 print(f"Clearing table: {table}")
@@ -55,14 +39,7 @@ def clear_tables():
                     conn.commit()
                 except Exception as ex:
                     print(f"Could not clear table {table}: {ex}")
-
-        # Re-enable foreign keys if sqlite
-        if "sqlite" in str(engine.url):
-            try:
-                conn.execute(text("PRAGMA foreign_keys = ON;"))
-            except Exception:
-                pass
-
+        
         # Attempt to reset primary key sequence for users
         try:
             conn.execute(text("SELECT setval(pg_get_serial_sequence('users', 'id'), 1, false);"))
@@ -71,22 +48,7 @@ def clear_tables():
         except Exception:
             pass
 
-    print("\n--- DATABASE VERIFICATION COUNT ---")
-    all_zero = True
-    with engine.connect() as conn:
-        for table in tables:
-            try:
-                res = conn.execute(text(f"SELECT COUNT(*) FROM {table};")).scalar()
-                print(f"Table '{table}': {res} records")
-                if res != 0:
-                    all_zero = False
-            except Exception as e:
-                print(f"Table '{table}': Could not query count ({e})")
-    
-    if all_zero:
-        print("\n[SUCCESS] All database tables are 100% empty (User count = 0, Posts = 0, Messages = 0, Notifications = 0)!")
-    else:
-        print("\nWARNING: Some tables still contain records.")
+    print("All tables cleared successfully!")
 
 if __name__ == "__main__":
     clear_tables()

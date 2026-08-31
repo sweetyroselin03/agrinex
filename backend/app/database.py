@@ -8,15 +8,7 @@ try:
 except ImportError:
     pass
 
-import sys
-
-TESTING = os.getenv("TESTING", "").lower() in ("true", "1", "yes") or "pytest" in sys.modules
-
-if TESTING:
-    SQLALCHEMY_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite:///./agrinex.db")
-else:
-    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./agrinex.db")
-
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./agrinex.db")
 
 # Fixing the URL for SQLAlchemy if it's using the 'postgres://' prefix (Heroku/older style)
 if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
@@ -25,23 +17,16 @@ if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://")
 if "sqlite" in SQLALCHEMY_DATABASE_URL:
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL,
-        connect_args={"check_same_thread": False, "timeout": 30}
+        connect_args={"check_same_thread": False}
     )
 else:
     # Production-optimized connection settings for Neon PostgreSQL
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL,
-        pool_pre_ping=True,       # Verifies connection health before using it from pool
-        pool_recycle=180,         # Recycles connections every 3 min to prevent serverless disconnects
+        pool_pre_ping=True,       # Verifies connection health before using it
+        pool_recycle=300,         # Recycles connections every 5 min to prevent serverless database disconnects
         pool_size=10,             # Maintains a pool of active connections
-        max_overflow=20,          # Allows temporary overflow under peak loads
-        connect_args={
-            "connect_timeout": 10,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5
-        }
+        max_overflow=20           # Allows temporary overflow under peak loads
     )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

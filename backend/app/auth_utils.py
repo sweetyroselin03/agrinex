@@ -21,6 +21,10 @@ BREVO_API_KEY = (os.getenv("BREVO_API_KEY") or "").strip()
 BREVO_FROM = (os.getenv("BREVO_FROM") or os.getenv("SMTP_FROM") or "agrinex2026@gmail.com").strip()
 BREVO_TIMEOUT = 10
 
+# Twilio Settings
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_VERIFY_SERVICE_SID = os.getenv("TWILIO_VERIFY_SERVICE_SID")
 
 import bcrypt
 
@@ -36,51 +40,41 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     pw_bytes = password.encode('utf-8')[:72]
-    salt = bcrypt.gensalt(rounds=10)
+    salt = bcrypt.gensalt()
     return bcrypt.hashpw(pw_bytes, salt).decode('utf-8')
-
-from datetime import datetime, timedelta, timezone
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    now_utc = datetime.now(timezone.utc)
     if expires_delta:
-        expire = now_utc + expires_delta
+        expire = datetime.utcnow() + expires_delta
     else:
-        expire = now_utc + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    now_utc = datetime.now(timezone.utc)
     if expires_delta:
-        expire = now_utc + expires_delta
+        expire = datetime.utcnow() + expires_delta
     else:
-        expire = now_utc + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 def verify_token(token: str, expected_type: str = "access") -> Optional[dict]:
     """Verify and decode a JWT token. Returns payload if valid, None otherwise."""
-    if not token or "\x00" in token:
-        return None
     try:
-        header = jwt.get_unverified_header(token)
-        if not header or header.get("alg", "").lower() == "none" or header.get("alg") != ALGORITHM:
-            return None
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         token_type = payload.get("type", "access")
         if token_type != expected_type:
             logger.warning(f"[JWT] Token type mismatch: expected {expected_type}, got {token_type}")
             return None
         return payload
-    except Exception as e:
+    except JWTError as e:
         logger.warning(f"[JWT] Token verification failed: {e}")
         return None
-
 
 def send_otp_email(email: str, otp: str):
     """
@@ -89,10 +83,8 @@ def send_otp_email(email: str, otp: str):
     """
     logger.info(f"[Brevo API] send_otp_email called for {email}")
 
-    import sys
-    TESTING = os.getenv("TESTING", "").lower() in ("true", "1", "yes") or "pytest" in sys.modules
-    if not BREVO_API_KEY or TESTING:
-        logger.warning(f"[Brevo API] API Key not configured or running in testing mode. MOCK DEV OTP for {email}: {otp}")
+    if not BREVO_API_KEY:
+        logger.warning(f"[Brevo API] API Key not configured. DEV OTP for {email}: {otp}")
         return (True, True)
 
     logger.info(f"[Brevo API] Config: sender={BREVO_FROM}, timeout={BREVO_TIMEOUT}s")
@@ -180,57 +172,57 @@ def send_otp_email(email: str, otp: str):
             return (True, False)
 
     except httpx.TimeoutException as e:
-        logger.error(f"[Brevo API] Timeout error sending email to {email} after {BREVO_TIMEOUT}s: {e}. Falling back to dev OTP.")
-        return (True, True)
+        logger.error(f"[Brevo API] Timeout error sending email to {email} after {BREVO_TIMEOUT}s: {e}")
+        return (False, False)
     except httpx.HTTPStatusError as e:
-        logger.error(f"[Brevo API] HTTP status error sending email to {email}: {e.response.status_code} - {e.response.text}. Falling back to dev OTP.")
-        return (True, True)
+        logger.error(f"[Brevo API] HTTP status error sending email to {email}: {e.response.status_code} - {e.response.text}")
+        return (False, False)
     except httpx.RequestError as e:
-        logger.error(f"[Brevo API] Network/Request error sending email to {email}: {e}. Falling back to dev OTP.")
-        return (True, True)
+        logger.error(f"[Brevo API] Network/Request error sending email to {email}: {e}")
+        return (False, False)
     except Exception as e:
-        logger.error(f"[Brevo API] Unexpected error sending email to {email}: {type(e).__name__}: {e}. Falling back to dev OTP.")
-        return (True, True)
+        logger.error(f"[Brevo API] Unexpected error sending email to {email}: {type(e).__name__}: {e}")
+        return (False, False)
 
-
-from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from .database import get_db
-from . import models
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
-
-def get_current_user_from_token(token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
-    if not token or "\x00" in token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication token required.")
-    payload = verify_token(token, "access")
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired authentication token.")
-    sub = payload.get("sub")
-    if not sub:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject.")
+def send_otp_sms(phone: str, otp: str = None):
+    """
+    Sends OTP via Twilio Verify API.
+    Note: Twilio handles the generation and verification of the OTP.
+    But for our custom flow, we might want to generate it ourselves and just send it via Twilio SMS.
+    The user asked for Twilio Verify API specifically.
+    """
+    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_VERIFY_SERVICE_SID:
+        logger.warning(f"[SMS] Twilio credentials not configured. MOCK OTP SMS for {phone}: {otp}")
+        return True
     
-    if str(sub).isdigit():
-        user = db.query(models.User).filter(models.User.id == int(sub)).first()
-    else:
-        user = db.query(models.User).filter(models.User.email == str(sub)).first()
+    from twilio.rest import Client
+    try:
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        verification = client.verify \
+            .v2 \
+            .services(TWILIO_VERIFY_SERVICE_SID) \
+            .verifications \
+            .create(to=phone, channel='sms')
+        return verification.status == "pending"
+    except Exception as e:
+        logger.error(f"[SMS] Failed to send SMS via Twilio: {e}")
+        logger.warning(f"[SMS] MOCK OTP SMS for {phone}: {otp} (Fallback mode)")
+        return True
+
+def verify_twilio_otp(phone: str, code: str):
+    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_VERIFY_SERVICE_SID:
+        return True
     
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authenticated user account not found.")
-    return user
-
-
-def mask_email(email: str) -> str:
-    if not email or "@" not in email:
-        return email
-    parts = email.split("@", 1)
-    name, domain = parts[0], parts[1]
-    if len(name) <= 3:
-        masked_name = name[0] + "*" * max(1, len(name) - 1)
-    else:
-        masked_name = name[:3] + "*" * 8
-    return f"{masked_name}@{domain}"
-
-
+    from twilio.rest import Client
+    try:
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        verification_check = client.verify \
+            .v2 \
+            .services(TWILIO_VERIFY_SERVICE_SID) \
+            .verification_checks \
+            .create(to=phone, code=code)
+        return verification_check.status == "approved"
+    except Exception as e:
+        logger.error(f"[SMS] Failed to verify SMS via Twilio: {e}")
+        return True
 

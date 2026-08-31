@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -17,44 +17,25 @@ import {
   X,
   Sparkles,
   ChevronRight,
-  UserCheck,
-  Pencil,
-  Video,
-  Search
+  UserCheck
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import UserSearchBar from '../components/UserSearchBar';
 import FollowButton from '../components/FollowButton';
-import ImageLightbox from '../components/chat/ImageLightbox';
-import { getCurrentGPSLocation } from '../utils/gps';
 
 export default function Community() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  
-  // Feed states
   const [posts, setPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [activeTab, setActiveTab] = useState<'farmers' | 'posts'>('posts');
-  const [postSearchQuery, setPostSearchQuery] = useState('');
   
   // Post publisher states
   const [newContent, setNewContent] = useState('');
+  const [newImage, setNewImage] = useState('');
   const [newLocation, setNewLocation] = useState('');
-  const [selectedMedia, setSelectedMedia] = useState<{ file: File; preview: string; type: 'image' | 'video' }[]>([]);
-  const [mediaCompressing, setMediaCompressing] = useState(false);
   const [showPublisher, setShowPublisher] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Edit Post modal states
-  const [editingPost, setEditingPost] = useState<any | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const [editLocation, setEditLocation] = useState('');
-  const [updatingPost, setUpdatingPost] = useState(false);
 
   // Comment Thread drawer states
   const [activePostForComments, setActivePostForComments] = useState<any | null>(null);
@@ -62,31 +43,6 @@ export default function Community() {
   const [newCommentVal, setNewCommentVal] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
-
-  // Lightbox state
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
-
-  const openLightbox = (images: string[], index: number) => {
-    setLightboxImages(images);
-    setLightboxIndex(index);
-    setLightboxOpen(true);
-  };
-
-  const [fetchingLocation, setFetchingLocation] = useState(false);
-
-  const autoAttachLocation = async () => {
-    setFetchingLocation(true);
-    try {
-      const gps = await getCurrentGPSLocation();
-      setNewLocation(gps.display_name);
-    } catch (err) {
-      console.warn("Failed to auto-detect GPS location:", err);
-    } finally {
-      setFetchingLocation(false);
-    }
-  };
 
   // React Query for Suggested Farmers
   const { data: suggestedFarmers = [], isLoading: loadingSuggested } = useQuery({
@@ -108,11 +64,9 @@ export default function Community() {
 
   const fetchFeed = async () => {
     setLoadingPosts(true);
-    setPostSearchQuery('');
     try {
-      const res = await api.get('/posts?limit=10&skip=0');
+      const res = await api.get('/posts');
       setPosts(res.data);
-      setHasMore(res.data.length >= 10);
     } catch (e) {
       console.warn('Failed to load posts');
     } finally {
@@ -120,193 +74,26 @@ export default function Community() {
     }
   };
 
-  const handlePostSearch = async (val: string) => {
-    setPostSearchQuery(val);
-    if (!val.trim()) {
-      fetchFeed();
-      return;
-    }
-    setLoadingPosts(true);
-    try {
-      const res = await api.get(`/posts/search?q=${encodeURIComponent(val)}`);
-      setPosts(res.data);
-      setHasMore(false); // Search returns full results
-    } catch {
-      console.warn("Search posts failed");
-    } finally {
-      setLoadingPosts(false);
-    }
-  };
-
-  const handleLoadMore = async () => {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    try {
-      const res = await api.get(`/posts?skip=${posts.length}&limit=10`);
-      if (res.data.length === 0) {
-        setHasMore(false);
-      } else {
-        setPosts(prev => [...prev, ...res.data]);
-        setHasMore(res.data.length >= 10);
-      }
-    } catch (e) {
-      console.warn('Failed to load more posts');
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  // Image compressor using canvas
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 800;
-          let width = img.width;
-          let height = img.height;
-          if (width > height) {
-            if (width > maxDim) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            }
-          } else {
-            if (height > maxDim) {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          resolve(dataUrl);
-        };
-        img.onerror = () => {
-          resolve(event.target?.result as string);
-        };
-      };
-      reader.onerror = () => {
-        resolve('');
-      };
-    });
-  };
-
-  const isVideoUrl = (url: string) => {
-    return url && (url.startsWith('data:video/') || url.includes('.mp4') || url.startsWith('blob:video/') || (url.startsWith('blob:') && url.includes('video')));
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    setMediaCompressing(true);
-    const newMedia = [...selectedMedia];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isVideo = file.type.startsWith('video/');
-      const isImage = file.type.startsWith('image/');
-      
-      if (!isImage && !isVideo) continue;
-      
-      if (newMedia.length >= 5) {
-        alert("You can upload a maximum of 5 media items (images or videos).");
-        break;
-      }
-      
-      if (isVideo) {
-        if (file.size > 15 * 1024 * 1024) {
-          alert("Video files must be under 15MB to preserve platform performance.");
-          continue;
-        }
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        await new Promise<void>((resolve) => {
-          reader.onload = () => {
-            newMedia.push({
-              file,
-              preview: reader.result as string,
-              type: 'video'
-            });
-            resolve();
-          };
-        });
-      } else {
-        const compressed = await compressImage(file);
-        if (compressed) {
-          newMedia.push({
-            file,
-            preview: compressed,
-            type: 'image'
-          });
-        }
-      }
-    }
-    
-    setSelectedMedia(newMedia);
-    setMediaCompressing(false);
-    e.target.value = '';
-  };
-
-  const handleRemoveMedia = (index: number) => {
-    setSelectedMedia(prev => prev.filter((_, idx) => idx !== index));
-  };
-
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newContent.trim() || publishing || mediaCompressing) return;
+    if (!newContent.trim() || publishing) return;
     setPublishing(true);
-
-    const imagesList = selectedMedia.map(m => m.preview);
-    const finalImageUrl = imagesList.length > 0 ? imagesList[0] : null;
 
     try {
       await api.post('/posts', {
         content: newContent.trim(),
-        image_url: finalImageUrl,
-        images: imagesList,
+        image_url: newImage.trim() || null,
         location: newLocation.trim() || null
       });
       setNewContent('');
+      setNewImage('');
       setNewLocation('');
-      setSelectedMedia([]);
       setShowPublisher(false);
       fetchFeed();
     } catch (err) {
       alert('Post creation failed.');
     } finally {
       setPublishing(false);
-    }
-  };
-
-  const handleEditClick = (post: any) => {
-    setEditingPost(post);
-    setEditContent(post.content || '');
-    setEditLocation(post.location || '');
-  };
-
-  const handleUpdatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editContent.trim() || updatingPost || !editingPost) return;
-    setUpdatingPost(true);
-
-    try {
-      const res = await api.put(`/posts/${editingPost.id}`, {
-        content: editContent.trim(),
-        location: editLocation.trim() || null
-      });
-      setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, ...res.data } : p));
-      setEditingPost(null);
-    } catch (err) {
-      alert('Failed to update post.');
-    } finally {
-      setUpdatingPost(false);
     }
   };
 
@@ -342,6 +129,7 @@ export default function Community() {
     }
   };
 
+  // Comments Loading
   const openCommentsDrawer = async (post: any) => {
     setActivePostForComments(post);
     setNewCommentVal('');
@@ -387,7 +175,7 @@ export default function Community() {
       <div className="lg:col-span-8 space-y-6">
         
         {/* Global Farmer Search Bar Header */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-extrabold text-brandDark tracking-tight">AgriNex Social Community</h1>
@@ -395,13 +183,7 @@ export default function Community() {
             </div>
             
             <button
-              onClick={() => {
-                const nextVal = !showPublisher;
-                setShowPublisher(nextVal);
-                if (nextVal) {
-                  autoAttachLocation();
-                }
-              }}
+              onClick={() => setShowPublisher(!showPublisher)}
               className="px-4 py-2.5 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm transition-all shrink-0"
             >
               <Plus className="w-4 h-4" />
@@ -409,42 +191,7 @@ export default function Community() {
             </button>
           </div>
 
-          {/* Tabbed search selector */}
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl w-fit">
-            <button
-              onClick={() => setActiveTab('posts')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'posts' ? 'bg-white text-brandDark shadow-xs' : 'text-textSec hover:text-brandDark'
-              }`}
-            >
-              Search Posts
-            </button>
-            <button
-              onClick={() => setActiveTab('farmers')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'farmers' ? 'bg-white text-brandDark shadow-xs' : 'text-textSec hover:text-brandDark'
-              }`}
-            >
-              Search Farmers
-            </button>
-          </div>
-
-          {activeTab === 'farmers' ? (
-            <UserSearchBar placeholder="Search farmers by name, username, village, or crops..." />
-          ) : (
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <Search className="w-4 h-4" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search feed updates, pest alerts, or keywords..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl text-xs text-brandDark outline-none transition-all placeholder:text-slate-400"
-                value={postSearchQuery}
-                onChange={(e) => handlePostSearch(e.target.value)}
-              />
-            </div>
-          )}
+          <UserSearchBar placeholder="Search farmers by name, username, village, or crops..." />
         </div>
 
         {/* Dynamic Post Publisher Card */}
@@ -460,107 +207,51 @@ export default function Community() {
                 <textarea
                   required
                   rows={3}
-                  placeholder="Share a farming warning, crop query, or yield report with your peers..."
+                  placeholder="Share a farming warning or yield report with your peers..."
                   className="w-full border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-4 text-xs text-brandDark placeholder-slate-400 outline-none resize-none transition-all leading-normal"
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
                 />
 
-                {/* Media Previews */}
-                {selectedMedia.length > 0 && (
-                  <div className="flex flex-wrap gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    {selectedMedia.map((m, idx) => (
-                      <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0 group">
-                        {m.type === 'video' ? (
-                          <div className="w-full h-full relative bg-slate-900">
-                            <video src={m.preview} className="w-full h-full object-cover pointer-events-none" muted playsInline />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                              <Video className="w-4 h-4 text-white" />
-                            </div>
-                          </div>
-                        ) : (
-                          <img src={m.preview} alt="upload preview" className="w-full h-full object-cover" />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMedia(idx)}
-                          className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={mediaCompressing}
-                      className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-textSec hover:text-primary transition-all flex items-center gap-1.5 text-xs font-bold"
-                    >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <ImageIcon className="w-4 h-4" />
-                      <span>Attach Media</span>
-                    </button>
+                    </div>
                     <input
-                      type="file"
-                      ref={fileInputRef}
-                      multiple
-                      accept="image/*,video/*"
-                      className="hidden"
-                      onChange={handleFileChange}
+                      type="url"
+                      placeholder="Image URL (optional)"
+                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
+                      value={newImage}
+                      onChange={(e) => setNewImage(e.target.value)}
                     />
                   </div>
 
-                  <div className="relative flex-1 min-w-[200px] flex items-center">
+                  <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      {fetchingLocation ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                      ) : (
-                        <MapPin className="w-4 h-4" />
-                      )}
+                      <MapPin className="w-4 h-4" />
                     </div>
                     <input
                       type="text"
-                      placeholder={fetchingLocation ? "Detecting GPS..." : "Location (optional)"}
-                      className="w-full pl-9 pr-20 py-2.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
+                      placeholder="Location (optional)"
+                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
                     />
-                    <button
-                      type="button"
-                      onClick={autoAttachLocation}
-                      disabled={fetchingLocation}
-                      className="absolute right-2 text-[10px] bg-slate-100 hover:bg-slate-250 text-brandDark px-2 py-1.5 rounded-lg font-bold transition-all"
-                    >
-                      GPS Detect
-                    </button>
                   </div>
                 </div>
 
-                {mediaCompressing && (
-                  <div className="flex items-center gap-2 text-xs text-primary font-bold">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Compressing media attachments...</span>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                <div className="flex justify-end gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowPublisher(false);
-                      setSelectedMedia([]);
-                    }}
+                    onClick={() => setShowPublisher(false)}
                     className="px-4 py-2 rounded-xl border border-slate-200 text-textSec text-xs font-bold hover:bg-slate-50 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={publishing || mediaCompressing || !newContent.trim()}
+                    disabled={publishing || !newContent.trim()}
                     className="px-6 py-2 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all"
                   >
                     {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Publish Update'}
@@ -580,27 +271,13 @@ export default function Community() {
         ) : posts.length === 0 ? (
           <div className="glass-card p-12 text-center text-textSec text-xs space-y-3">
             <Sparkles className="w-8 h-8 text-primary mx-auto opacity-70" />
-            <h3 className="font-extrabold text-brandDark text-sm">No community posts found</h3>
+            <h3 className="font-extrabold text-brandDark text-sm">No community posts yet</h3>
             <p className="text-slate-400 max-w-sm mx-auto">Be the first farmer to share a field update or pest warning with your network.</p>
           </div>
         ) : (
           <div className="space-y-6">
             {posts.map((post) => {
               const isOwner = user && user.id === post.user_id;
-              
-              // Handle images list parse safely
-              let parsedImages: string[] = [];
-              if (post.images) {
-                if (Array.isArray(post.images)) {
-                  parsedImages = post.images;
-                } else if (typeof post.images === 'string') {
-                  try {
-                    parsedImages = JSON.parse(post.images);
-                  } catch {
-                    parsedImages = [];
-                  }
-                }
-              }
 
               return (
                 <div key={post.id} className="glass-card p-6 space-y-4 hover:border-slate-300 transition-all">
@@ -642,31 +319,22 @@ export default function Community() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      {isOwner && (
-                        <>
-                          <button
-                            onClick={() => handleEditClick(post)}
-                            className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
-                            title="Edit post"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePost(post.id)}
-                            className="p-2 text-slate-400 hover:text-rose hover:bg-rose/10 rounded-xl transition-all"
-                            title="Delete post"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
+                    <div className="flex items-center gap-2">
                       {!isOwner && (
                         <FollowButton
                           userId={post.user_id}
                           userName={post.author_name}
                           size="sm"
                         />
+                      )}
+                      {isOwner && (
+                        <button
+                          onClick={() => handleDeletePost(post.id)}
+                          className="p-2 text-slate-400 hover:text-rose hover:bg-rose/10 rounded-xl transition-all"
+                          title="Delete post"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -676,74 +344,19 @@ export default function Community() {
                     {post.content}
                   </p>
 
-                  {/* Optional Image or Video Attachment */}
-                  {parsedImages.length > 0 ? (
-                    <div className={`grid gap-2 rounded-2xl overflow-hidden ${
-                      parsedImages.length === 1 ? 'grid-cols-1' :
-                      parsedImages.length === 2 ? 'grid-cols-2' :
-                      parsedImages.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
-                    }`}>
-                      {parsedImages.slice(0, 4).map((mediaUrl: string, idx: number) => {
-                        const isLast = idx === 3 && parsedImages.length > 4;
-                        const isVid = isVideoUrl(mediaUrl);
-                        return (
-                          <div key={idx} className="relative aspect-video bg-slate-50 border border-slate-100/50 max-h-80 overflow-hidden cursor-pointer" onClick={() => openLightbox(parsedImages, idx)}>
-                            {isVid ? (
-                              <div className="w-full h-full relative bg-slate-900">
-                                <video
-                                  src={mediaUrl}
-                                  className="w-full h-full object-cover pointer-events-none"
-                                  muted
-                                  playsInline
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                                  <Video className="w-8 h-8 text-white drop-shadow-md" />
-                                </div>
-                              </div>
-                            ) : (
-                              <img
-                                src={mediaUrl}
-                                alt={`Post media ${idx + 1}`}
-                                loading="lazy"
-                                className="w-full h-full object-cover hover:scale-105 transition-transform"
-                              />
-                            )}
-                            {isLast && (
-                              <div className="absolute inset-0 bg-brandDark/60 backdrop-blur-xs flex items-center justify-center text-white text-lg font-black pointer-events-none">
-                                +{parsedImages.length - 4} More
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                  {/* Optional Image */}
+                  {post.image_url && (
+                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96">
+                      <img
+                        src={post.image_url}
+                        alt="Post media"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
                     </div>
-                  ) : post.image_url ? (
-                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96 cursor-pointer" onClick={() => openLightbox([post.image_url], 0)}>
-                      {isVideoUrl(post.image_url) ? (
-                        <div className="w-full h-full relative bg-slate-900">
-                          <video
-                            src={post.image_url}
-                            className="w-full h-full max-h-96 object-contain pointer-events-none"
-                            muted
-                            playsInline
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                            <Video className="w-10 h-10 text-white drop-shadow-md" />
-                          </div>
-                        </div>
-                      ) : (
-                        <img
-                          src={post.image_url}
-                          alt="Post media"
-                          loading="lazy"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      )}
-                    </div>
-                  ) : null}
+                  )}
 
                   {/* Post Actions Bar */}
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold text-textSec">
@@ -781,20 +394,6 @@ export default function Community() {
                 </div>
               );
             })}
-
-            {/* Pagination Load More */}
-            {hasMore && (
-              <div className="text-center pt-2">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="px-6 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-brandDark hover:border-slate-300 disabled:opacity-50 transition-all inline-flex items-center gap-2"
-                >
-                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                  <span>Load More Posts</span>
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -899,70 +498,6 @@ export default function Community() {
 
       </div>
 
-      {/* ─── MODAL OVERLAY: EDIT POST ─── */}
-      <AnimatePresence>
-        {editingPost && (
-          <div className="fixed inset-0 z-50 bg-brandDark/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl p-6 border border-slate-100 overflow-hidden"
-            >
-              <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
-                <h3 className="text-md font-extrabold text-brandDark">Edit Community Post</h3>
-                <button
-                  onClick={() => setEditingPost(null)}
-                  className="p-1.5 text-textSec hover:text-brandDark hover:bg-slate-100 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdatePost} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-textSec mb-2">Content</label>
-                  <textarea
-                    required
-                    rows={4}
-                    className="w-full border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl p-3 text-xs text-brandDark outline-none resize-none"
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-textSec mb-2">Location</label>
-                  <input
-                    type="text"
-                    className="w-full border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-3 py-2.5 text-xs text-brandDark outline-none"
-                    value={editLocation}
-                    onChange={(e) => setEditLocation(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setEditingPost(null)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 text-textSec text-xs font-bold hover:bg-slate-50 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updatingPost || !editContent.trim()}
-                    className="px-6 py-2 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all"
-                  >
-                    {updatingPost ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* ─── SLIDING DRAWER OVERLAY: COMMENT THREADS ─── */}
       <AnimatePresence>
         {activePostForComments && (
@@ -1049,14 +584,6 @@ export default function Community() {
           </div>
         )}
       </AnimatePresence>
-
-      <ImageLightbox
-        isOpen={lightboxOpen}
-        images={lightboxImages}
-        currentIndex={lightboxIndex}
-        onClose={() => setLightboxOpen(false)}
-        onNavigate={(idx) => setLightboxIndex(idx)}
-      />
 
     </div>
   );

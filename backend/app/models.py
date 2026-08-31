@@ -8,6 +8,7 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
+    phone = Column(String, unique=True, index=True, nullable=True)
     full_name = Column(String, nullable=True, index=True)
     username = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String, nullable=True)
@@ -19,7 +20,6 @@ class User(Base):
     crop_specialization = Column(String, nullable=True, index=True) # Added
     crop_types = Column(String, nullable=True)
     profile_picture = Column(String, nullable=True)
-    cover_photo = Column(String, nullable=True)
     bio = Column(String, nullable=True)
     website = Column(String, nullable=True)
     is_verified = Column(Boolean, default=True)
@@ -31,15 +31,6 @@ class User(Base):
     saved_posts = relationship("SavedPost", back_populates="user", cascade="all, delete-orphan")
     followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following")
     following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower")
-
-    @property
-    def is_password_set(self) -> bool:
-        return bool(self.hashed_password and len(self.hashed_password.strip()) > 0)
-
-    @property
-    def password_setup_required(self) -> bool:
-        return not self.is_password_set
-
 
 
 class Post(Base):
@@ -150,8 +141,6 @@ class CropScan(Base):
     is_valid_crop = Column(Boolean, default=True)
     detected_object = Column(String, nullable=True)
     rejection_reason = Column(String, nullable=True)
-    scientific_name = Column(String, nullable=True)
-    scan_mode = Column(String, nullable=True, default="full")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -217,7 +206,6 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     content = Column(Text, nullable=True)
-    client_msg_id = Column(String, nullable=True, unique=True, index=True)
     reply_to_id = Column(Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True)
     is_edited = Column(Boolean, default=False)
     is_deleted_everyone = Column(Boolean, default=False)

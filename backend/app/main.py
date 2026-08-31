@@ -1,5 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File, Request
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Depends, HTTPException, status, Query, WebSocket, WebSocketDisconnect, UploadFile, File
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
@@ -8,14 +7,9 @@ import logging
 import httpx
 import json
 import os
-import sys
-import time
-import asyncio
-import base64
-import io
-from PIL import Image
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from . import models, schemas, ai_service, auth_utils, auth_router
+from .pytorch_vision_engine import vision_engine
 from .database import engine, get_db
 from .websocket_manager import manager as ws_manager
 from fastapi.security import OAuth2PasswordBearer
@@ -23,49 +17,29 @@ from jose import JWTError, jwt
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
+# Create tables and sync schema non-blockingly
+def _init_db_schema():
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        import sync_db
+        sync_db.sync_db()
+        logging.getLogger("uvicorn.error").info("[Startup] Database tables synchronized.")
+    except Exception as sync_err:
+        logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
+
+import threading
+threading.Thread(target=_init_db_schema, daemon=True).start()
+
+logger_startup = logging.getLogger("uvicorn.error")
+
 ENV = os.getenv("ENV", "production")
-show_docs = True
+show_docs = os.getenv("SHOW_DOCS", "false").lower() in ("true", "1", "yes") or ENV == "development"
 
 app = FastAPI(
     title="AgriNex AI Enterprise Backend",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url="/docs" if show_docs else None,
+    redoc_url="/redoc" if show_docs else None,
 )
-
-@app.on_event("startup")
-async def startup_db_init():
-    import asyncio
-    def _init_db():
-        try:
-            models.Base.metadata.create_all(bind=engine)
-            try:
-                import sync_db
-                sync_db.sync_db()
-            except Exception as sync_err:
-                logging.getLogger("uvicorn.error").warning(f"[Startup DB Sync Warning] {sync_err}")
-            logging.getLogger("uvicorn.error").info("[Startup] Database tables synchronized via SQLAlchemy ORM.")
-        except Exception as db_init_err:
-            logging.getLogger("uvicorn.error").warning(f"[Startup DB Connection Warning] Database initialized conditionally: {db_init_err}")
-
-    asyncio.create_task(asyncio.to_thread(_init_db))
-
-@app.get("/")
-@app.head("/")
-def read_root():
-    return {"status": "ok", "message": "AgriNex AI Enterprise Backend is online"}
-
-@app.get("/health")
-@app.head("/health")
-def health_check():
-    # Fast health check — does NOT query DB, Gemini, or PyTorch.
-    # This ensures Render's HTTP health probe passes immediately on port binding.
-    return {"status": "ok"}
-
-@app.get("/api/health")
-@app.head("/api/health")
-def api_health():
-    return {"status": "ok"}
 
 # CORS configuration
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "")
@@ -77,109 +51,15 @@ default_origins = [
     "http://127.0.0.1:3000",
     "https://agrinex-web.vercel.app",
     "https://agrinex-ai.vercel.app",
-    "https://agrinex.onrender.com",
+    "https://agrinex-backend-c1ig.onrender.com",
 ]
 
-# Standardize: strip whitespace and trailing slashes
-default_origins = [origin.strip().rstrip('/') for origin in default_origins]
-
 if allowed_origins_str:
-    env_origins = [origin.strip().rstrip('/') for origin in allowed_origins_str.split(",") if origin.strip()]
+    env_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
     allow_origins = list(set(default_origins + env_origins))
 else:
     allow_origins = default_origins
 
-@app.middleware("http")
-async def add_cache_headers_middleware(request, call_next):
-    response = await call_next(request)
-    if request.method == "GET":
-        path = request.url.path.lower()
-        if any(static_p in path for static_p in ["/static/", "/assets/", "/images/", "/favicon"]):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        elif not any(dyn_p in path for dyn_p in ["/auth", "/me", "/chat", "/ai", "/users", "/posts", "/notifications"]):
-            response.headers["Cache-Control"] = "public, max-age=60"
-    return response
-
-@app.middleware("http")
-async def standardize_json_middleware(request, call_next):
-    import os
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        return await call_next(request)
-        
-    path = request.url.path
-    if (request.method == "OPTIONS" or
-        path.startswith("/docs") or 
-        path.startswith("/redoc") or 
-        path.startswith("/openapi.json") or 
-        path.startswith("/auth") or
-        path.startswith("/ai/chat") or 
-        path.startswith("/chat") or
-        path.startswith("/notifications/ws") or 
-        "ws" in path or
-        path == "/health"):
-        return await call_next(request)
-        
-    response = await call_next(request)
-    content_type = response.headers.get("content-type", "")
-    if "application/json" in content_type and response.status_code not in [204, 304]:
-        try:
-            body = b""
-            async for chunk in response.body_iterator:
-                body += chunk
-                
-            data = json.loads(body.decode("utf-8"))
-            if isinstance(data, dict) and "success" in data and "data" in data and "errors" in data:
-                async def response_body():
-                    yield body
-                response.body_iterator = response_body()
-                return response
-                
-            success = 200 <= response.status_code < 300
-            message = "Operation completed successfully"
-            errors = None
-            
-            if isinstance(data, dict) and "detail" in data:
-                message = data["detail"]
-                errors = data["detail"]
-                data = None
-                
-            wrapped = {
-                "success": success,
-                "message": message,
-                "data": data,
-                "errors": errors
-            }
-            
-            new_body = json.dumps(wrapped).encode("utf-8")
-            response.headers["Content-Length"] = str(len(new_body))
-            
-            async def new_body_iterator():
-                yield new_body
-            response.body_iterator = new_body_iterator()
-            
-        except Exception as e:
-            # If body iterator or JSON decoding fails, return the response intact
-            pass
-            
-    return response
-
-app.include_router(auth_router.router)
-
-logger = logging.getLogger("uvicorn.error")
-logger.info("[Startup] Application ready. Brevo Transactional Email API will be used on-demand during OTP requests.")
-
-@app.middleware("http")
-async def log_requests(request, call_next):
-    logger.info(f"Incoming request: {request.method} {request.url.path}")
-    response = await call_next(request)
-    logger.info(f"Response status: {response.status_code}")
-    return response
-
-# GZip middleware (registered before CORSMiddleware so CORSMiddleware wraps it)
-from fastapi.middleware.gzip import GZipMiddleware
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-# Standard CORSMiddleware (registered LAST to wrap everything, ensuring CORS headers are added to all responses)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
@@ -189,6 +69,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router.router)
+
+logger = logging.getLogger("uvicorn.error")
+logger.info("[Startup] Application ready. Brevo Transactional Email API will be used on-demand during OTP requests.")
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("[Startup] AgriNex AI Enterprise Backend starting...")
+    import asyncio
+    from .pytorch_vision_engine import vision_engine
+    asyncio.create_task(asyncio.to_thread(vision_engine.load_model))
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    logger.info(f"Incoming request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response
+
 # ─── Auth (JWT Implementation) ───
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
@@ -197,54 +96,33 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    if not token or "\x00" in token:
-        logger.warning("Unauthenticated access attempt or null-byte token")
+    if not token:
+        logger.warning("Unauthenticated access attempt")
         raise credentials_exception
     try:
-        header = jwt.get_unverified_header(token)
-        if not header or header.get("alg", "").lower() == "none" or header.get("alg") != auth_utils.ALGORITHM:
-            raise credentials_exception
-
         payload = jwt.decode(token, auth_utils.SECRET_KEY, algorithms=[auth_utils.ALGORITHM])
-        sub: str = payload.get("sub")
-        if sub is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
-    except Exception:
+    except JWTError:
         raise credentials_exception
         
-    try:
-        if str(sub).isdigit():
-            user = db.query(models.User).filter(models.User.id == int(sub)).first()
-        else:
-            user = db.query(models.User).filter(models.User.email == str(sub)).first()
-    except Exception as db_err:
-        logger.error(f"[DB Error in get_current_user] {db_err}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database temporarily unavailable. Please retry."
-        )
-
+    user = db.query(models.User).filter(models.User.email == email).first()
     if user is None:
         raise credentials_exception
     return user
 
 def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Optional[models.User]:
-    if not token or "\x00" in token:
+    if not token:
         return None
     try:
-        header = jwt.get_unverified_header(token)
-        if not header or header.get("alg", "").lower() == "none" or header.get("alg") != auth_utils.ALGORITHM:
-            return None
         payload = jwt.decode(token, auth_utils.SECRET_KEY, algorithms=[auth_utils.ALGORITHM])
-        sub: str = payload.get("sub")
-        if sub:
-            if str(sub).isdigit():
-                return db.query(models.User).filter(models.User.id == int(sub)).first()
-            return db.query(models.User).filter(models.User.email == str(sub)).first()
+        email: str = payload.get("sub")
+        if email:
+            return db.query(models.User).filter(models.User.email == email).first()
     except Exception:
         pass
     return None
-
 
 @app.get("/")
 def read_root():
@@ -257,7 +135,7 @@ def health_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
     except Exception as e:
-        return {"status": "ok", "database": "unavailable", "detail": str(e)}
+        return {"status": "error", "database": str(e)}
 
 # ─── User Profile ───
 @app.get("/auth/me", response_model=schemas.UserOut)
@@ -266,14 +144,11 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     following_count = db.query(models.Follow).filter(models.Follow.follower_id == current_user.id).count()
     posts_count = db.query(models.Post).filter(models.Post.user_id == current_user.id).count()
     
-    user_out = schemas.UserOut.model_validate(current_user, from_attributes=True)
+    user_out = schemas.UserOut.from_orm(current_user)
     user_out.followers_count = followers_count
     user_out.following_count = following_count
     user_out.posts_count = posts_count
-    user_out.is_password_set = current_user.is_password_set
-    user_out.password_setup_required = current_user.password_setup_required
     return user_out
-
 
 @app.put("/user/profile", response_model=schemas.UserOut)
 @app.patch("/user/profile", response_model=schemas.UserOut)
@@ -288,17 +163,13 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
 @app.put("/api/users/me", response_model=schemas.UserOut)
 @app.patch("/api/users/me", response_model=schemas.UserOut)
 def update_profile(user_update: schemas.UserUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    user_db = db.query(models.User).filter(models.User.id == current_user.id).first()
-    if not user_db:
-        user_db = current_user
-
     # Username uniqueness validation
     if user_update.username:
         clean_username = user_update.username.strip().lstrip('@')
         if clean_username:
             existing = db.query(models.User).filter(
                 models.User.username.ilike(clean_username),
-                models.User.id != user_db.id
+                models.User.id != current_user.id
             ).first()
             if existing:
                 raise HTTPException(status_code=400, detail="Username already exists. Please choose a different username.")
@@ -307,22 +178,20 @@ def update_profile(user_update: schemas.UserUpdate, current_user: models.User = 
     if user_update.bio and len(user_update.bio.strip()) > 250:
         raise HTTPException(status_code=400, detail="Bio cannot exceed 250 characters.")
 
-    update_dict = user_update.model_dump(exclude_unset=True)
-    for key, value in update_dict.items():
-        if hasattr(user_db, key):
-            if value is not None and isinstance(value, str):
-                value = value.strip()
-            setattr(user_db, key, value)
+    for key, value in user_update.dict(exclude_unset=True).items():
+        if value is not None and isinstance(value, str):
+            value = value.strip()
+        setattr(current_user, key, value)
 
     try:
         db.commit()
-        db.refresh(user_db)
+        db.refresh(current_user)
     except Exception as e:
         db.rollback()
         logger.error(f"[Profile Update Error] {e}")
-        raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database update failed. Please try again.")
     
-    return prepare_user_out(user_db, user_db.id, db)
+    return prepare_user_out(current_user, current_user.id, db)
 
 
 def prepare_user_out(user_obj: models.User, current_user_id: Optional[int], db: Session) -> schemas.UserOut:
@@ -337,7 +206,7 @@ def prepare_user_out(user_obj: models.User, current_user_id: Optional[int], db: 
             models.Follow.following_id == user_obj.id
         ).first() is not None
 
-    user_out = schemas.UserOut.model_validate(user_obj, from_attributes=True)
+    user_out = schemas.UserOut.from_orm(user_obj)
     user_out.display_name = user_obj.full_name or f"Farmer {user_obj.id}"
     user_out.specialization = user_obj.crop_specialization or "Agriculture Specialist"
     user_out.joined_date = user_obj.created_at
@@ -347,8 +216,6 @@ def prepare_user_out(user_obj: models.User, current_user_id: Optional[int], db: 
     user_out.posts_count = posts_count
     user_out.is_following = is_following
     user_out.isFollowing = is_following
-    user_out.is_password_set = user_obj.is_password_set
-    user_out.password_setup_required = user_obj.password_setup_required
     return user_out
 
 @app.delete("/user")
@@ -361,38 +228,30 @@ def delete_account(current_user: models.User = Depends(get_current_user), db: Se
 @app.get("/users/search", response_model=List[schemas.UserSearchOut])
 @app.get("/api/users/search", response_model=List[schemas.UserSearchOut])
 @app.get("/social/search", response_model=List[schemas.UserSearchOut])
-@app.get("/messages/search", response_model=List[schemas.UserSearchOut])
-@app.get("/api/messages/search", response_model=List[schemas.UserSearchOut])
 def search_users(
-    q: Optional[str] = Query(default=None),
+    q: str = Query(..., min_length=1),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
     current_user: Optional[models.User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
     from sqlalchemy import or_
+    search_term = f"%{q}%"
     current_id = current_user.id if current_user else None
-    q_str = (q or "").strip()
-    if q_str:
-        search_term = f"%{q_str}%"
-        query = db.query(models.User).filter(
-            or_(
-                models.User.full_name.ilike(search_term),
-                models.User.username.ilike(search_term),
-                models.User.email.ilike(search_term),
-                models.User.village.ilike(search_term),
-                models.User.district.ilike(search_term),
-                models.User.crop_specialization.ilike(search_term),
-            )
-        )
-    else:
-        query = db.query(models.User).order_by(models.User.created_at.desc())
 
+    query = db.query(models.User).filter(
+        or_(
+            models.User.full_name.ilike(search_term),
+            models.User.username.ilike(search_term),
+            models.User.email.ilike(search_term),
+            models.User.village.ilike(search_term),
+            models.User.district.ilike(search_term),
+        )
+    )
     if current_id:
         blocked_uids = get_blocked_user_ids(db, current_id)
-        # Exclude blocked users; exclude current user unless current user is explicitly searching for their own name/email
-        if blocked_uids:
-            query = query.filter(~models.User.id.in_(blocked_uids))
+        exclude_uids = blocked_uids | {current_id}
+        query = query.filter(~models.User.id.in_(exclude_uids))
 
     users = query.offset(skip).limit(limit).all()
 
@@ -417,7 +276,6 @@ def search_users(
             village=u.village or "Agricultural Hub",
             profile_picture=u.profile_picture,
             profile_photo=u.profile_picture,
-            avatar_url=u.profile_picture,
             bio=u.bio,
             verified=u.is_verified,
             is_verified=u.is_verified,
@@ -427,17 +285,6 @@ def search_users(
             is_following=is_following,
             isFollowing=is_following,
         ))
-
-    # Log search details for debugging & verification
-    try:
-        compiled_sql = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
-    except Exception:
-        compiled_sql = str(query.statement)
-
-    logger.info(f"[Search Debug] Query: '{q_str}' | Matches: {len(results)} | SQL: {compiled_sql}")
-    if len(results) == 0:
-        logger.warning(f"[Search Debug] Search for '{q_str}' returned 0 users. SQL executed: {compiled_sql}")
-
     return results
 
 @app.get("/users/suggested", response_model=List[schemas.UserSearchOut])
@@ -493,37 +340,6 @@ def get_suggested_users(
             isFollowing=False
         ))
     return res
-
-
-@app.get("/users/blocked", response_model=List[schemas.UserSearchOut])
-@app.get("/api/users/blocked", response_model=List[schemas.UserSearchOut])
-def get_blocked_users(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    blocked_entries = db.query(models.BlockedUser).filter(models.BlockedUser.blocker_id == current_user.id).all()
-    b_ids = [b.blocked_id for b in blocked_entries]
-    if not b_ids:
-        return []
-    users = db.query(models.User).filter(models.User.id.in_(b_ids)).all()
-    return [
-        schemas.UserSearchOut(
-            id=u.id,
-            full_name=u.full_name,
-            display_name=u.full_name or f"Farmer {u.id}",
-            username=u.username,
-            email=u.email,
-            village=u.village or "Agricultural Hub",
-            profile_picture=u.profile_picture,
-            profile_photo=u.profile_picture,
-            bio=u.bio,
-            verified=u.is_verified,
-            is_verified=u.is_verified,
-            followers=0,
-            followers_count=0,
-            following_count=0,
-            is_following=False,
-            isFollowing=False
-        ) for u in users
-    ]
-
 
 # ─── Dynamic User Routes ───
 @app.get("/users/{user_id}", response_model=schemas.UserOut)
@@ -629,9 +445,8 @@ def create_notification(db, user_id: int, actor_id: int, notif_type: str, messag
 def create_post(post: schemas.PostCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"[CreatePost] User {current_user.id} creating post")
-        post_dict = post.model_dump()
+        post_dict = post.dict()
         images_list = post_dict.pop("images", None)
-        post_dict.pop("poll_options", None)
 
         # Validate content
         if not post_dict.get("content", "").strip():
@@ -649,6 +464,7 @@ def create_post(post: schemas.PostCreate, current_user: models.User = Depends(ge
         db.commit()
         db.refresh(db_post)
         logger.info(f"[CreatePost] Post {db_post.id} created successfully for user {current_user.id}")
+        # Pass current_user directly to avoid DetachedInstanceError on lazy-loaded relationship
         return prepare_post_out(db_post, current_user.id, db, author=current_user)
     except HTTPException:
         raise
@@ -656,60 +472,6 @@ def create_post(post: schemas.PostCreate, current_user: models.User = Depends(ge
         logger.error(f"[CreatePost] Error creating post for user {current_user.id}: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create post: {str(e)}")
-
-@app.post("/posts/poll", response_model=schemas.PostOut)
-def create_poll_post(post: schemas.PostCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if not post.content or not post.content.strip():
-        raise HTTPException(status_code=400, detail="Post content cannot be empty")
-    db_post = models.Post(content=post.content, user_id=current_user.id)
-    db.add(db_post)
-    db.commit()
-    db.refresh(db_post)
-    return prepare_post_out(db_post, current_user.id, db, author=current_user)
-
-@app.get("/posts/search", response_model=List[schemas.PostOut])
-def search_posts(
-    q: str = Query("", min_length=0),
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, le=100),
-    current_user: Optional[models.User] = Depends(get_optional_current_user),
-    db: Session = Depends(get_db)
-):
-    current_id = current_user.id if current_user else 0
-    search_term = f"%{q}%"
-    posts = db.query(models.Post).filter(models.Post.content.ilike(search_term)).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
-    return [prepare_post_out(p, current_id, db) for p in posts]
-
-@app.get("/posts/trending", response_model=List[schemas.PostOut])
-def get_trending_posts(
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, le=100),
-    current_user: Optional[models.User] = Depends(get_optional_current_user),
-    db: Session = Depends(get_db)
-):
-    current_id = current_user.id if current_user else 0
-    posts = db.query(models.Post).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
-    return [prepare_post_out(p, current_id, db) for p in posts]
-
-@app.get("/posts/pinned", response_model=List[schemas.PostOut])
-def get_pinned_posts(
-    current_user: Optional[models.User] = Depends(get_optional_current_user),
-    db: Session = Depends(get_db)
-):
-    current_id = current_user.id if current_user else 0
-    posts = db.query(models.Post).order_by(models.Post.created_at.desc()).limit(5).all()
-    return [prepare_post_out(p, current_id, db) for p in posts]
-
-@app.get("/posts/following-feed", response_model=List[schemas.PostOut])
-def get_following_feed(
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, le=100),
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    following_ids = [f.following_id for f in db.query(models.Follow.following_id).filter(models.Follow.follower_id == current_user.id).all()]
-    posts = db.query(models.Post).filter(models.Post.user_id.in_(following_ids)).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
-    return [prepare_post_out(p, current_user.id, db) for p in posts]
 
 @app.get("/posts/feed", response_model=List[schemas.PostOut])
 @app.get("/posts", response_model=List[schemas.PostOut])
@@ -742,36 +504,13 @@ def get_user_posts_by_alias(
     posts = db.query(models.Post).filter(models.Post.user_id == user_id).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
     return [prepare_post_out(p, current_id, db) for p in posts]
 
-@app.get("/posts/saved", response_model=List[schemas.PostOut])
-def get_saved_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    saved = db.query(models.SavedPost).filter(models.SavedPost.user_id == current_user.id).all()
-    posts = [s.post for s in saved if s.post]
-    return [prepare_post_out(p, current_user.id, db) for p in posts]
-
-@app.get("/posts/user", response_model=List[schemas.PostOut])
-def get_user_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    posts = db.query(models.Post).filter(models.Post.user_id == current_user.id).order_by(models.Post.created_at.desc()).all()
-    return [prepare_post_out(p, current_user.id, db) for p in posts]
-
-@app.get("/posts/{post_id}", response_model=schemas.PostOut)
-def get_post_by_id(
-    post_id: int,
-    current_user: Optional[models.User] = Depends(get_optional_current_user),
-    db: Session = Depends(get_db)
-):
-    post = db.query(models.Post).filter(models.Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    current_id = current_user.id if current_user else 0
-    return prepare_post_out(post, current_id, db)
-
 @app.put("/posts/{post_id}", response_model=schemas.PostOut)
 def update_post(post_id: int, post_update: schemas.PostUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     post = db.query(models.Post).filter(models.Post.id == post_id, models.Post.user_id == current_user.id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found or unauthorized")
         
-    post_dict = post_update.model_dump(exclude_unset=True)
+    post_dict = post_update.dict(exclude_unset=True)
     if "images" in post_dict:
         images_list = post_dict.pop("images")
         post.images = json.dumps(images_list) if images_list is not None else None
@@ -794,38 +533,32 @@ def delete_post(post_id: int, current_user: models.User = Depends(get_current_us
     db.commit()
     return {"message": "Post deleted successfully"}
 
-
 def prepare_post_out(post, current_user_id, db, author=None):
     likes_count = db.query(models.Like).filter(models.Like.post_id == post.id).count()
     comments_count = db.query(models.Comment).filter(models.Comment.post_id == post.id).count()
     is_liked = db.query(models.Like).filter(models.Like.post_id == post.id, models.Like.user_id == current_user_id).first() is not None
     is_saved = db.query(models.SavedPost).filter(models.SavedPost.post_id == post.id, models.SavedPost.user_id == current_user_id).first() is not None
 
-    post_out = schemas.PostOut.model_validate(post, from_attributes=True)
+    post_out = schemas.PostOut.from_orm(post)
     post_out.likes_count = likes_count
     post_out.comments_count = comments_count
     post_out.is_liked = is_liked
     post_out.is_saved = is_saved
 
-    def get_author_name(u):
-        if not u:
-            return "Agri Farmer"
-        return u.full_name or u.username or (u.email.split('@')[0] if u.email else None) or f"Farmer {u.id}"
-
     # Use passed author to avoid DetachedInstanceError after commit
     if author is not None:
-        post_out.author_name = get_author_name(author)
+        post_out.author_name = author.full_name or f"Farmer {author.id}"
         post_out.author_avatar = author.profile_picture
         post_out.author_verified = author.is_verified
     else:
         try:
-            post_out.author_name = get_author_name(post.user)
+            post_out.author_name = post.user.full_name or f"Farmer {post.user.id}"
             post_out.author_avatar = post.user.profile_picture
             post_out.author_verified = post.user.is_verified
         except Exception:
             # Fallback: fetch user manually if lazy-load fails
             u = db.query(models.User).filter(models.User.id == post.user_id).first()
-            post_out.author_name = get_author_name(u)
+            post_out.author_name = u.full_name if u else f"Farmer {post.user_id}"
             post_out.author_avatar = u.profile_picture if u else None
             post_out.author_verified = u.is_verified if u else False
 
@@ -883,7 +616,7 @@ def comment_post(post_id: int, comment: schemas.CommentCreate, current_user: mod
         actor_name = current_user.full_name or f"Farmer {current_user.id}"
         create_notification(db, post.user_id, current_user.id, "COMMENT",
             f"{actor_name} commented on your post", post_id=post_id)
-    out = schemas.CommentOut.model_validate(db_comment, from_attributes=True)
+    out = schemas.CommentOut.from_orm(db_comment)
     out.author_name = current_user.full_name or f"Farmer {current_user.id}"
     out.author_avatar = current_user.profile_picture
     return out
@@ -893,7 +626,7 @@ def get_comments(post_id: int, db: Session = Depends(get_db)):
     comments = db.query(models.Comment).filter(models.Comment.post_id == post_id, models.Comment.parent_id == None).order_by(models.Comment.created_at.desc()).all()
     res = []
     for c in comments:
-        out = schemas.CommentOut.model_validate(c, from_attributes=True)
+        out = schemas.CommentOut.from_orm(c)
         out.author_name = c.user.full_name or f"Farmer {c.user_id}"
         out.author_avatar = c.user.profile_picture
         res.append(out)
@@ -912,11 +645,19 @@ def save_post(post_id: int, current_user: models.User = Depends(get_current_user
         db.commit()
         return {"saved": True, "message": "Post saved"}
 
-# Endpoints shifted above to prevent route conflict with /posts/{post_id}
+@app.get("/posts/saved", response_model=List[schemas.PostOut])
+def get_saved_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    saved = db.query(models.SavedPost).filter(models.SavedPost.user_id == current_user.id).all()
+    posts = [s.post for s in saved if s.post]
+    return [prepare_post_out(p, current_user.id, db) for p in posts]
+
+@app.get("/posts/user", response_model=List[schemas.PostOut])
+def get_user_posts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    posts = db.query(models.Post).filter(models.Post.user_id == current_user.id).order_by(models.Post.created_at.desc()).all()
+    return [prepare_post_out(p, current_user.id, db) for p in posts]
 
 # ─── Notifications ───
 @app.get("/notifications", response_model=List[schemas.NotificationOut])
-@app.get("/api/notifications", response_model=List[schemas.NotificationOut])
 def get_notifications(
     skip: int = 0,
     limit: int = 50,
@@ -929,7 +670,7 @@ def get_notifications(
 
     result = []
     for n in notifs:
-        out = schemas.NotificationOut.model_validate(n, from_attributes=True)
+        out = schemas.NotificationOut.from_orm(n)
         if n.actor_id:
             actor = db.query(models.User).filter(models.User.id == n.actor_id).first()
             out.actor_name = actor.full_name if actor else None
@@ -938,7 +679,6 @@ def get_notifications(
     return result
 
 @app.get("/notifications/unread-count")
-@app.get("/api/notifications/unread-count")
 def get_unread_count(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     count = db.query(models.Notification).filter(
         models.Notification.user_id == current_user.id,
@@ -947,7 +687,6 @@ def get_unread_count(current_user: models.User = Depends(get_current_user), db: 
     return {"count": count}
 
 @app.post("/notifications/read-all")
-@app.post("/api/notifications/read-all")
 def mark_all_read(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     db.query(models.Notification).filter(
         models.Notification.user_id == current_user.id,
@@ -957,7 +696,6 @@ def mark_all_read(current_user: models.User = Depends(get_current_user), db: Ses
     return {"message": "All notifications marked as read"}
 
 @app.post("/notifications/{notif_id}/read")
-@app.post("/api/notifications/{notif_id}/read")
 def mark_one_read(notif_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     notif = db.query(models.Notification).filter(
         models.Notification.id == notif_id,
@@ -969,7 +707,6 @@ def mark_one_read(notif_id: int, current_user: models.User = Depends(get_current
     return {"message": "Notification marked as read"}
 
 @app.delete("/notifications")
-@app.delete("/api/notifications")
 def clear_notifications(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     db.query(models.Notification).filter(
         models.Notification.user_id == current_user.id
@@ -977,7 +714,117 @@ def clear_notifications(current_user: models.User = Depends(get_current_user), d
     db.commit()
     return {"message": "All notifications cleared"}
 
+# ─── User Search & Social Endpoints ───
+@app.get("/users/search", response_model=List[schemas.UserSearchOut])
+@app.get("/api/users/search", response_model=List[schemas.UserSearchOut])
+def search_users(
+    q: str = Query(..., min_length=1),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    from sqlalchemy import or_
+    search_term = f"%{q}%"
+    current_id = current_user.id if current_user else None
 
+    query = db.query(models.User).filter(
+        or_(
+            models.User.full_name.ilike(search_term),
+            models.User.username.ilike(search_term),
+            models.User.email.ilike(search_term),
+            models.User.village.ilike(search_term),
+        )
+    )
+    if current_id:
+        query = query.filter(models.User.id != current_id)
+
+    users = query.offset(skip).limit(limit).all()
+
+    results = []
+    for u in users:
+        is_following = False
+        if current_id:
+            is_following = db.query(models.Follow).filter(
+                models.Follow.follower_id == current_id,
+                models.Follow.following_id == u.id
+            ).first() is not None
+        
+        followers_cnt = db.query(models.Follow).filter(models.Follow.following_id == u.id).count()
+        following_cnt = db.query(models.Follow).filter(models.Follow.follower_id == u.id).count()
+
+        results.append(schemas.UserSearchOut(
+            id=u.id,
+            full_name=u.full_name,
+            display_name=u.full_name or f"Farmer {u.id}",
+            username=u.username,
+            email=u.email,
+            village=u.village or "Agricultural Hub",
+            profile_picture=u.profile_picture,
+            profile_photo=u.profile_picture,
+            bio=u.bio,
+            verified=u.is_verified,
+            is_verified=u.is_verified,
+            followers=followers_cnt,
+            followers_count=followers_cnt,
+            following_count=following_cnt,
+            is_following=is_following,
+            isFollowing=is_following,
+        ))
+    return results
+
+@app.get("/users/suggested", response_model=List[schemas.UserSearchOut])
+@app.get("/api/users/suggested", response_model=List[schemas.UserSearchOut])
+def get_suggested_users(
+    limit: int = Query(default=5, ge=1, le=20),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    following_ids = [f.following_id for f in db.query(models.Follow.following_id).filter(models.Follow.follower_id == current_user.id).all()]
+    exclude_ids = set(following_ids)
+    exclude_ids.add(current_user.id)
+
+    query = db.query(models.User).filter(~models.User.id.in_(exclude_ids))
+    
+    suggested = []
+    if current_user.crop_specialization or current_user.village:
+        from sqlalchemy import or_
+        matches = query.filter(
+            or_(
+                models.User.crop_specialization == current_user.crop_specialization,
+                models.User.village == current_user.village
+            )
+        ).limit(limit).all()
+        suggested.extend(matches)
+
+    if len(suggested) < limit:
+        already_picked = {u.id for u in suggested}
+        already_picked.update(exclude_ids)
+        remains = db.query(models.User).filter(~models.User.id.in_(already_picked)).limit(limit - len(suggested)).all()
+        suggested.extend(remains)
+
+    res = []
+    for u in suggested:
+        followers_cnt = db.query(models.Follow).filter(models.Follow.following_id == u.id).count()
+        res.append(schemas.UserSearchOut(
+            id=u.id,
+            full_name=u.full_name,
+            display_name=u.full_name or f"Farmer {u.id}",
+            username=u.username,
+            email=u.email,
+            village=u.village or "Agricultural Hub",
+            profile_picture=u.profile_picture,
+            profile_photo=u.profile_picture,
+            bio=u.bio,
+            verified=u.is_verified,
+            is_verified=u.is_verified,
+            followers=followers_cnt,
+            followers_count=followers_cnt,
+            following_count=0,
+            is_following=False,
+            isFollowing=False
+        ))
+    return res
 
 @app.get("/users/{user_id}/posts", response_model=List[schemas.PostOut])
 @app.get("/api/users/{user_id}/posts", response_model=List[schemas.PostOut])
@@ -1082,155 +929,65 @@ def is_following_user(user_id: int, current_user: models.User = Depends(get_curr
     return {"is_following": following, "isFollowing": following}
 
 # ─── Chat AI ───
-@app.post("/ai/chat")
-@app.post("/api/ai/chat")
+@app.post("/ai/chat", response_model=schemas.ChatMessage)
 async def chat_with_ai(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    try:
-        # Save user message to database defensively
-        try:
-            user_msg = models.ChatMessage(
-                user_id=current_user.id,
-                conversation_id=chat.conversation_id,
-                message=chat.message,
-                is_ai=False
-            )
-            db.add(user_msg)
-            db.commit()
-        except Exception as db_err:
-            logger.warning(f"[Chat User DB Save Error] {db_err}")
-            db.rollback()
+    user_msg = models.ChatMessage(
+        user_id=current_user.id,
+        conversation_id=chat.conversation_id,
+        message=chat.message,
+        is_ai=False
+    )
+    db.add(user_msg)
+    db.commit()
 
-        # Get history for context
-        history = []
-        try:
-            query = db.query(models.ChatMessage).filter(models.ChatMessage.user_id == current_user.id)
-            if chat.conversation_id:
-                query = query.filter(models.ChatMessage.conversation_id == chat.conversation_id)
-            else:
-                query = query.filter(models.ChatMessage.conversation_id == None)
+    # Get history for context, filter by conversation_id if provided
+    query = db.query(models.ChatMessage).filter(models.ChatMessage.user_id == current_user.id)
+    if chat.conversation_id:
+        query = query.filter(models.ChatMessage.conversation_id == chat.conversation_id)
+    else:
+        query = query.filter(models.ChatMessage.conversation_id == None)
 
-            history = query.order_by(models.ChatMessage.created_at.desc()).limit(10).all()
-            history.reverse()
-        except Exception as hist_err:
-            logger.warning(f"[Chat History Fetch Error] {hist_err}")
+    history = query.order_by(models.ChatMessage.created_at.desc()).limit(10).all()
+    history.reverse()
 
-        # Fetch last 3 scans for smart context memory
-        scan_context = ""
-        try:
-            scans = db.query(models.CropScan).filter(
-                models.CropScan.user_id == current_user.id,
-                models.CropScan.is_valid_crop == True
-            ).order_by(models.CropScan.created_at.desc()).limit(3).all()
-            
-            if scans:
-                scan_context = "User's recent crop scans:\n"
-                for scan in scans:
-                    crop_name = getattr(scan, 'detected_object', None) or "Crop"
-                    date_str = scan.created_at.strftime('%Y-%m-%d') if getattr(scan, 'created_at', None) else "N/A"
-                    scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name or 'N/A'}, Severity: {scan.severity_level or 'N/A'}, Date: {date_str}\n"
-        except Exception as scan_err:
-            logger.warning(f"[Chat Scan Context Error] {scan_err}")
+    # Fetch last 3 scans for smart context memory
+    scans = db.query(models.CropScan).filter(
+        models.CropScan.user_id == current_user.id,
+        models.CropScan.is_valid_crop == True
+    ).order_by(models.CropScan.created_at.desc()).limit(3).all()
+    
+    scan_context = ""
+    if scans:
+        scan_context = "User's recent crop scans:\n"
+        for scan in scans:
+            crop_name = scan.detected_object or "Crop"
+            scan_context += f"- Crop: {crop_name}, Diagnosis: {scan.disease_name}, Severity: {scan.severity_level}, Date: {scan.created_at.strftime('%Y-%m-%d')}\n"
 
-        # Handle image attachment analysis if present
-        if chat.image_url:
-            try:
-                img_analysis = await ai_service.ai_service.detect_disease(chat.image_url)
-                if img_analysis:
-                    crop = img_analysis.get("crop_type", "Crop")
-                    disease = img_analysis.get("disease_name", "Unknown")
-                    sev = img_analysis.get("severity_level", "Unknown")
-                    symp = img_analysis.get("symptoms", "")
-                    scan_context += f"\n[CURRENT ATTACHED IMAGE ANALYSIS]: Crop: {crop}, Condition: {disease}, Severity: {sev}, Symptoms: {symp}\n"
-            except Exception as img_err:
-                logger.warning(f"[Chat Image Analysis Warning] {img_err}")
-
-        if chat.stream:
-            from fastapi.responses import StreamingResponse
-            import json
-
-            async def sse_chat_generator():
-                ai_reply = ""
-                try:
-                    async for chunk in ai_service.ai_service.get_chat_response_stream(
-                        chat.message, history, scan_context=scan_context, language=chat.language
-                    ):
-                        ai_reply += chunk
-                        yield f"data: {json.dumps({'text': chunk, 'done': False})}\n\n"
-                    
-                    # At the end, save the response to database
-                    saved_id = -1
-                    try:
-                        ai_msg = models.ChatMessage(
-                            user_id=current_user.id,
-                            conversation_id=chat.conversation_id,
-                            message=ai_reply,
-                            is_ai=True
-                        )
-                        db.add(ai_msg)
-                        db.commit()
-                        db.refresh(ai_msg)
-                        saved_id = ai_msg.id
-                    except Exception as ai_db_err:
-                        logger.warning(f"[Chat AI DB Save Error] {ai_db_err}")
-
-                    # Yield final event
-                    yield f"data: {json.dumps({'text': '', 'done': True, 'id': saved_id, 'conversation_id': chat.conversation_id})}\n\n"
-                except Exception as e:
-                    logger.error(f"[Chat Stream Error] {e}")
-                    fallback_msg = "AgriGPT is temporarily unavailable. Please try again."
-                    yield f"data: {json.dumps({'text': fallback_msg, 'done': False})}\n\n"
-                    yield f"data: {json.dumps({'text': '', 'done': True, 'id': -1, 'conversation_id': chat.conversation_id})}\n\n"
-
-            return StreamingResponse(sse_chat_generator(), media_type="text/event-stream")
-
-        ai_reply = await ai_service.ai_service.get_chat_response(
-            chat.message, history, scan_context=scan_context, language=chat.language
-        )
-
-        saved_msg_id = Date_now_id = int(time.time() * 1000)
-        try:
-            ai_msg = models.ChatMessage(
-                user_id=current_user.id,
-                conversation_id=chat.conversation_id,
-                message=ai_reply,
-                is_ai=True
-            )
-            db.add(ai_msg)
-            db.commit()
-            db.refresh(ai_msg)
-            saved_msg_id = ai_msg.id
-        except Exception as ai_db_err:
-            logger.warning(f"[Chat AI DB Save Error] {ai_db_err}")
-
-        return {
-            "success": True,
-            "response": ai_reply,
-            "message": ai_reply,
-            "reply": ai_reply,
-            "id": saved_msg_id,
-            "conversation_id": chat.conversation_id,
-            "is_ai": True,
-            "created_at": datetime.utcnow().isoformat()
-        }
-    except Exception as top_err:
-        logger.error(f"[Chat Top-Level Exception] {top_err}", exc_info=True)
-        return {
-            "success": True,
-            "response": "AgriGPT is available. Please try asking your question again.",
-            "message": "AgriGPT is available. Please try asking your question again.",
-            "reply": "AgriGPT is available. Please try asking your question again.",
-            "id": -1,
-            "conversation_id": chat.conversation_id,
-            "is_ai": True
-        }
+    ai_reply = await ai_service.ai_service.get_chat_response(chat.message, history, scan_context=scan_context)
+    
+    ai_msg = models.ChatMessage(
+        user_id=current_user.id,
+        conversation_id=chat.conversation_id,
+        message=ai_reply,
+        is_ai=True
+    )
+    db.add(ai_msg)
+    db.commit()
+    db.refresh(ai_msg)
+    return ai_msg
 
 @app.post("/chat")
-@app.post("/api/chat")
 async def chat_legacy(chat: schemas.ChatMessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     res = await chat_with_ai(chat, current_user, db)
-    if isinstance(res, StreamingResponse):
-        return res
-    return res
+    return {
+        "response": res.message,
+        "message": res.message,
+        "reply": res.message,
+        "id": res.id,
+        "conversation_id": res.conversation_id,
+        "is_ai": res.is_ai,
+        "created_at": res.created_at
+    }
 
 @app.get("/chat/history", response_model=List[schemas.ChatMessage])
 def get_chat_history(conversation_id: Optional[str] = None, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1313,267 +1070,40 @@ def get_conversations(current_user: models.User = Depends(get_current_user), db:
     
     return results
 
-# ─── Crop Scan (Two-Stage Validation Pipeline) ───
-@app.post(
-    "/ai/detect-disease",
-    response_model=schemas.CropScanOut,
-    summary="Detect Crop Disease from Image",
-    description="Upload a crop/plant leaf image file or provide an image URL / base64 string to detect plant diseases.",
-    openapi_extra={
-        "requestBody": {
-            "required": True,
-            "content": {
-                "multipart/form-data": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "file": {
-                                "type": "string",
-                                "format": "binary",
-                                "description": "Crop or plant leaf image file to scan"
-                            },
-                            "image_url": {
-                                "type": "string",
-                                "description": "Optional image URL or base64 data string"
-                            },
-                            "scan_mode": {
-                                "type": "string",
-                                "default": "full",
-                                "description": "Scan mode ('crop' or 'full')"
-                            }
-                        }
-                    }
-                },
-                "application/json": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "image_url": {
-                                "type": "string",
-                                "description": "Image URL or base64 data string"
-                            },
-                            "scan_mode": {
-                                "type": "string",
-                                "default": "full"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-)
-async def create_scan(
-    request: Request,
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    content_type = request.headers.get("content-type", "")
-    image_url = ""
-    scan_mode = "full"
-    filename = "data_url.jpg"
-
-    print("=== CROP IMAGE RECEIVED ===")
-    print("Filename:", filename)
-    print("Content type:", content_type)
-
-    if "multipart/form-data" in content_type:
-        form = await request.form()
-        file_obj = form.get("file") or form.get("image")
-        scan_mode_val = form.get("scan_mode")
-        if scan_mode_val:
-            scan_mode = str(scan_mode_val)
-
-        if file_obj and hasattr(file_obj, "read"):
-            filename = getattr(file_obj, "filename", "uploaded_image.jpg")
-            file_mime = getattr(file_obj, "content_type", "image/jpeg")
-            image_bytes = await file_obj.read()
-            print("Image byte size:", len(image_bytes))
-            logger.info(f"[AI Endpoint] Received filename: '{filename}', Content-Type: '{file_mime}', Byte size: {len(image_bytes)} bytes")
-
-            # Verify & decode image via PIL
-            try:
-                img = Image.open(io.BytesIO(image_bytes))
-                print("- width:", img.width)
-                print("- height:", img.height)
-                print("- mode:", img.mode)
-                print("- format:", getattr(img, "format", "JPEG"))
-                logger.info(f"[AI Endpoint] Decoded image dimensions: {img.width}x{img.height}, Color mode: {img.mode}")
-            except Exception as img_err:
-                logger.error(f"[AI Endpoint Error] Failed to decode image bytes: {img_err}")
-                raise HTTPException(status_code=400, detail=f"Invalid or corrupted image file: {img_err}")
-
-            b64_str = base64.b64encode(image_bytes).decode("utf-8")
-            image_url = f"data:{file_mime};base64,{b64_str}"
-        elif form.get("image_url") or form.get("image") or form.get("file"):
-            image_url = str(form.get("image_url") or form.get("image") or form.get("file"))
-    else:
-        try:
-            body = await request.json()
-            image_url = (
-                body.get("image_url") or 
-                body.get("image") or 
-                body.get("file") or 
-                body.get("data") or 
-                ""
-            )
-            if isinstance(image_url, str):
-                image_url = image_url.strip()
-
-            scan_mode = body.get("scan_mode", "full")
-            logger.info(f"[AI Endpoint] JSON request parsed. Payload keys: {list(body.keys())}, image_url length: {len(image_url)}, scan_mode: {scan_mode}")
-            
-            if image_url and not image_url.startswith("http") and not image_url.startswith("data:image"):
-                if "," in image_url:
-                    image_url = f"data:image/jpeg;base64,{image_url.split(',', 1)[1]}"
-                else:
-                    image_url = f"data:image/jpeg;base64,{image_url}"
-
-            if image_url.startswith("data:image"):
-                try:
-                    b64_part = image_url.split(",", 1)[1] if "," in image_url else image_url
-                    image_bytes = base64.b64decode(b64_part)
-                    img = Image.open(io.BytesIO(image_bytes))
-                    logger.info(f"[AI Endpoint] Base64 image verified via PIL: {img.width}x{img.height}, format={getattr(img, 'format', 'JPEG')}, size={len(image_bytes)} bytes")
-                except Exception as b64_err:
-                    logger.warning(f"[AI Endpoint Warning] Could not decode Base64 preview via PIL: {b64_err}")
-        except Exception as json_err:
-            logger.error(f"[AI Endpoint Error] Failed to parse JSON request body: {json_err}")
-            raise HTTPException(status_code=400, detail=f"Invalid JSON body format: {json_err}")
-
-    if not image_url:
-        logger.error("[AI Endpoint Error] Missing required image_url or image file payload")
-        raise HTTPException(status_code=400, detail="Missing required image_url or image file payload.")
-
-    effective_scan_mode = (scan_mode or "full").lower()
-    if effective_scan_mode not in ["crop", "full"]:
-        effective_scan_mode = "full"
-
-    # ━━━ STAGE 1: Validate that the image contains a crop/plant ━━━
-    try:
-        validation = await ai_service.ai_service.validate_crop_image(image_url)
-        logger.info(f"[AI Endpoint] Stage 1 Validation Result: is_valid={validation.get('is_valid')}, detected={validation.get('detected_object')}, confidence={validation.get('confidence')}")
-    except Exception as e:
-        logger.error(f"[AI Endpoint Error] Stage 1 Validation failed: {e}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"AI Scanner Stage 1 Validation failed: {str(e)}"
-        )
-
-    if not validation.get("is_valid", True):
-        # Image rejected — return immediately without running disease detection
-        detected = validation.get("detected_object", "non-agricultural object")
-        reason = validation.get("rejection_reason", "This image does not contain a detectable crop or plant.")
-        quality_issue = validation.get("quality_issue")
-
-        disease_name = "Quality Issue" if quality_issue else "Invalid Crop Scan"
-
-        return schemas.CropScanOut(
-            id=-1,
-            user_id=current_user.id,
-            image_url=image_url,
-            disease_name=disease_name,
-            confidence=validation.get("confidence", 0.0),
-            scan_mode=effective_scan_mode,
-            is_valid_crop=False,
-            severity_level="Critical",
-            symptoms=reason,
-            causes=f"Detected: {detected}. {reason}",
-            prevention="Align a plant leaf, fruit, or stem in the camera frame for accurate disease detection.",
-            detected_object=detected,
-            rejection_reason=reason,
-            created_at=datetime.now(timezone.utc)
-        )
-
-    # ━━━ STAGE 2: Run disease detection (only for validated crop images) ━━━
-    try:
-        analysis = await ai_service.ai_service.detect_disease(image_url)
-        logger.info(f"[AI Endpoint] Stage 2 Disease Model Result: crop={analysis.get('crop_type')}, disease={analysis.get('disease_name')}, confidence={analysis.get('confidence_level')}")
-    except Exception as e:
-        logger.error(f"[AI Endpoint Error] Stage 2 Disease Detection failed: {e}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"AI Scanner Stage 2 Disease Detection failed: {str(e)}"
-        )
-
-    if not analysis:
-        analysis = {
-            "is_valid_crop": True,
-            "disease_name": "Analysis Unavailable",
-            "confidence_level": 0.0,
-            "severity_level": "Warning",
-            "symptoms": "AI service temporarily unavailable",
-            "causes": "Server connectivity issue",
-            "prevention": "Please try again in a moment",
-            "treatment": "Retry scan or consult local agriculture expert",
-            "organic_treatment": "Consult local expert",
-            "pesticide_recommendations": "Consult local dealer",
-            "irrigation_recommendations": "Maintain regular schedule",
-            "fertilizer_recommendations": "Balanced NPK",
-            "recovery_steps": "Retry scan when service is available",
-            "estimated_recovery_time": "N/A",
-            "weather_risk": "N/A",
-            "prevention_tips": "Regular monitoring recommended",
-        }
-
-    # Only reject when Gemini clearly states the image is not a plant (is_valid_crop = False)
-    if not analysis.get("is_valid_crop", True):
-        confidence = analysis.get("confidence") or analysis.get("confidence_level") or 0.0
-        return schemas.CropScanOut(
-            id=-1,
-            user_id=current_user.id,
-            image_url=image_url,
-            disease_name="Invalid Crop Scan",
-            confidence=confidence,
-            scan_mode=effective_scan_mode,
-            is_valid_crop=False,
-            severity_level="Critical",
-            symptoms="Unable to identify a crop. Please upload a clear image of a plant leaf.",
-            causes="Low confidence match or non-crop object detected.",
-            prevention="Make sure the leaf is in focus and there is adequate lighting.",
-            detected_object=analysis.get("crop_type", "non-crop object"),
-            rejection_reason="Unable to identify a crop. Please upload a clear image of a plant leaf.",
-            scientific_name="N/A",
-            created_at=datetime.now(timezone.utc)
-        )
-
-    conf_val = analysis.get("confidence") or analysis.get("confidence_level") or 90.0
-    try:
-        conf_float = float(conf_val)
-    except Exception:
-        conf_float = 90.0
+# ─── Crop Scan (Trained PyTorch ML Engine) ───
+@app.post("/ai/detect-disease", response_model=schemas.CropScanOut)
+async def create_scan(scan: schemas.CropScanCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Run inference directly using trained PyTorch ResNet18 model
+    analysis = await ai_service.ai_service.detect_disease(scan.image_url)
 
     db_scan = models.CropScan(
         user_id=current_user.id,
-        image_url=image_url,
-        disease_name=analysis.get("disease_name", "Healthy Crop"),
-        confidence=conf_float,
-        scan_mode=effective_scan_mode,
+        image_url=scan.image_url,
+        disease_name=analysis.get("disease_name", "Unknown"),
+        confidence=analysis.get("confidence", 0.0),
         symptoms=analysis.get("symptoms"),
         causes=analysis.get("causes"),
         prevention=analysis.get("prevention"),
-        pesticide_recommendations=analysis.get("pesticide_recommendations") or analysis.get("treatment"),
+        pesticide_recommendations=analysis.get("pesticide_recommendations"),
         organic_treatment=analysis.get("organic_treatment"),
         irrigation_recommendations=analysis.get("irrigation_recommendations"),
         fertilizer_recommendations=analysis.get("fertilizer_recommendations"),
         recovery_steps=analysis.get("recovery_steps"),
         estimated_recovery_time=analysis.get("estimated_recovery_time"),
-        severity_level=analysis.get("severity_level", "Healthy"),
-        health_score=analysis.get("health_score", 85),
+        severity_level=analysis.get("severity_level", "Warning"),
+        health_score=analysis.get("health_score"),
         yield_impact=analysis.get("yield_impact"),
         pro_tips=analysis.get("pro_tips"),
         prevention_tips=analysis.get("prevention_tips"),
         is_valid_crop=True,
-        detected_object=analysis.get("crop_type", "Crop"),
-        rejection_reason="",
-        scientific_name=analysis.get("scientific_name", "N/A")
+        detected_object=analysis.get("detected_object", "Crop"),
+        rejection_reason=""
     )
     db.add(db_scan)
     db.commit()
     db.refresh(db_scan)
-    
-    # Return with extra fields from analysis
-    result = schemas.CropScanOut.model_validate(db_scan, from_attributes=True)
+
+    result = schemas.CropScanOut.from_orm(db_scan)
     return result
 
 @app.get("/ai/scan-history", response_model=List[schemas.CropScanOut])
@@ -1586,64 +1116,6 @@ def get_scan_history(
         models.CropScan.user_id == current_user.id
     ).order_by(models.CropScan.created_at.desc()).limit(limit).all()
     return scans
-
-@app.get("/ai/model-info")
-def get_ai_model_info():
-    """Returns current PyTorch vision engine architecture, device, status, and metadata."""
-    return ai_service.ai_service.vision_engine.get_model_info()
-
-@app.get("/ai/accuracy-metrics")
-def get_ai_accuracy_metrics():
-    """Returns PyTorch V2-B vision model validation accuracy and recall metrics."""
-    return {
-        "model_architecture": "ResNet18 V2-B Pipeline",
-        "validation_accuracy": 99.4,
-        "test_accuracy": 99.31,
-        "macro_f1_score": 99.09,
-        "plant_detection_recall": 99.2,
-        "false_rejection_rate": 0.5,
-        "inference_latency_ms": 24.5,
-        "supported_disease_classes": 60,
-        "two_stage_enabled": True,
-        "gradcam_supported": True
-    }
-
-@app.get("/ai/supported-crops")
-def get_supported_crops():
-    return {
-        "crops": [
-            "Apple", "Bitter Gourd", "Blueberry", "Bottle Gourd", "Cauliflower",
-            "Cherry", "Corn", "Cucumber", "Eggplant", "Grape", "Orange",
-            "Peach", "Bell Pepper", "Potato", "Raspberry", "Soybean",
-            "Squash", "Strawberry", "Tomato", "Unknown Crop Species"
-        ]
-    }
-
-@app.get("/ai/supported-diseases")
-def get_supported_diseases():
-    return {
-        "total_diseases": 60,
-        "categories": [
-            "Apple Scab", "Black Rot", "Cedar Apple Rust", "Downey Mildew",
-            "Fusarium Wilt", "Mosaic Virus", "Anthracnose", "Powdery Mildew",
-            "Cercospora Leaf Spot", "Common Rust", "Northern Leaf Blight",
-            "Belly Rot", "Begomovirus", "Verticillium Wilt", "Citrus Greening",
-            "Bacterial Spot", "Early Blight", "Late Blight", "Leaf Scorch",
-            "Insect Damage", "Leaf Mold", "Leaf Miner", "Septoria Leaf Spot",
-            "Spider Mites", "Target Spot", "Yellow Leaf Curl Virus",
-            "Spotted Wilt", "Healthy Leaf"
-        ]
-    }
-
-@app.get("/ai/model-info")
-def get_model_info():
-    return {
-        "model_name": "AgriNex V2-B ResNet18 Crop Vision & Gemini Engine",
-        "version": "2.5.0-v2b",
-        "status": "active",
-        "backend_framework": "PyTorch 2.0 / Google Gemini AI",
-        "cache_loaded": True
-    }
 
 # ─── Weather (Real via Open-Meteo API) ───
 def _get_weather_condition(wmo_code: int) -> str:
@@ -1772,127 +1244,27 @@ def _get_farming_suitability(temp: float, humidity: int, wind: float, rain_prob:
     else:
         return "Poor — Postpone field work if possible"
 
-@app.get("/api/location/reverse")
-@app.get("/location/reverse")
-async def reverse_geocode_coords(
-    lat: float = Query(..., description="Latitude"),
-    lon: float = Query(..., description="Longitude")
-):
-    """
-    Reverse geocode coordinates to obtain Village, District, State, Country.
-    Uses high accuracy reverse geocoding via OpenStreetMap Nominatim.
-    """
-    result = {
-        "latitude": lat,
-        "longitude": lon,
-        "village": "Agricultural Village",
-        "district": "Pune District",
-        "state": "Maharashtra",
-        "country": "India",
-        "display_name": "Agricultural Village, Pune District, Maharashtra, India"
-    }
-    try:
-        geo_url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json&zoom=18"
-        async with httpx.AsyncClient(timeout=4.0) as geo_client:
-            geo_resp = await geo_client.get(geo_url, headers={"User-Agent": "AgriNex/1.0"})
-            if geo_resp.status_code == 200:
-                geo_data = geo_resp.json()
-                address = geo_data.get("address", {})
-                
-                village = (
-                    address.get("village") or 
-                    address.get("suburb") or 
-                    address.get("town") or 
-                    address.get("hamlet") or 
-                    address.get("neighbourhood") or 
-                    address.get("city_district") or 
-                    "Agricultural Village"
-                )
-                district = (
-                    address.get("county") or 
-                    address.get("state_district") or 
-                    address.get("city") or 
-                    "Pune District"
-                )
-                state = address.get("state") or "Maharashtra"
-                country = address.get("country") or "India"
-                
-                parts = [p for p in [village, district, state, country] if p]
-                display_name = ", ".join(parts) if parts else "Maharashtra, India"
-                
-                result.update({
-                    "village": village,
-                    "district": district,
-                    "state": state,
-                    "country": country,
-                    "display_name": display_name
-                })
-    except Exception as e:
-        logger.warning(f"[Location Reverse] Error during Nominatim reverse geocode: {e}")
-        
-    return result
-
 @app.get("/weather/current")
 async def get_weather(
     lat: Optional[float] = Query(default=19.076, description="Latitude"),
     lon: Optional[float] = Query(default=72.8777, description="Longitude"),
 ):
     """Fetch real weather data from Open-Meteo API with farming insights."""
-    data = None
-    retries = 2
-    for attempt in range(retries):
-        try:
-            async with httpx.AsyncClient(timeout=6.0) as http_client:
-                url = (
-                    f"https://api.open-meteo.com/v1/forecast?"
-                    f"latitude={lat}&longitude={lon}"
-                    f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,"
-                    f"weather_code,wind_speed_10m,surface_pressure"
-                    f"&daily=temperature_2m_max,temperature_2m_min,weather_code,"
-                    f"precipitation_probability_max,uv_index_max,sunrise,sunset"
-                    f"&timezone=auto&forecast_days=7"
-                )
-                resp = await http_client.get(url)
-                resp.raise_for_status()
-                data = resp.json()
-                break
-        except Exception as retry_err:
-            if attempt < retries - 1:
-                await asyncio.sleep(0.3)
-            else:
-                logger.warning(f"[Weather API Warning] Open-Meteo API unavailable ({retry_err}). Returning seasonal estimate fallback.")
-
-    if not data:
-        # Fallback structured response when Open-Meteo returns 503 or is unavailable
-        return {
-            "temp": 32,
-            "feels_like": 34,
-            "condition": "Partly Cloudy",
-            "humidity": 55,
-            "wind": 12,
-            "uv_index": 6.5,
-            "rain_probability": 20,
-            "pressure": 1013,
-            "visibility": 10.0,
-            "location": f"{lat:.2f}° N, {lon:.2f}° E",
-            "sunrise": "05:42 AM",
-            "sunset": "06:54 PM",
-            "daily_high": 35,
-            "daily_low": 24,
-            "soil_moisture": "Moderate — Monitor irrigation needs",
-            "farming_suitability": "Good — Most activities suitable",
-            "alerts": [{"type": "info", "severity": "low", "message": "ℹ️ Real-time weather sync paused temporarily. Displaying regional seasonal estimate.", "icon": "CloudSun"}],
-            "forecast": [
-                {"day": "Mon", "temp": 31, "condition": "Sunny", "icon": "Sun"},
-                {"day": "Tue", "temp": 29, "condition": "Cloudy", "icon": "CloudIcon"},
-                {"day": "Wed", "temp": 28, "condition": "Rain", "icon": "CloudRain"},
-                {"day": "Thu", "temp": 30, "condition": "Sunny", "icon": "Sun"},
-                {"day": "Fri", "temp": 32, "condition": "Sunny", "icon": "Sun"}
-            ],
-            "weather_available": False
-        }
-
     try:
+        async with httpx.AsyncClient(timeout=8.0) as http_client:
+            url = (
+                f"https://api.open-meteo.com/v1/forecast?"
+                f"latitude={lat}&longitude={lon}"
+                f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,"
+                f"weather_code,wind_speed_10m,surface_pressure"
+                f"&daily=temperature_2m_max,temperature_2m_min,weather_code,"
+                f"precipitation_probability_max,uv_index_max,sunrise,sunset"
+                f"&timezone=auto&forecast_days=7"
+            )
+            resp = await http_client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+        
         current = data.get("current", {})
         daily = data.get("daily", {})
         
@@ -1997,6 +1369,7 @@ async def get_weather(
         }
     except Exception as e:
         logger.error(f"Weather API error: {e}")
+        # Fallback to realistic mock data
         return {
             "temp": 32,
             "feels_like": 34,
@@ -2078,8 +1451,8 @@ def prepare_message_out(msg: models.Message, current_user_id: int, db: Session) 
     sender_name = sender_u.full_name if sender_u else f"Farmer {msg.sender_id}"
     sender_avatar = sender_u.profile_picture if sender_u else None
 
-    attachments_out = [schemas.MessageAttachmentOut.model_validate(a, from_attributes=True) for a in msg.attachments]
-    reactions_out = [schemas.MessageReactionOut.model_validate(r, from_attributes=True) for r in msg.reactions]
+    attachments_out = [schemas.MessageAttachmentOut.from_orm(a) for a in msg.attachments]
+    reactions_out = [schemas.MessageReactionOut.from_orm(r) for r in msg.reactions]
 
     return schemas.MessageOut(
         id=msg.id,
@@ -2169,12 +1542,8 @@ def prepare_conversation_out(conv: models.Conversation, current_user_id: int, db
     )
 
 
-@app.get("/conversations", response_model=List[schemas.ConversationOut])
-@app.get("/api/conversations", response_model=List[schemas.ConversationOut])
 @app.get("/messages", response_model=List[schemas.ConversationOut])
-@app.get("/api/messages", response_model=List[schemas.ConversationOut])
-@app.get("/messages/conversations", response_model=List[schemas.ConversationOut])
-@app.get("/api/messages/conversations", response_model=List[schemas.ConversationOut])
+@app.get("/api/conversations", response_model=List[schemas.ConversationOut])
 def get_user_conversations(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     parts = db.query(models.Participant).filter(models.Participant.user_id == current_user.id).all()
     conv_ids = [p.conversation_id for p in parts]
@@ -2183,47 +1552,27 @@ def get_user_conversations(current_user: models.User = Depends(get_current_user)
 
     convs = db.query(models.Conversation).filter(models.Conversation.id.in_(conv_ids)).order_by(models.Conversation.updated_at.desc()).all()
     res = [prepare_conversation_out(c, current_user.id, db) for c in convs]
-    res.sort(
-        key=lambda x: (
-            not x.is_pinned,
-            x.updated_at if x.updated_at is not None else (x.created_at if x.created_at is not None else datetime.min)
-        ),
-        reverse=True
-    )
+    res.sort(key=lambda x: (not x.is_pinned, x.updated_at), reverse=True)
     return res
 
 
-@app.post("/conversations", response_model=schemas.ConversationOut)
-@app.post("/api/conversations", response_model=schemas.ConversationOut)
-@app.post("/conversations/start", response_model=schemas.ConversationOut)
-@app.post("/api/conversations/start", response_model=schemas.ConversationOut)
 @app.post("/messages/start", response_model=schemas.ConversationOut)
-@app.post("/messages/conversations", response_model=schemas.ConversationOut)
-@app.post("/api/messages/conversations", response_model=schemas.ConversationOut)
-def start_conversation(
-    req: Optional[schemas.StartConversationRequest] = None,
-    target_user_id: Optional[int] = Query(None),
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    target_id = (req.target_user_id if req else None) or target_user_id
-    if not target_id:
-        raise HTTPException(status_code=400, detail="target_user_id parameter or body required")
-
-    if target_id == current_user.id:
+@app.post("/api/conversations/start", response_model=schemas.ConversationOut)
+def start_conversation(req: schemas.StartConversationRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if req.target_user_id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot start a conversation with yourself")
 
-    target = db.query(models.User).filter(models.User.id == target_id).first()
+    target = db.query(models.User).filter(models.User.id == req.target_user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
 
-    if check_user_blocked(db, current_user.id, target_id):
+    if check_user_blocked(db, current_user.id, req.target_user_id):
         raise HTTPException(status_code=403, detail="Cannot message this user due to block settings")
 
     p1 = db.query(models.Participant.conversation_id).filter(models.Participant.user_id == current_user.id).subquery()
     existing = db.query(models.Participant.conversation_id).filter(
         models.Participant.conversation_id.in_(p1),
-        models.Participant.user_id == target_id
+        models.Participant.user_id == req.target_user_id
     ).first()
 
     if existing:
@@ -2235,17 +1584,15 @@ def start_conversation(
         db.refresh(conv)
 
         part1 = models.Participant(conversation_id=conv.id, user_id=current_user.id)
-        part2 = models.Participant(conversation_id=conv.id, user_id=target_id)
+        part2 = models.Participant(conversation_id=conv.id, user_id=req.target_user_id)
         db.add_all([part1, part2])
         db.commit()
 
     return prepare_conversation_out(conv, current_user.id, db)
 
 
-@app.get("/conversations/{conversation_id}/messages", response_model=List[schemas.MessageOut])
-@app.get("/api/conversations/{conversation_id}/messages", response_model=List[schemas.MessageOut])
 @app.get("/messages/{conversation_id}", response_model=List[schemas.MessageOut])
-@app.get("/api/messages/{conversation_id}", response_model=List[schemas.MessageOut])
+@app.get("/api/conversations/{conversation_id}/messages", response_model=List[schemas.MessageOut])
 def get_conversation_messages(
     conversation_id: int,
     skip: int = Query(default=0, ge=0),
@@ -2278,7 +1625,7 @@ def get_conversation_messages(
                 db.add(models.MessageRead(message_id=m.id, user_id=current_user.id, status="seen"))
             else:
                 read_entry.status = "seen"
-        part.last_read_at = datetime.now(timezone.utc)
+        part.last_read_at = datetime.utcnow()
         db.commit()
 
         other_parts = db.query(models.Participant.user_id).filter(
@@ -2297,20 +1644,13 @@ def get_conversation_messages(
     return [prepare_message_out(m, current_user.id, db) for m in messages]
 
 
-@app.post("/conversations/{conversation_id}/messages", response_model=schemas.MessageOut)
-@app.post("/api/conversations/{conversation_id}/messages", response_model=schemas.MessageOut)
 @app.post("/messages/send", response_model=schemas.MessageOut)
 @app.post("/api/messages/send", response_model=schemas.MessageOut)
-def send_message(
-    msg_in: schemas.MessageCreate,
-    conversation_id: Optional[int] = None,
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    conv_id = conversation_id or msg_in.conversation_id
+def send_message(msg_in: schemas.MessageCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv_id = msg_in.conversation_id
 
     if not conv_id and msg_in.recipient_id:
-        start_res = start_conversation(req=schemas.StartConversationRequest(target_user_id=msg_in.recipient_id), current_user=current_user, db=db)
+        start_res = start_conversation(schemas.StartConversationRequest(target_user_id=msg_in.recipient_id), current_user, db)
         conv_id = start_res.id
 
     if not conv_id:
@@ -2341,11 +1681,6 @@ def send_message(
                 raise HTTPException(status_code=403, detail="You cannot send messages because this user has blocked you.")
 
 
-    if msg_in.client_msg_id:
-        existing = db.query(models.Message).filter(models.Message.client_msg_id == msg_in.client_msg_id).first()
-        if existing:
-            return prepare_message_out(existing, current_user.id, db)
-
     if not msg_in.content and not msg_in.attachments:
         raise HTTPException(status_code=400, detail="Message content or image attachment required")
 
@@ -2353,8 +1688,7 @@ def send_message(
         conversation_id=conv_id,
         sender_id=current_user.id,
         content=msg_in.content.strip() if msg_in.content else None,
-        reply_to_id=msg_in.reply_to_id,
-        client_msg_id=msg_in.client_msg_id
+        reply_to_id=msg_in.reply_to_id
     )
     db.add(message)
     db.commit()
@@ -2362,16 +1696,13 @@ def send_message(
 
     for att_url in msg_in.attachments:
         if att_url.strip():
-            f_type = "image"
-            if "data:audio/" in att_url or ".wav" in att_url or ".mp3" in att_url or ".webm" in att_url or ".ogg" in att_url:
-                f_type = "audio"
-            db.add(models.MessageAttachment(message_id=message.id, url=att_url.strip(), file_type=f_type))
+            db.add(models.MessageAttachment(message_id=message.id, url=att_url.strip(), file_type="image"))
     db.commit()
     db.refresh(message)
 
     conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id).first()
     if conv:
-        conv.updated_at = datetime.now(timezone.utc)
+        conv.updated_at = datetime.utcnow()
         db.commit()
 
     msg_out = prepare_message_out(message, current_user.id, db)
@@ -2380,7 +1711,7 @@ def send_message(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(ws_manager.broadcast_message(msg_out.model_dump(), other_uids + [current_user.id]))
+            loop.create_task(ws_manager.broadcast_message(msg_out.dict(), other_uids + [current_user.id]))
     except Exception as e:
         logger.warning(f"WebSocket broadcast error: {e}")
 
@@ -2408,8 +1739,7 @@ def edit_message(
     if not message:
         raise HTTPException(status_code=404, detail="Message not found or unauthorized")
 
-    created_at = message.created_at.replace(tzinfo=timezone.utc) if message.created_at and message.created_at.tzinfo is None else message.created_at
-    time_diff = (datetime.now(timezone.utc) - created_at).total_seconds()
+    time_diff = (datetime.utcnow() - message.created_at).total_seconds()
     if time_diff > 900:
         raise HTTPException(status_code=400, detail="Messages can only be edited within 15 minutes of sending")
 
@@ -2428,7 +1758,7 @@ def edit_message(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_edited", "message": msg_out.model_dump()}))
+            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_edited", "message": msg_out.dict()}))
     except Exception:
         pass
 
@@ -2513,7 +1843,7 @@ def mark_messages_read(
     if not part:
         raise HTTPException(status_code=403, detail="Not a participant")
 
-    part.last_read_at = datetime.now(timezone.utc)
+    part.last_read_at = datetime.utcnow()
 
     unread_msgs = db.query(models.Message).filter(
         models.Message.conversation_id == target_id,
@@ -2594,7 +1924,7 @@ def toggle_message_reaction(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_reaction", "message": msg_out.model_dump()}))
+            loop.create_task(ws_manager.broadcast_to_users(uids, {"type": "message_reaction", "message": msg_out.dict()}))
     except Exception:
         pass
 
@@ -2718,26 +2048,46 @@ def unblock_user(user_id: int, current_user: models.User = Depends(get_current_u
     return {"blocked": False, "user_id": user_id}
 
 
+@app.get("/users/blocked", response_model=List[schemas.UserSearchOut])
+@app.get("/api/users/blocked", response_model=List[schemas.UserSearchOut])
+
+def get_blocked_users(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    blocked_entries = db.query(models.BlockedUser).filter(models.BlockedUser.blocker_id == current_user.id).all()
+    b_ids = [b.blocked_id for b in blocked_entries]
+    if not b_ids:
+        return []
+    users = db.query(models.User).filter(models.User.id.in_(b_ids)).all()
+    return [
+        schemas.UserSearchOut(
+            id=u.id,
+            full_name=u.full_name,
+            display_name=u.full_name or f"Farmer {u.id}",
+            username=u.username,
+            email=u.email,
+            village=u.village or "Agricultural Hub",
+            profile_picture=u.profile_picture,
+            profile_photo=u.profile_picture,
+            bio=u.bio,
+            verified=u.is_verified,
+            is_verified=u.is_verified,
+            followers=0,
+            followers_count=0,
+            following_count=0,
+            is_following=False,
+            isFollowing=False
+        ) for u in users
+    ]
+
+
 # ─── MEDIA UPLOAD ENDPOINT ───
 
-@app.post("/upload")
-@app.post("/api/upload")
-@app.post("/media/upload")
 @app.post("/api/media/upload")
 async def upload_media_file(file: UploadFile = File(...), current_user: models.User = Depends(get_current_user)):
     try:
         contents = await file.read()
-        if len(contents) > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
-
-        mime_type = file.content_type
-        if not mime_type or not (mime_type.startswith("image/") or mime_type.startswith("audio/") or mime_type.startswith("video/")):
-            raise HTTPException(status_code=400, detail="Invalid file type. Only image, audio, and video formats are allowed.")
-
         import base64
         ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
-        if not mime_type:
-            mime_type = f"image/{ext}"
+        mime_type = file.content_type or f"image/{ext}"
         base64_str = base64.b64encode(contents).decode("utf-8")
         data_url = f"data:{mime_type};base64,{base64_str}"
         return {"url": data_url, "filename": file.filename}
@@ -2748,51 +2098,17 @@ async def upload_media_file(file: UploadFile = File(...), current_user: models.U
 
 # ─── WEBSOCKET ROUTE ───
 
-@app.websocket("/ws/chat")
-@app.websocket("/ws/messages")
-@app.websocket("/ws/notifications")
-async def websocket_generic_endpoint(
-    websocket: WebSocket,
-    user_id: Optional[int] = Query(None),
-    token: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    actual_user_id = user_id
-    if token:
-        try:
-            payload = jwt.decode(token, auth_utils.SECRET_KEY, algorithms=[auth_utils.ALGORITHM])
-            sub = payload.get("sub")
-            if sub:
-                if str(sub).isdigit():
-                    actual_user_id = int(sub)
-                else:
-                    user = db.query(models.User).filter(models.User.email == str(sub)).first()
-                    if user:
-                        actual_user_id = user.id
-        except Exception:
-            pass
-
-    if not actual_user_id:
-        try:
-            await websocket.accept()
-            await websocket.close(code=4003)
-        except Exception:
-            pass
-        return
-
-    await websocket_chat_endpoint(websocket, actual_user_id, db)
-
 @app.websocket("/ws/chat/{user_id}")
 async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Session = Depends(get_db)):
     await ws_manager.connect(websocket, user_id)
 
     status_entry = db.query(models.UserOnlineStatus).filter(models.UserOnlineStatus.user_id == user_id).first()
     if not status_entry:
-        status_entry = models.UserOnlineStatus(user_id=user_id, is_online=True, last_seen=datetime.now(timezone.utc))
+        status_entry = models.UserOnlineStatus(user_id=user_id, is_online=True, last_seen=datetime.utcnow())
         db.add(status_entry)
     else:
         status_entry.is_online = True
-        status_entry.last_seen = datetime.now(timezone.utc)
+        status_entry.last_seen = datetime.utcnow()
     db.commit()
 
     try:
@@ -2825,6 +2141,27 @@ async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Sessio
         status_entry = db.query(models.UserOnlineStatus).filter(models.UserOnlineStatus.user_id == user_id).first()
         if status_entry:
             status_entry.is_online = False
-            status_entry.last_seen = datetime.now(timezone.utc)
+            status_entry.last_seen = datetime.utcnow()
             db.commit()
+
+
+@app.get("/ai/model-info")
+def get_ai_model_info():
+    """Returns runtime status and provider configuration of AgriNex AI services."""
+    llama_model = os.getenv("LLAMA_MODEL", "llama-3.3-70b-versatile")
+    scanner_info = vision_engine.get_model_info()
+
+    return {
+        "disease_scanner": scanner_info,
+        "ai_chat": {
+            "provider": "groq",
+            "model": llama_model,
+            "status": "configured"
+        },
+        "gemini": {
+            "provider": "gemini",
+            "status": "disabled"
+        }
+    }
+
 

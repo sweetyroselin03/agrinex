@@ -98,8 +98,8 @@ export default function UserSearchBar({
             </div>
           ) : searchResults.length === 0 ? (
             <div className="p-6 text-center text-xs text-textSec">
-              <p className="font-semibold text-brandDark">No matching users found.</p>
-              <p className="text-[11px] text-slate-400 mt-1">Try searching by full name, username, or email address.</p>
+              <p className="font-semibold text-brandDark">No farmers found for "{searchQuery}"</p>
+              <p className="text-[11px] text-slate-400 mt-1">Try searching by village name, crop type, or username.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
@@ -115,7 +115,7 @@ export default function UserSearchBar({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <img
-                      src={user.avatar_url || user.profile_photo || user.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.email}`}
+                      src={user.profile_photo || user.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.email}`}
                       alt={user.display_name || user.full_name || 'farmer'}
                       className="w-11 h-11 rounded-full border border-slate-200 object-cover bg-slate-50 shrink-0"
                     />

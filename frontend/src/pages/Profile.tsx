@@ -98,6 +98,7 @@ export default function Profile() {
   const userToUse = isOwnProfile ? currentUser : profileData;
   const [fullName, setFullName] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
+  const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
   const [village, setVillage] = useState('');
   const [district, setDistrict] = useState('');
@@ -106,13 +107,12 @@ export default function Profile() {
   const [experience, setExperience] = useState('');
   const [cropSpecialization, setCropSpecialization] = useState('');
   const [website, setWebsite] = useState('');
-  const [profilePhoto, setProfilePhoto] = useState('');
-  const [coverPhoto, setCoverPhoto] = useState('');
 
   useEffect(() => {
     if (userToUse) {
       setFullName(userToUse.full_name || '');
       setUsernameInput(userToUse.username || '');
+      setPhone(userToUse.phone || '');
       setBio(userToUse.bio || '');
       setVillage(userToUse.village || '');
       setDistrict(userToUse.district || '');
@@ -121,38 +121,12 @@ export default function Profile() {
       setExperience(userToUse.experience || '');
       setCropSpecialization(userToUse.crop_specialization || '');
       setWebsite(userToUse.website || '');
-      setProfilePhoto(userToUse.profile_picture || userToUse.profile_photo || '');
-      setCoverPhoto(userToUse.cover_photo || '');
     }
   }, [userToUse]);
 
   // Password reset forms
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  // Password change OTP modal state
-  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [maskedEmail, setMaskedEmail] = useState('');
-  const [resendTimer, setResendTimer] = useState(60);
-  const [isResendDisabled, setIsResendDisabled] = useState(true);
-  const [otpErr, setOtpErr] = useState<string | null>(null);
-  const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
-  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
-
-  useEffect(() => {
-    let interval: any = null;
-    if (isOtpModalOpen && resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (resendTimer === 0) {
-      setIsResendDisabled(false);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isOtpModalOpen, resendTimer]);
 
   // Alerts
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -167,11 +141,11 @@ export default function Profile() {
 
     const trimmedFullName = fullName.trim();
     if (!trimmedFullName) {
-      setLocalErr('Full Name is required.');
+      setLocalErr('Full name is required.');
       return;
     }
 
-    if (bio.length > 250) {
+    if (bio.trim().length > 250) {
       setLocalErr('Bio cannot exceed 250 characters.');
       return;
     }
@@ -181,6 +155,7 @@ export default function Profile() {
       await updateProfile({
         full_name: trimmedFullName,
         username: usernameInput.trim() ? usernameInput.trim().replace(/^@/, '') : undefined,
+        phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
         village: village.trim() || undefined,
         district: district.trim() || undefined,
@@ -189,8 +164,6 @@ export default function Profile() {
         experience: experience.trim() || undefined,
         crop_specialization: cropSpecialization.trim() || undefined,
         website: website.trim() || undefined,
-        profile_picture: profilePhoto || undefined,
-        cover_photo: coverPhoto || undefined,
       });
 
       queryClient.invalidateQueries({ queryKey: ['user_profile', targetId] });
@@ -216,15 +189,6 @@ export default function Profile() {
     }
   };
 
-  const validatePasswordStrength = (pw: string): string | null => {
-    if (!pw || pw.length < 8) return 'Password must be at least 8 characters long.';
-    if (!/[A-Z]/.test(pw)) return 'Password must contain at least one uppercase letter (A-Z).';
-    if (!/[a-z]/.test(pw)) return 'Password must contain at least one lowercase letter (a-z).';
-    if (!/\d/.test(pw)) return 'Password must contain at least one number (0-9).';
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pw)) return 'Password must contain at least one special character (!@#$%^&*...).';
-    return null;
-  };
-
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMsg(null);
@@ -241,71 +205,21 @@ export default function Profile() {
       return;
     }
 
-    const validationErr = validatePasswordStrength(newPassword);
-    if (validationErr) {
-      setLocalErr(validationErr);
+    if (newPassword.length < 6) {
+      setLocalErr('Password must be at least 6 characters long.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setIsRequestingOtp(true);
-      const res = await api.post('/auth/change-password/request-otp');
-      setMaskedEmail(res.data?.email_masked || currentUser?.email || 'your email');
-      setResendTimer(60);
-      setIsResendDisabled(true);
-      setOtpCode('');
-      setOtpErr(null);
-      setIsOtpModalOpen(true);
-    } catch (err: any) {
-      setLocalErr(err?.response?.data?.detail || 'Failed to send verification code. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-      setIsRequestingOtp(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (isResendDisabled) return;
-    setOtpErr(null);
-    try {
-      setIsRequestingOtp(true);
-      const res = await api.post('/auth/change-password/request-otp');
-      setMaskedEmail(res.data?.email_masked || currentUser?.email || 'your email');
-      setResendTimer(60);
-      setIsResendDisabled(true);
-    } catch (err: any) {
-      setOtpErr(err?.response?.data?.detail || 'Failed to resend verification code.');
-    } finally {
-      setIsRequestingOtp(false);
-    }
-  };
-
-  const handleOtpVerifySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpErr(null);
-
-    if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setOtpErr('Please enter a valid 6-digit verification code.');
-      return;
-    }
-
-    try {
-      setIsSubmittingOtp(true);
-      const res = await api.post('/auth/change-password/verify-and-update', {
-        otp: otpCode.trim(),
-        new_password: newPassword,
-      });
-
-      setIsOtpModalOpen(false);
-      setSuccessMsg(res.data?.message || '✓ Account password updated successfully.');
+      await setPassword(currentUser?.email || '', newPassword);
+      setSuccessMsg('Security credentials updated successfully');
       setNewPassword('');
       setConfirmPassword('');
-      setOtpCode('');
     } catch (err: any) {
-      setOtpErr(err?.response?.data?.detail || 'Verification failed. Please check the code and try again.');
+      setLocalErr(err?.response?.data?.detail || 'Failed to update security credentials.');
     } finally {
-      setIsSubmittingOtp(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -354,20 +268,10 @@ export default function Profile() {
         className="glass-card overflow-hidden p-0 relative border-slate-200 shadow-sm"
       >
         
-        {/* Banner Gradient / Image */}
+        {/* Banner Gradient */}
         <div className="h-44 sm:h-56 w-full relative bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 overflow-hidden">
-          {profile?.cover_photo ? (
-            <img
-              src={profile.cover_photo}
-              alt="Profile Cover"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <>
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/30 via-emerald-800/60 to-slate-950" />
-              <div className="absolute inset-0 bg-black/20" />
-            </>
-          )}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/30 via-emerald-800/60 to-slate-950" />
+          <div className="absolute inset-0 bg-black/20" />
         </div>
 
         {/* Profile Card Body */}
@@ -546,6 +450,19 @@ export default function Profile() {
           <>
             <button
               type="button"
+              onClick={() => setActiveTab('settings')}
+              className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
+                activeTab === 'settings'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              <span>Edit Profile</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('security')}
               className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
                 activeTab === 'security'
@@ -710,77 +627,6 @@ export default function Profile() {
             )}
             
             <form onSubmit={handleUpdateProfileSubmit} className="space-y-6">
-              {/* Media Uploads */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
-                {/* Profile Photo Uploader */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Profile Photo</label>
-                  <div className="flex items-center gap-4">
-                    <img
-                      src={profilePhoto || `https://api.dicebear.com/7.x/adventurer/svg?seed=${currentUser?.email || 'farmer'}`}
-                      alt="Profile preview"
-                      className="w-16 h-16 rounded-full object-cover border border-slate-200"
-                    />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          try {
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            const res = await api.post('/api/media/upload', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' },
-                            });
-                            setProfilePhoto(res.data.url);
-                          } catch (err) {
-                            setLocalErr('Failed to upload profile photo.');
-                          }
-                        }
-                      }}
-                      className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                {/* Cover Photo Uploader */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cover Photo</label>
-                  <div className="flex items-center gap-4">
-                    {coverPhoto ? (
-                      <img
-                        src={coverPhoto}
-                        alt="Cover preview"
-                        className="w-24 h-16 rounded-xl object-cover border border-slate-200"
-                      />
-                    ) : (
-                      <div className="w-24 h-16 rounded-xl bg-gradient-to-r from-emerald-800 to-slate-900 border border-slate-200" />
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          try {
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            const res = await api.post('/api/media/upload', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' },
-                            });
-                            setCoverPhoto(res.data.url);
-                          } catch (err) {
-                            setLocalErr('Failed to upload cover photo.');
-                          }
-                        }
-                      }}
-                      className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* Full Name */}
@@ -816,7 +662,6 @@ export default function Profile() {
                     </span>
                   </div>
                   <textarea
-                    id="bio"
                     rows={3}
                     maxLength={250}
                     placeholder="Tell the AgriNex community about your farm and experience..."
@@ -862,6 +707,17 @@ export default function Profile() {
                   />
                 </div>
 
+                {/* Phone */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Phone Number</label>
+                  <input
+                    type="text"
+                    placeholder="+91 98765 43210"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
 
                 {/* Farm Size */}
                 <div className="space-y-1.5">
@@ -913,16 +769,8 @@ export default function Profile() {
 
               </div>
 
-              <div className="flex justify-end items-center gap-3 pt-4 border-t border-slate-100">
+              <div className="flex justify-end pt-4 border-t border-slate-100">
                 <button
-                  type="button"
-                  onClick={() => setActiveTab('posts')}
-                  className="px-6 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs transition-all active:scale-95 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                 <button
-                  id="save-profile"
                   type="submit"
                   disabled={authLoading || isSubmitting}
                   className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white font-extrabold text-xs flex items-center gap-2 shadow-md shadow-emerald-900/20 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
@@ -996,109 +844,7 @@ export default function Profile() {
 
       </AnimatePresence>
 
-      {/* ─── PASSWORD CHANGE OTP VERIFICATION MODAL ─── */}
-      <AnimatePresence>
-        {isOtpModalOpen && (
-          <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
-            onClick={() => setIsOtpModalOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-5"
-            >
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                    <Lock className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 text-base">Verify Email Address</h3>
-                    <p className="text-[11px] text-slate-400 font-medium">Security OTP Verification</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsOtpModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="text-xs text-slate-600 space-y-2">
-                <p>We've sent a 6-digit verification code to your registered email address:</p>
-                <p className="font-bold text-slate-900 text-sm bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center font-mono">
-                  {maskedEmail}
-                </p>
-              </div>
-
-              {otpErr && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 font-bold animate-fade-in">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{otpErr}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleOtpVerifySubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block text-center">
-                    Enter 6-Digit Verification Code
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    required
-                    placeholder="123456"
-                    className="w-full px-4 py-3 text-center text-xl font-bold tracking-[0.5em] font-mono rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 outline-none transition-all"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>Didn't receive code?</span>
-                  {isResendDisabled ? (
-                    <span className="font-semibold text-slate-400">Resend in {resendTimer}s</span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isRequestingOtp}
-                      onClick={handleResendOtp}
-                      className="font-bold text-emerald-600 hover:underline cursor-pointer disabled:opacity-50"
-                    >
-                      {isRequestingOtp ? 'Sending...' : 'Resend Code'}
-                    </button>
-                  )}
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingOtp || otpCode.trim().length !== 6}
-                    className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-900/20 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    {isSubmittingOtp ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Verifying & Updating...</span>
-                      </>
-                    ) : (
-                      <span>Verify & Complete Password Change</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* ─── FOLLOWERS / FOLLOWING NETWORK LIST MODAL ─── */}
-
       <AnimatePresence>
         {networkModal && (
           <div

@@ -16,7 +16,6 @@ export default function Login() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
     setLocalError(null);
     clearError();
 
@@ -105,9 +104,6 @@ export default function Login() {
                   <Mail className="w-5 h-5" />
                 </div>
                 <input
-                  id="email"
-                  name="email"
-                  autoComplete="username"
                   type="email"
                   placeholder="name@farm.com"
                   className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
@@ -131,9 +127,6 @@ export default function Login() {
                   <Lock className="w-5 h-5" />
                 </div>
                 <input
-                  id="password"
-                  name="password"
-                  autoComplete="current-password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
@@ -167,7 +160,6 @@ export default function Login() {
 
             {/* Submit Button */}
             <button
-              id="login-btn"
               type="submit"
               className="w-full py-4 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
               disabled={isLoading}

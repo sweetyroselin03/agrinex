@@ -1,5 +1,5 @@
 import json
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -7,6 +7,7 @@ from datetime import datetime
 # ─── User ────────────────────────────────────────────────────────────────────
 class UserBase(BaseModel):
     email: str
+    phone: Optional[str] = None
 
 class UserCreate(UserBase):
     pass
@@ -14,6 +15,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     username: Optional[str] = None
+    phone: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
     state: Optional[str] = None
@@ -22,13 +24,13 @@ class UserUpdate(BaseModel):
     crop_specialization: Optional[str] = None
     crop_types: Optional[str] = None
     profile_picture: Optional[str] = None
-    cover_photo: Optional[str] = None
     bio: Optional[str] = None
     website: Optional[str] = None
 
 class UserOut(BaseModel):
     id: int
     email: str
+    phone: Optional[str] = None
     full_name: Optional[str] = None
     display_name: Optional[str] = None
     username: Optional[str] = None
@@ -42,7 +44,6 @@ class UserOut(BaseModel):
     crop_types: Optional[str] = None
     profile_picture: Optional[str] = None
     profile_photo: Optional[str] = None
-    cover_photo: Optional[str] = None
     bio: Optional[str] = None
     website: Optional[str] = None
     is_verified: Optional[bool] = False
@@ -53,10 +54,9 @@ class UserOut(BaseModel):
     posts_count: Optional[int] = 0
     is_following: Optional[bool] = False
     isFollowing: Optional[bool] = False
-    is_password_set: Optional[bool] = True
-    password_setup_required: Optional[bool] = False
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # Keep legacy alias
 User = UserOut
@@ -71,8 +71,6 @@ class UserSearchOut(BaseModel):
     village: Optional[str] = None
     profile_picture: Optional[str] = None
     profile_photo: Optional[str] = None
-    cover_photo: Optional[str] = None
-    avatar_url: Optional[str] = None
     bio: Optional[str] = None
     verified: Optional[bool] = True
     is_verified: Optional[bool] = True
@@ -82,23 +80,19 @@ class UserSearchOut(BaseModel):
     is_following: Optional[bool] = False
     isFollowing: Optional[bool] = False
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 class RegisterRequest(BaseModel):
     full_name: str
     email: str
+    phone: str
 
 class PasswordSetRequest(BaseModel):
-    email: Optional[str] = None
+    email: str
     password: str
-
-class PasswordChangeUpdateRequest(BaseModel):
-    otp: str
-    new_password: str
-
-
 
 class OTPRequest(BaseModel):
     email: str
@@ -148,7 +142,6 @@ class PostCreate(BaseModel):
     hashtags: Optional[str] = None
     location: Optional[str] = None
     crop_category: Optional[str] = None
-    poll_options: Optional[List[str]] = None
 
 class PostUpdate(BaseModel):
     content: Optional[str] = None
@@ -176,10 +169,8 @@ class PostOut(BaseModel):
     author_name: Optional[str] = None
     author_avatar: Optional[str] = None
     author_verified: Optional[bool] = False
-    poll_options: Optional[List[str]] = None
 
-    @field_validator('images', mode='before')
-    @classmethod
+    @validator('images', pre=True)
     def parse_images(cls, v):
         if v is None:
             return []
@@ -193,7 +184,8 @@ class PostOut(BaseModel):
                 return []
         return []
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # Keep legacy alias
 Post = PostOut
@@ -221,7 +213,8 @@ class CommentOut(BaseModel):
     author_avatar: Optional[str] = None
     replies: Optional[List['CommentOut']] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 CommentOut.model_rebuild()
 
@@ -236,7 +229,8 @@ class FollowOut(BaseModel):
     followingCount: int
     following_count: int
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # ─── Notification ─────────────────────────────────────────────────────────────
@@ -252,7 +246,8 @@ class NotificationOut(BaseModel):
     actor_name: Optional[str] = None
     actor_avatar: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # ─── SavedPost ────────────────────────────────────────────────────────────────
@@ -265,8 +260,6 @@ class ChatMessageCreate(BaseModel):
     message: str
     conversation_id: Optional[str] = None
     language: Optional[str] = None
-    stream: Optional[bool] = False
-    image_url: Optional[str] = None
 
 class ChatMessage(BaseModel):
     id: int
@@ -275,10 +268,9 @@ class ChatMessage(BaseModel):
     message: str
     is_ai: bool
     created_at: datetime
-    success: Optional[bool] = True
-    reply: Optional[str] = ""
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class ConversationSummary(BaseModel):
@@ -289,13 +281,13 @@ class ConversationSummary(BaseModel):
     updated_at: Optional[datetime] = None
     message_count: int = 0
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # ─── Crop Scan ────────────────────────────────────────────────────────────────
 class CropScanCreate(BaseModel):
     image_url: str
-    scan_mode: Optional[str] = "full"
 
 class CropScanOut(BaseModel):
     id: int
@@ -303,7 +295,6 @@ class CropScanOut(BaseModel):
     image_url: str
     disease_name: str
     confidence: float
-    scan_mode: Optional[str] = "full"
     is_valid_crop: Optional[bool] = True
     severity_level: Optional[str] = "Warning"
     symptoms: Optional[str] = None
@@ -322,10 +313,10 @@ class CropScanOut(BaseModel):
     health_score: Optional[int] = None
     yield_impact: Optional[str] = None
     pro_tips: Optional[str] = None
-    scientific_name: Optional[str] = None
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # ─── Weather ──────────────────────────────────────────────────────────────────
@@ -357,7 +348,8 @@ class WeatherResponse(BaseModel):
     daily_high: Optional[float] = None
     daily_low: Optional[float] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # ─── DM / DIRECT MESSAGING SCHEMAS ───
@@ -368,7 +360,8 @@ class MessageAttachmentOut(BaseModel):
     file_type: str = "image"
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class MessageReactionOut(BaseModel):
@@ -377,7 +370,8 @@ class MessageReactionOut(BaseModel):
     emoji: str
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class MessageOut(BaseModel):
@@ -387,7 +381,6 @@ class MessageOut(BaseModel):
     sender_name: Optional[str] = None
     sender_avatar: Optional[str] = None
     content: Optional[str] = None
-    client_msg_id: Optional[str] = None
     reply_to_id: Optional[int] = None
     reply_to_content: Optional[str] = None
     reply_to_sender: Optional[str] = None
@@ -399,7 +392,8 @@ class MessageOut(BaseModel):
     attachments: List[MessageAttachmentOut] = []
     reactions: List[MessageReactionOut] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class ConversationParticipantOut(BaseModel):
@@ -415,7 +409,8 @@ class ConversationParticipantOut(BaseModel):
     is_muted: bool = False
     is_archived: bool = False
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class ConversationOut(BaseModel):
@@ -431,14 +426,14 @@ class ConversationOut(BaseModel):
     is_muted: bool = False
     is_archived: bool = False
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class MessageCreate(BaseModel):
     conversation_id: Optional[int] = None
     recipient_id: Optional[int] = None
     content: Optional[str] = None
-    client_msg_id: Optional[str] = None
     reply_to_id: Optional[int] = None
     attachments: List[str] = []  # Image URLs
 
@@ -466,12 +461,14 @@ class BlockStatusOut(BaseModel):
     user_id: int
 
 
+
 class UserOnlineStatusOut(BaseModel):
     user_id: int
     is_online: bool
     last_seen: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
     soil_moisture: Optional[str] = None
     farming_suitability: Optional[str] = None

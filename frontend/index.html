@@ -9,13 +9,7 @@
       (function() {
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.style.backgroundColor = isDark ? '#06131D' : '#F8FAFC';
-        if (document.body) {
-          document.body.style.backgroundColor = isDark ? '#06131D' : '#F8FAFC';
-        } else {
-          window.addEventListener('DOMContentLoaded', () => {
-            document.body.style.backgroundColor = isDark ? '#06131D' : '#F8FAFC';
-          });
-        }
+        document.body.style.backgroundColor = isDark ? '#06131D' : '#F8FAFC';
       })();
     </script>
   </head>
