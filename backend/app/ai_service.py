@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import socket
 import urllib.request
 import urllib.error
 import asyncio
@@ -76,14 +77,21 @@ class AIService:
             # Call Ollama /api/generate in background threadpool (non-blocking)
             response_text = await asyncio.wait_for(
                 asyncio.to_thread(self._query_ollama_generate, prompt),
-                timeout=90.0
+                timeout=180.0
             )
             return response_text
 
-        except asyncio.TimeoutError:
-            logger.error("[AgriNex AI Error] Ollama /api/generate timed out after 90s")
+        except (asyncio.TimeoutError, TimeoutError):
+            logger.error("[AgriNex AI Error] Ollama /api/generate timed out after 180s")
+            return "AGRIGPT is taking longer than expected to respond. Please try again."
+        except ConnectionError as ce:
+            logger.error(f"[AgriNex AI Error] Ollama connection failure: {ce}")
             return "AGRIGPT is temporarily unavailable because the Llama model service is offline."
         except Exception as e:
+            err_str = str(e).lower()
+            if "timeout" in err_str or "timed out" in err_str:
+                logger.error(f"[AgriNex AI Error] Ollama generation timeout: {e}")
+                return "AGRIGPT is taking longer than expected to respond. Please try again."
             logger.error(f"[AgriNex AI Error] Ollama communication failure: {e}")
             return "AGRIGPT is temporarily unavailable because the Llama model service is offline."
 
@@ -112,15 +120,18 @@ class AIService:
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=85) as resp:
+            with urllib.request.urlopen(req, timeout=175) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
-                # /api/generate returns: { "response": "...", ... }
                 if "response" in result:
                     return result["response"].strip()
                 else:
                     raise ValueError(f"Unexpected Ollama /api/generate response: {result}")
+        except socket.timeout:
+            raise TimeoutError("Ollama HTTP request timed out after 175 seconds")
         except urllib.error.URLError as url_err:
-            raise RuntimeError(f"Could not reach Ollama at {url}: {url_err}")
+            if isinstance(url_err.reason, socket.timeout) or "timed out" in str(url_err).lower():
+                raise TimeoutError("Ollama HTTP request timed out after 175 seconds")
+            raise ConnectionError(f"Could not reach Ollama at {url}: {url_err}")
 
 
 ai_service = AIService()

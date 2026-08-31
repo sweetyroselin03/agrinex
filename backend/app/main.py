@@ -8,7 +8,7 @@ import httpx
 import json
 import os
 from datetime import datetime, timedelta
-from . import models, schemas, ai_service, auth_utils, auth_router
+from . import models, schemas, ai_service, auth_utils, auth_router, moderation_service
 from .pytorch_vision_engine import vision_engine
 from .database import engine, get_db
 from .websocket_manager import manager as ws_manager
@@ -447,9 +447,19 @@ def create_post(post: schemas.PostCreate, current_user: models.User = Depends(ge
         post_dict = post.dict()
         images_list = post_dict.pop("images", None)
 
+        content = post_dict.get("content", "").strip()
         # Validate content
-        if not post_dict.get("content", "").strip():
+        if not content:
             raise HTTPException(status_code=400, detail="Post content cannot be empty")
+
+        # NLP Moderation Check BEFORE Database Insert
+        mod_result = moderation_service.moderation_service.moderate_text(content)
+        if not mod_result["allowed"]:
+            logger.warning(f"[Moderation Block] User {current_user.id} post blocked: {mod_result['reason']}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This post cannot be published because it contains offensive or inappropriate content. Please edit your message and try again."
+            )
 
         # Serialize images list to JSON string
         images_json = json.dumps(images_list) if images_list is not None else None
@@ -605,6 +615,14 @@ def unlike_post(post_id: int, current_user: models.User = Depends(get_current_us
 
 @app.post("/posts/{post_id}/comments", response_model=schemas.CommentOut)
 def comment_post(post_id: int, comment: schemas.CommentCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    content = (comment.content or "").strip()
+    if content:
+        mod_result = moderation_service.moderation_service.moderate_text(content)
+        if not mod_result["allowed"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This post cannot be published because it contains offensive or inappropriate content. Please edit your message and try again."
+            )
     db_comment = models.Comment(post_id=post_id, user_id=current_user.id, content=comment.content, parent_id=comment.parent_id)
     db.add(db_comment)
     db.commit()

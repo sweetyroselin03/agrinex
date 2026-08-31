@@ -138,10 +138,14 @@ export default function Chatbot() {
     setMessages(prev => [...prev, userMsg]);
 
     try {
-      const res = await api.post('/chat', {
-        message: messageText,
-        conversation_id: activeConvId
-      });
+      const res = await api.post(
+        '/chat',
+        {
+          message: messageText,
+          conversation_id: activeConvId
+        },
+        { timeout: 180000 }
+      );
 
       // Update active selection and fetch list updates
       if (!selectedConvId) {
@@ -157,11 +161,17 @@ export default function Chatbot() {
         created_at: new Date()
       };
       setMessages(prev => [...prev, aiMsg]);
-    } catch (err) {
-      // Show local warning error bubble
+    } catch (err: any) {
+      const errorMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        (err?.code === 'ECONNABORTED'
+          ? 'AGRIGPT is taking longer than expected to respond. Please try again.'
+          : 'Sorry, I encountered a connection error. Please verify your connection to Render cloud service and try again.');
+
       setMessages(prev => [...prev, {
         id: Date.now() + 2,
-        message: 'Sorry, I encountered a connection error. Please verify your connection to Render cloud service and try again.',
+        message: errorMsg,
         is_ai: true,
         created_at: new Date()
       }]);
@@ -394,9 +404,6 @@ export default function Chatbot() {
               <Send className="w-4.5 h-4.5" />
             </button>
           </form>
-          <div className="text-[10px] text-textSec text-center mt-2.5 font-medium uppercase tracking-wider">
-            Powered by Ollama Llama 3 AI Engine
-          </div>
         </div>
 
       </div>

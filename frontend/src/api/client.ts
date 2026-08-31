@@ -14,6 +14,8 @@ const NO_RETRY_ROUTES = [
   '/auth/register',
   '/auth/set-password',
   '/posts',
+  '/chat',
+  '/ai/chat',
 ];
 
 // Public auth routes — 401 here is expected (invalid password etc) and should NOT trigger session clearing

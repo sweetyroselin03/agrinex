@@ -90,8 +90,9 @@ export default function Community() {
       setNewLocation('');
       setShowPublisher(false);
       fetchFeed();
-    } catch (err) {
-      alert('Post creation failed.');
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail || err?.response?.data?.message || 'Post creation failed.';
+      alert(errorMsg);
     } finally {
       setPublishing(false);
     }
@@ -161,8 +162,9 @@ export default function Community() {
           ? { ...p, comments_count: (p.comments_count || 0) + 1 } 
           : p
       ));
-    } catch (err) {
-      alert('Failed to send comment');
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to send comment.';
+      alert(errorMsg);
     } finally {
       setSubmittingComment(false);
     }
