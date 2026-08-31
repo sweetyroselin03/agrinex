@@ -12,7 +12,7 @@ from .pytorch_vision_engine import vision_engine
 logger = logging.getLogger("uvicorn.error")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:latest")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 
 
 class AIService:
@@ -21,16 +21,16 @@ class AIService:
         self.ollama_base_url = OLLAMA_BASE_URL.rstrip('/')
         self.ollama_model = OLLAMA_MODEL
 
-        logger.info("[AgriNex ML] Scanner ready (Powered by trained PyTorch ResNet18 V2-B model - 60 classes)")
-        logger.info(f"[AgriNex AI] Chat provider: Ollama (Model: {self.ollama_model}, Endpoint: {self.ollama_base_url})")
+        logger.info("[AgriNex ML] Scanner ready (PyTorch ResNet18 V2-B, 60 classes)")
+        logger.info(f"[AgriNex AI] Chat → Ollama {self.ollama_model} @ {self.ollama_base_url}")
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # Disease Detection (CUSTOM TRAINED PYTORCH MODEL ONLY)
+    # Disease Detection — Custom PyTorch model ONLY
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     async def detect_disease(self, image_input: str) -> Dict[str, Any]:
         """
-        Runs plant disease detection using ONLY the trained PyTorch ML model.
-        Does NOT send images to Gemini, Groq, OpenAI, or any external vision API.
+        Runs plant disease detection using the trained PyTorch ML model only.
+        No external vision API is called.
         """
         try:
             result = await asyncio.to_thread(self.vision_engine.predict, image_input)
@@ -40,72 +40,87 @@ class AIService:
             raise e
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # AI Chat / Agronomist (OLLAMA LLAMA3 ONLY)
+    # AI Chat — Ollama /api/generate ONLY
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     async def get_chat_response(self, message: str, history: list = [], scan_context: str = "") -> str:
         try:
-            system_prompt = (
+            system_block = (
                 "You are AgriNex AI, an expert agricultural advisory assistant. "
-                "You provide detailed, practical, farmer-friendly advice on crop diseases, symptoms, treatments, "
-                "prevention, fertilizers, irrigation, soil health, pests, organic farming, and yield optimization.\n\n"
+                "You provide detailed, practical, farmer-friendly advice on crop diseases, "
+                "symptoms, treatments, prevention, fertilizers, irrigation, soil health, "
+                "pests, organic farming, and yield optimization.\n\n"
                 "Formatting Guidelines:\n"
-                "- Structure responses cleanly using Markdown headers (#, ##, ###), bold text, and bullet points.\n"
+                "- Structure responses using Markdown headers (#, ##, ###), bold text, and bullet points.\n"
                 "- Provide actionable steps, specific product names/dosages, and timings when applicable.\n"
                 "- Keep advice practical, warm, and clear for farmers.\n"
-                "- If the user writes in Tamil, Telugu, Hindi, Malayalam, or English, respond fluently in that SAME language."
+                "- Detect and respond in the user's language: English, Tamil, Telugu, Hindi, or Malayalam.\n"
             )
 
             if scan_context:
-                system_prompt += f"\n\nContext (User's recent crop scans):\n{scan_context}\nUse this context if relevant to the query."
+                system_block += f"\nContext (User's recent crop scans):\n{scan_context}\n"
 
-            messages = [{"role": "system", "content": system_prompt}]
-
+            # Build conversation history as a plain-text prompt for /api/generate
+            history_text = ""
             for msg in history[-10:]:
-                role = "assistant" if getattr(msg, "is_ai", False) else "user"
+                role = "Assistant" if getattr(msg, "is_ai", False) else "User"
                 msg_text = getattr(msg, "message", str(msg))
-                messages.append({"role": role, "content": msg_text})
+                history_text += f"{role}: {msg_text}\n"
 
-            messages.append({"role": "user", "content": message})
+            prompt = (
+                f"SYSTEM:\n{system_block}\n"
+                f"{history_text}"
+                f"User: {message}\n"
+                f"Assistant:"
+            )
 
-            # Call Ollama HTTP API in background threadpool
+            # Call Ollama /api/generate in background threadpool (non-blocking)
             response_text = await asyncio.wait_for(
-                asyncio.to_thread(self._query_ollama, messages),
-                timeout=60.0
+                asyncio.to_thread(self._query_ollama_generate, prompt),
+                timeout=90.0
             )
             return response_text
 
         except asyncio.TimeoutError:
-            logger.error("[AgriNex AI Error] Ollama Llama request timed out after 60s")
+            logger.error("[AgriNex AI Error] Ollama /api/generate timed out after 90s")
             return "AGRIGPT is temporarily unavailable because the Llama model service is offline."
         except Exception as e:
-            logger.error(f"[AgriNex AI Error] Ollama Llama Communication Failure: {e}")
+            logger.error(f"[AgriNex AI Error] Ollama communication failure: {e}")
             return "AGRIGPT is temporarily unavailable because the Llama model service is offline."
 
-    def _query_ollama(self, messages: list) -> str:
-        url = f"{self.ollama_base_url}/api/chat"
+    def _query_ollama_generate(self, prompt: str) -> str:
+        """
+        Calls POST {OLLAMA_BASE_URL}/api/generate with:
+          { "model": "<OLLAMA_MODEL>", "prompt": "...", "stream": false }
+
+        Adds cfNoInterrupt: 1 header so Cloudflare Quick Tunnels don't intercept the request.
+        """
+        url = f"{self.ollama_base_url}/api/generate"
         payload = {
             "model": self.ollama_model,
-            "messages": messages,
+            "prompt": prompt,
             "stream": False
         }
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             url,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                # Required to pass Cloudflare interstitial pages on trycloudflare.com tunnels
+                "cfNoInterrupt": "1",
+            },
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=55) as resp:
+            with urllib.request.urlopen(req, timeout=85) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
-                if "message" in result and "content" in result["message"]:
-                    return result["message"]["content"]
-                elif "response" in result:
-                    return result["response"]
+                # /api/generate returns: { "response": "...", ... }
+                if "response" in result:
+                    return result["response"].strip()
                 else:
-                    raise ValueError(f"Unexpected response structure from Ollama: {result}")
+                    raise ValueError(f"Unexpected Ollama /api/generate response: {result}")
         except urllib.error.URLError as url_err:
-            raise RuntimeError(f"Could not connect to Ollama at {url}: {url_err}")
+            raise RuntimeError(f"Could not reach Ollama at {url}: {url_err}")
 
 
 ai_service = AIService()

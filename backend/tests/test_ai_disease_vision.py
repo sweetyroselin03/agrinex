@@ -1,6 +1,7 @@
 import pytest
 import sys
 import asyncio
+import inspect
 from pathlib import Path
 from PIL import Image
 
@@ -38,7 +39,7 @@ def test_pytorch_vision_engine_inference():
 
 
 def test_model_info_endpoint():
-    """Verify /ai/model-info accurately reports custom_ml, ollama llama3:latest, removed gemini and groq."""
+    """Verify /ai/model-info reports ollama/llama3/api/generate with removed gemini and groq."""
     client = TestClient(app)
     res = client.get("/ai/model-info")
     assert res.status_code == 200
@@ -50,23 +51,38 @@ def test_model_info_endpoint():
     assert data["disease_scanner"]["status"] == "loaded"
 
     assert data["ai_chat"]["provider"] == "ollama"
-    assert data["ai_chat"]["model"] == "llama3:latest"
+    assert data["ai_chat"]["model"] == "llama3"
     assert data["ai_chat"]["status"] == "configured"
+    assert "/api/generate" in data["ai_chat"]["api_endpoint"]
     assert data["gemini"]["status"] == "removed"
     assert data["groq"]["status"] == "removed"
 
 
+def test_uses_api_generate_endpoint():
+    """Verify ai_service._query_ollama_generate uses /api/generate (not /api/chat)."""
+    src = inspect.getsource(ai_service._query_ollama_generate)
+    assert "/api/generate" in src, "Must use Ollama /api/generate endpoint"
+    assert '"prompt"' in src, "Must send 'prompt' key (not 'messages')"
+    assert '"stream"' in src, "Must send 'stream': False"
+
+
+def test_cloudflare_header_present():
+    """Verify cfNoInterrupt header is set for Cloudflare tunnel compatibility."""
+    src = inspect.getsource(ai_service._query_ollama_generate)
+    assert "cfNoInterrupt" in src, "Must include cfNoInterrupt header for Cloudflare tunnels"
+
+
 def test_no_gemini_or_groq_in_scanner():
-    """Verify scanner vision engine has zero Gemini or Groq vision dependencies."""
+    """Verify scanner vision engine has zero Gemini or Groq dependencies."""
     assert not hasattr(ai_service.vision_engine, "genai")
     assert not hasattr(ai_service.vision_engine, "client")
     assert ai_service.vision_engine.model is not None
 
 
 def test_ollama_offline_error():
-    """Verify system returns explicit error message when Ollama endpoint is unreachable."""
+    """Verify system returns clean error message when Ollama is unreachable."""
     original_url = ai_service.ollama_base_url
-    ai_service.ollama_base_url = "http://localhost:59999"
-    resp = asyncio.run(ai_service.get_chat_response("Hello agronomist"))
+    ai_service.ollama_base_url = "http://127.0.0.1:59998"
+    resp = asyncio.run(ai_service.get_chat_response("Hello"))
     assert resp == "AGRIGPT is temporarily unavailable because the Llama model service is offline."
     ai_service.ollama_base_url = original_url
