@@ -2147,19 +2147,21 @@ async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Sessio
 @app.get("/ai/model-info")
 def get_ai_model_info():
     """Returns runtime status and provider configuration of AgriNex AI services."""
-    llama_model = os.getenv("LLAMA_MODEL", "llama-3.3-70b-versatile")
+    ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     scanner_info = vision_engine.get_model_info()
 
     return {
         "disease_scanner": scanner_info,
         "ai_chat": {
-            "provider": "groq",
-            "model": llama_model,
-            "status": "configured"
+            "provider": "ollama",
+            "model": ollama_model,
+            "status": "configured",
+            "endpoint": ollama_base_url
         },
         "gemini": {
             "provider": "gemini",
-            "status": "disabled"
+            "status": "removed"
         }
     }
 

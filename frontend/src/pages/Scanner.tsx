@@ -11,12 +11,16 @@ import {
   FileText,
   Activity,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Crop as CropIcon
 } from 'lucide-react';
 import api from '../api/client';
+import ImageCropperModal from '../components/ImageCropperModal';
 
 export default function Scanner() {
   const [image, setImage] = useState<string | null>(null);
+  const [rawOriginalImage, setRawOriginalImage] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -41,8 +45,11 @@ export default function Scanner() {
     setFileSize((file.size / 1024 / 1024).toFixed(2) + ' MB');
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImage(reader.result as string);
+      const dataUrl = reader.result as string;
+      setRawOriginalImage(dataUrl);
+      setImage(dataUrl);
       setResult(null);
+      setShowCropper(true);
     };
     reader.readAsDataURL(file);
   };
@@ -84,8 +91,15 @@ export default function Scanner() {
 
   const clearImage = () => {
     setImage(null);
+    setRawOriginalImage(null);
     setFileSize(null);
     setResult(null);
+    setShowCropper(false);
+  };
+
+  const handleConfirmCrop = (croppedDataUrl: string) => {
+    setImage(croppedDataUrl);
+    setShowCropper(false);
   };
 
   return (
@@ -94,6 +108,15 @@ export default function Scanner() {
       animate={{ opacity: 1 }} 
       className="space-y-8"
     >
+      {/* Leaf Position Cropper Modal */}
+      {showCropper && (rawOriginalImage || image) && (
+        <ImageCropperModal
+          imageUrl={rawOriginalImage || image!}
+          onConfirmCrop={handleConfirmCrop}
+          onCancel={() => setShowCropper(false)}
+          onReset={() => setImage(rawOriginalImage)}
+        />
+      )}
       
       {/* Page Header */}
       <div>
@@ -130,20 +153,30 @@ export default function Scanner() {
                   )}
                 </div>
 
-                {/* Image Specs */}
+                {/* Image Specs & Crop Controls */}
                 <div className="flex justify-between items-center w-full mt-4 text-xs font-semibold text-textSec">
                   <span className="flex items-center gap-1">
                     <FileText className="w-4 h-4" />
                     Size: {fileSize}
                   </span>
-                  <button 
-                    onClick={clearImage}
-                    className="text-rose hover:text-rose/85 flex items-center gap-1"
-                    disabled={scanning}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Remove Image
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowCropper(true)}
+                      className="text-primary hover:underline flex items-center gap-1 font-bold"
+                      disabled={scanning}
+                    >
+                      <CropIcon className="w-4 h-4" />
+                      Adjust Leaf Position
+                    </button>
+                    <button 
+                      onClick={clearImage}
+                      className="text-rose hover:text-rose/85 flex items-center gap-1"
+                      disabled={scanning}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Remove
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (

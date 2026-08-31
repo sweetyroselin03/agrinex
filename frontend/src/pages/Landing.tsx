@@ -114,7 +114,7 @@ export default function Landing() {
             {/* Visual indicators */}
             <div className="absolute bottom-6 left-6 right-6 flex justify-between items-center text-[11px] font-bold text-textSec uppercase tracking-widest border-t border-slate-200/50 pt-4">
               <span>📡 IoT Sensors Active</span>
-              <span>⚡ Groq AI Engine</span>
+              <span>⚡ Llama 3 AI Engine</span>
               <span>🛡️ Secure Ledger</span>
             </div>
           </div>

@@ -37,7 +37,7 @@ def test_pytorch_vision_engine_inference():
 
 
 def test_model_info_endpoint():
-    """Verify /ai/model-info accurately reports custom_ml, groq llama, and disabled gemini."""
+    """Verify /ai/model-info accurately reports custom_ml, ollama llama3, and removed gemini."""
     client = TestClient(app)
     res = client.get("/ai/model-info")
     assert res.status_code == 200
@@ -48,8 +48,8 @@ def test_model_info_endpoint():
     assert data["disease_scanner"]["classes"] == 60
     assert data["disease_scanner"]["status"] == "loaded"
 
-    assert data["ai_chat"]["provider"] == "groq"
-    assert data["gemini"]["status"] == "disabled"
+    assert data["ai_chat"]["provider"] == "ollama"
+    assert data["gemini"]["status"] == "removed"
 
 
 def test_no_gemini_or_groq_in_scanner():

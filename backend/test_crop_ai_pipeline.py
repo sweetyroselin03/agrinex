@@ -53,14 +53,16 @@ print(f"  - Gemini  : {data['gemini']}")
 assert data["disease_scanner"]["provider"] == "custom_ml"
 assert data["disease_scanner"]["model"] == "ResNet18 V2-B"
 assert data["disease_scanner"]["classes"] == 60
-assert data["gemini"]["status"] == "disabled"
+assert data["ai_chat"]["provider"] == "ollama"
+assert data["gemini"]["status"] == "removed"
 print("  [OK] /ai/model-info Verification Passed")
 
-# 4. Test Gemini Disablement
-print("\n[4/4] Verifying Gemini Disablement across Backend...")
+# 4. Test External AI Isolation
+print("\n[4/4] Verifying Gemini/Groq Removal across Backend...")
 assert not hasattr(ai_service.vision_engine, "genai")
+assert hasattr(ai_service, "ollama_model")
 print("  [OK] Scanner has 0 Gemini or external vision dependencies")
-print("  [OK] Chat routes through Groq Llama")
+print("  [OK] Chat routes through Ollama Llama 3")
 
 print("\n" + "=" * 70)
 print("ALL AGRINEX AI PIPELINE TESTS PASSED 100% SUCCESSFULLY!")

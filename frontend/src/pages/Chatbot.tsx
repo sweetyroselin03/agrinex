@@ -14,30 +14,37 @@ import {
 import api from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 
-// Simple markdown formatter to display rich AI advice without extra dependencies
+// Enhanced Markdown renderer to display structured Llama AI agronomist responses
 const formatMessageText = (text: string) => {
-  if (!text) return '';
+  if (!text) return null;
   
-  // Replace headers: ### text
-  let formatted = text.replace(/^### (.*?)$/gm, '<h5 class="font-extrabold text-brandDark mt-3 mb-1 text-sm">$1</h5>');
-  formatted = formatted.replace(/^## (.*?)$/gm, '<h4 class="font-extrabold text-brandDark mt-4 mb-2 text-md">$1</h4>');
-  formatted = formatted.replace(/^# (.*?)$/gm, '<h3 class="font-black text-brandDark mt-5 mb-3 text-lg">$1</h3>');
+  // Headers: # text, ## text, ### text
+  let formatted = text
+    .replace(/^### (.*?)$/gm, '<h5 class="font-extrabold text-brandDark mt-3 mb-1 text-xs uppercase tracking-wider">$1</h5>')
+    .replace(/^## (.*?)$/gm, '<h4 class="font-black text-brandDark mt-4 mb-2 text-sm border-b border-slate-100 pb-1">$1</h4>')
+    .replace(/^# (.*?)$/gm, '<h3 class="font-black text-brandDark mt-5 mb-3 text-base">$1</h3>');
   
   // Bold: **text**
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-brandDark">$1</strong>');
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-brandDark">$1</strong>');
   
-  // Bullet points: - text or * text
-  formatted = formatted.replace(/^\s*[-*]\s+(.*?)$/gm, '<li class="ml-4 list-disc text-xs my-0.5">$1</li>');
+  // Italics: *text* or _text_
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic text-slate-700">$1</em>');
   
+  // Numbered list items: 1. text
+  formatted = formatted.replace(/^\s*\d+\.\s+(.*?)$/gm, '<li class="ml-4 list-decimal text-xs my-1 text-slate-700">$1</li>');
+
+  // Bullet points: - text or * text or • text
+  formatted = formatted.replace(/^\s*[-*•]\s+(.*?)$/gm, '<li class="ml-4 list-disc text-xs my-1 text-slate-700">$1</li>');
+
   // Code blocks: `code`
   formatted = formatted.replace(/`(.*?)`/g, '<code class="bg-slate-100 text-rose px-1.5 py-0.5 rounded text-xs font-mono">$1</code>');
   
-  // Convert newlines to breaks (ignoring list tags)
+  // Convert newlines to breaks (ignoring list and heading tags)
   formatted = formatted.split('\n').map(line => {
     if (line.includes('<h') || line.includes('<li') || line.includes('<code')) {
       return line;
     }
-    return line + '<br/>';
+    return line ? line + '<br/>' : '';
   }).join('');
 
   return <div dangerouslySetInnerHTML={{ __html: formatted }} className="space-y-1 text-xs text-slate-700 leading-relaxed" />;
@@ -388,7 +395,7 @@ export default function Chatbot() {
             </button>
           </form>
           <div className="text-[10px] text-textSec text-center mt-2.5 font-medium uppercase tracking-wider">
-            Powered by Groq AI and Render Cloud Services
+            Powered by Ollama Llama 3 AI Engine
           </div>
         </div>
 
