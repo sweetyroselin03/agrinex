@@ -2147,7 +2147,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Sessio
 @app.get("/ai/model-info")
 def get_ai_model_info():
     """Returns runtime status and provider configuration of AgriNex AI services."""
-    ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
+    ollama_model = os.getenv("OLLAMA_MODEL", "llama3:latest")
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     scanner_info = vision_engine.get_model_info()
 
@@ -2160,7 +2160,9 @@ def get_ai_model_info():
             "endpoint": ollama_base_url
         },
         "gemini": {
-            "provider": "gemini",
+            "status": "removed"
+        },
+        "groq": {
             "status": "removed"
         }
     }

@@ -12,7 +12,7 @@ from .pytorch_vision_engine import vision_engine
 logger = logging.getLogger("uvicorn.error")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:latest")
 
 
 class AIService:
@@ -70,12 +70,12 @@ class AIService:
             # Call Ollama HTTP API in background threadpool
             response_text = await asyncio.wait_for(
                 asyncio.to_thread(self._query_ollama, messages),
-                timeout=30.0
+                timeout=60.0
             )
             return response_text
 
         except asyncio.TimeoutError:
-            logger.error("[AgriNex AI Error] Ollama Llama request timed out after 30s")
+            logger.error("[AgriNex AI Error] Ollama Llama request timed out after 60s")
             return "AGRIGPT is temporarily unavailable because the Llama model service is offline."
         except Exception as e:
             logger.error(f"[AgriNex AI Error] Ollama Llama Communication Failure: {e}")
@@ -96,7 +96,7 @@ class AIService:
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=25) as resp:
+            with urllib.request.urlopen(req, timeout=55) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
                 if "message" in result and "content" in result["message"]:
                     return result["message"]["content"]

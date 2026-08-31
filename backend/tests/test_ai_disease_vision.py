@@ -1,5 +1,6 @@
 import pytest
 import sys
+import asyncio
 from pathlib import Path
 from PIL import Image
 
@@ -37,7 +38,7 @@ def test_pytorch_vision_engine_inference():
 
 
 def test_model_info_endpoint():
-    """Verify /ai/model-info accurately reports custom_ml, ollama llama3, and removed gemini."""
+    """Verify /ai/model-info accurately reports custom_ml, ollama llama3:latest, removed gemini and groq."""
     client = TestClient(app)
     res = client.get("/ai/model-info")
     assert res.status_code == 200
@@ -49,7 +50,10 @@ def test_model_info_endpoint():
     assert data["disease_scanner"]["status"] == "loaded"
 
     assert data["ai_chat"]["provider"] == "ollama"
+    assert data["ai_chat"]["model"] == "llama3:latest"
+    assert data["ai_chat"]["status"] == "configured"
     assert data["gemini"]["status"] == "removed"
+    assert data["groq"]["status"] == "removed"
 
 
 def test_no_gemini_or_groq_in_scanner():
@@ -57,3 +61,12 @@ def test_no_gemini_or_groq_in_scanner():
     assert not hasattr(ai_service.vision_engine, "genai")
     assert not hasattr(ai_service.vision_engine, "client")
     assert ai_service.vision_engine.model is not None
+
+
+def test_ollama_offline_error():
+    """Verify system returns explicit error message when Ollama endpoint is unreachable."""
+    original_url = ai_service.ollama_base_url
+    ai_service.ollama_base_url = "http://localhost:59999"
+    resp = asyncio.run(ai_service.get_chat_response("Hello agronomist"))
+    assert resp == "AGRIGPT is temporarily unavailable because the Llama model service is offline."
+    ai_service.ollama_base_url = original_url
