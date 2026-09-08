@@ -10,6 +10,7 @@ import httpx
 import json
 import os
 import uuid
+from datetime import datetime, timedelta
 from . import models, schemas, ai_service, auth_utils, auth_router, moderation_service
 from .pytorch_vision_engine import vision_engine
 from .database import engine, get_db
@@ -491,13 +492,13 @@ async def create_post(
         if not content:
             raise HTTPException(status_code=400, detail="Post content cannot be empty")
 
-        # NLP Moderation Check BEFORE Database Insert or File Retention
-        mod_result = moderation_service.moderation_service.moderate_text(content)
-        if not mod_result["allowed"]:
-            logger.warning(f"[Moderation Block] User {current_user.id} post blocked: {mod_result['reason']}")
+        # Content Moderation Check (local NLP rule engine — no external APIs)
+        mod_result = await moderation_service.moderate_content(content)
+        if not mod_result.get("is_safe", True):
+            logger.warning(f"[Moderation Block] User {current_user.id} post blocked: {mod_result.get('reason')}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This post cannot be published because it contains offensive or inappropriate content. Please edit your message and try again."
+                detail="Post blocked: contains inappropriate content"
             )
 
         # Process & validate uploaded image file if present
@@ -561,17 +562,24 @@ async def create_post(
 @app.get("/api/posts", response_model=List[schemas.PostOut])
 def get_feed(skip: int = 0, limit: int = 20, current_user: Optional[models.User] = Depends(get_optional_current_user), db: Session = Depends(get_db)):
     current_id = current_user.id if current_user else None
+    blocked_ids = get_blocked_user_ids(db, current_id) if current_id else set()
+
+    base_query = db.query(models.Post).filter(models.Post.is_hidden == False)
+    if blocked_ids:
+        base_query = base_query.filter(~models.Post.user_id.in_(blocked_ids))
+
     if current_id:
         following_ids = [f.following_id for f in db.query(models.Follow.following_id).filter(models.Follow.follower_id == current_id).all()]
         if following_ids:
-            followed_posts = db.query(models.Post).filter(models.Post.user_id.in_(following_ids + [current_id])).order_by(models.Post.created_at.desc()).all()
-            other_posts = db.query(models.Post).filter(~models.Post.user_id.in_(following_ids + [current_id])).order_by(models.Post.created_at.desc()).all()
+            target_ids = list(set(following_ids + [current_id]) - blocked_ids)
+            followed_posts = base_query.filter(models.Post.user_id.in_(target_ids)).order_by(models.Post.created_at.desc()).all()
+            other_posts = base_query.filter(~models.Post.user_id.in_(target_ids)).order_by(models.Post.created_at.desc()).all()
             all_posts = followed_posts + other_posts
             posts = all_posts[skip:skip+limit]
         else:
-            posts = db.query(models.Post).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+            posts = base_query.order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
     else:
-        posts = db.query(models.Post).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+        posts = base_query.order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
 
     return [prepare_post_out(p, current_id or 0, db) for p in posts]
 
@@ -627,6 +635,15 @@ def prepare_post_out(post, current_user_id, db, author=None):
     post_out.comments_count = comments_count
     post_out.is_liked = is_liked
     post_out.is_saved = is_saved
+    post_out.report_count = getattr(post, 'report_count', 0) or 0
+    post_out.is_hidden = getattr(post, 'is_hidden', False) or False
+    if current_user_id:
+        post_out.is_reported_by_me = db.query(models.PostReport).filter(
+            models.PostReport.post_id == post.id,
+            models.PostReport.user_id == current_user_id
+        ).first() is not None
+    else:
+        post_out.is_reported_by_me = False
 
     # Use passed author to avoid DetachedInstanceError after commit
     if author is not None:
@@ -655,6 +672,68 @@ def prepare_post_out(post, current_user_id, db, author=None):
         post_out.images = [post.image_url] if post.image_url else []
 
     return post_out
+
+# ─── Post Reporting ───
+@app.post("/posts/{post_id}/report", response_model=schemas.PostReportOut)
+@app.post("/api/posts/{post_id}/report", response_model=schemas.PostReportOut)
+def report_post(
+    post_id: int,
+    report_data: schemas.PostReportCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    existing_report = db.query(models.PostReport).filter(
+        models.PostReport.post_id == post_id,
+        models.PostReport.user_id == current_user.id
+    ).first()
+
+    if existing_report:
+        existing_report.reason = report_data.reason
+        db.commit()
+        return schemas.PostReportOut(
+            id=existing_report.id,
+            post_id=post.id,
+            user_id=current_user.id,
+            reason=existing_report.reason,
+            created_at=existing_report.created_at,
+            is_hidden=post.is_hidden or (post.report_count or 0) >= 3,
+            message="Post reported successfully"
+        )
+
+    new_report = models.PostReport(
+        post_id=post_id,
+        user_id=current_user.id,
+        reason=report_data.reason
+    )
+    db.add(new_report)
+
+    # Increment post report count and auto-hide if >= 3
+    post.report_count = (post.report_count or 0) + 1
+    if post.report_count >= 3:
+        post.is_hidden = True
+
+    # Increment author report count and auto-flag if >= 5
+    author = db.query(models.User).filter(models.User.id == post.user_id).first()
+    if author:
+        author.report_count = (author.report_count or 0) + 1
+        if author.report_count >= 5:
+            author.is_flagged = True
+
+    db.commit()
+    db.refresh(new_report)
+    return schemas.PostReportOut(
+        id=new_report.id,
+        post_id=post.id,
+        user_id=current_user.id,
+        reason=new_report.reason,
+        created_at=new_report.created_at,
+        is_hidden=post.is_hidden,
+        message="Post reported successfully"
+    )
 
 # ─── Likes & Comments ───
 @app.post("/posts/{post_id}/like")
@@ -2313,9 +2392,10 @@ async def websocket_chat_endpoint(websocket: WebSocket, user_id: int, db: Sessio
 @app.get("/ai/model-info")
 def get_ai_model_info():
     """Returns runtime status and provider configuration of AgriNex AI services."""
-    ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
-    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    import os
     scanner_info = vision_engine.get_model_info()
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
 
     return {
         "disease_scanner": scanner_info,
@@ -2323,14 +2403,21 @@ def get_ai_model_info():
             "provider": "ollama",
             "model": ollama_model,
             "status": "configured",
-            "endpoint": ollama_base_url,
+            "powered_by": "Llama AI",
             "api_endpoint": f"{ollama_base_url}/api/generate"
         },
         "gemini": {
-            "status": "removed"
+            "status": "removed",
+            "reason": "Gemini has been removed from AgriNex architecture"
         },
         "groq": {
-            "status": "removed"
+            "status": "removed",
+            "reason": "Groq has been removed from AgriNex architecture"
+        },
+        "moderation": {
+            "provider": "local_nlp",
+            "status": "active",
+            "note": "Local regex/pattern-based moderation only"
         }
     }
 

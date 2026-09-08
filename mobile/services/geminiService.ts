@@ -223,7 +223,7 @@ export async function sendMessage(
   history: any[] = [],
   language?: string
 ): Promise<string> {
-  // First try backend /ai/chat
+  // First try backend AgriGPT Llama chat
   try {
     const payload: any = {
       message: message.trim() || 'Help me with my crop',
@@ -235,12 +235,12 @@ export async function sendMessage(
     }
     if (language) payload.language = language;
 
-    const res = await client.post('/ai/chat', payload, { timeout: 25000 });
+    const res = await client.post('/chat', payload, { timeout: 25000 }).catch(() => client.post('/ai/chat', payload, { timeout: 25000 }));
     const payloadData = (res.data && typeof res.data === 'object' && 'data' in res.data && res.data.data) ? res.data.data : res.data;
     const replyText = payloadData?.message || payloadData?.reply || payloadData?.response;
     if (replyText && typeof replyText === 'string') return replyText;
   } catch (e) {
-    console.warn('[Gemini SDK Mobile] Backend chat call failed, trying direct Gemini SDK:', e);
+    console.warn('[AgriGPT Mobile] Backend Llama chat call failed, trying fallback:', e);
   }
 
   // Direct SDK Chat Fallback

@@ -7,40 +7,28 @@ import {
   Plus, 
   MessageSquare, 
   Loader2, 
-  Edit3, 
-  Check,
-  ChevronRight
+  Bot,
+  Zap,
+  Leaf
 } from 'lucide-react';
 import api, { getLocalToken } from '../api/client';
 import { API_BASE_URL } from '../config/api';
-import { useAuthStore } from '../store/useAuthStore';
 
-// Enhanced Markdown renderer to display structured Llama AI agronomist responses
+// Structured Markdown parser for Llama AI agronomist responses
 const formatMessageText = (text: string) => {
   if (!text) return null;
   
-  // Headers: # text, ## text, ### text
   let formatted = text
-    .replace(/^### (.*?)$/gm, '<h5 class="font-extrabold text-brandDark mt-3 mb-1 text-xs uppercase tracking-wider">$1</h5>')
-    .replace(/^## (.*?)$/gm, '<h4 class="font-black text-brandDark mt-4 mb-2 text-sm border-b border-slate-100 pb-1">$1</h4>')
-    .replace(/^# (.*?)$/gm, '<h3 class="font-black text-brandDark mt-5 mb-3 text-base">$1</h3>');
+    .replace(/^### (.*?)$/gm, '<h5 class="font-extrabold text-[#1B5E20] mt-3 mb-1 text-xs uppercase tracking-wider">$1</h5>')
+    .replace(/^## (.*?)$/gm, '<h4 class="font-black text-[#1A2E1A] mt-4 mb-2 text-sm border-b border-[#E0E7DE] pb-1">$1</h4>')
+    .replace(/^# (.*?)$/gm, '<h3 class="font-black text-[#1A2E1A] mt-5 mb-3 text-base">$1</h3>');
   
-  // Bold: **text**
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-brandDark">$1</strong>');
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-black text-[#1B5E20]">$1</strong>');
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic text-[#546E7A]">$1</em>');
+  formatted = formatted.replace(/^\s*\d+\.\s+(.*?)$/gm, '<li class="ml-4 list-decimal text-xs my-1 text-[#1A2E1A]">$1</li>');
+  formatted = formatted.replace(/^\s*[-*•]\s+(.*?)$/gm, '<li class="ml-4 list-disc text-xs my-1 text-[#1A2E1A]">$1</li>');
+  formatted = formatted.replace(/`(.*?)`/g, '<code class="bg-[#E8F5E9] text-[#1B5E20] px-1.5 py-0.5 rounded text-xs font-mono font-bold">$1</code>');
   
-  // Italics: *text* or _text_
-  formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic text-slate-700">$1</em>');
-  
-  // Numbered list items: 1. text
-  formatted = formatted.replace(/^\s*\d+\.\s+(.*?)$/gm, '<li class="ml-4 list-decimal text-xs my-1 text-slate-700">$1</li>');
-
-  // Bullet points: - text or * text or • text
-  formatted = formatted.replace(/^\s*[-*•]\s+(.*?)$/gm, '<li class="ml-4 list-disc text-xs my-1 text-slate-700">$1</li>');
-
-  // Code blocks: `code`
-  formatted = formatted.replace(/`(.*?)`/g, '<code class="bg-slate-100 text-rose px-1.5 py-0.5 rounded text-xs font-mono">$1</code>');
-  
-  // Convert newlines to breaks (ignoring list and heading tags)
   formatted = formatted.split('\n').map(line => {
     if (line.includes('<h') || line.includes('<li') || line.includes('<code')) {
       return line;
@@ -48,10 +36,10 @@ const formatMessageText = (text: string) => {
     return line ? line + '<br/>' : '';
   }).join('');
 
-  return <div dangerouslySetInnerHTML={{ __html: formatted }} className="space-y-1 text-xs text-slate-700 leading-relaxed" />;
+  return <div dangerouslySetInnerHTML={{ __html: formatted }} className="space-y-1 text-xs text-[#1A2E1A] leading-relaxed" />;
 };
 
-// Streaming SSE consumer helper
+// SSE streaming reader helper
 async function fetchChatStream(
   messageText: string,
   conversationId: string,
@@ -80,13 +68,13 @@ async function fetchChatStream(
 
     if (!response.ok) {
       const errData = await response.json().catch(() => null);
-      const msg = errData?.detail || errData?.message || 'Connection error to AI service.';
+      const msg = errData?.detail || errData?.message || 'AgriGPT is experiencing high demand. Please try again in a moment.';
       onError(msg);
       return;
     }
 
     if (!response.body) {
-      onError('No response body returned from server');
+      onError('No response received from Llama service.');
       return;
     }
 
@@ -103,406 +91,324 @@ async function fetchChatStream(
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data: ')) {
-          const jsonStr = trimmed.slice(6);
-          try {
-            const parsed = JSON.parse(jsonStr);
-            if (parsed.error) {
-              onError(parsed.error);
-              return;
-            }
-            if (parsed.token) {
-              onToken(parsed.token);
-            }
-            if (parsed.done) {
-              onDone(parsed);
-              return;
-            }
-          } catch (_) {}
-        }
+        if (!line.trim() || !line.startsWith('data: ')) continue;
+        const dataStr = line.replace('data: ', '').trim();
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.error) {
+            onError(parsed.error);
+            return;
+          }
+          if (parsed.token) {
+            onToken(parsed.token);
+          }
+          if (parsed.done) {
+            onDone(parsed);
+          }
+        } catch (_) {}
       }
     }
-
-    if (buffer.trim().startsWith('data: ')) {
-      const jsonStr = buffer.trim().slice(6);
-      try {
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.token) onToken(parsed.token);
-        if (parsed.done) onDone(parsed);
-      } catch (_) {}
-    }
   } catch (err: any) {
-    onError('Sorry, I encountered a connection error. Please verify your connection to Render cloud service and try again.');
+    onError(err.message || 'Network communication error with AgriGPT.');
   }
 }
 
 export default function Chatbot() {
-  const { user } = useAuthStore();
   const [conversations, setConversations] = useState<any[]>([]);
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [activeConvId, setActiveConvId] = useState<string>(() => `conv_${Date.now()}`);
   const [messages, setMessages] = useState<any[]>([]);
-  const [input, setInput] = useState('');
-  const [loadingConversations, setLoadingConversations] = useState(true);
-  const [sending, setSending] = useState(false);
-  
-  // Rename variables
-  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
-  const [editTitleVal, setEditTitleVal] = useState('');
-
+  const [inputMessage, setInputMessage] = useState('');
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [liveStreamText, setLiveStreamText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize: load conversations
-  useEffect(() => {
-    fetchConversations();
-  }, []);
+  const quickPrompts = [
+    { text: "Best fertilizer dosage for paddy rice?", icon: "🌾" },
+    { text: "Tomato early blight organic treatment", icon: "🍅" },
+    { text: "Smart drip irrigation scheduling", icon: "💧" },
+    { text: "Neem oil organic pest control recipe", icon: "🌱" },
+    { text: "Wheat Rabi season field prep tips", icon: "🌤️" },
+    { text: "Cotton bollworm bio-management", icon: "🛡️" },
+  ];
 
-  // Fetch messages when conversation selection changes
   useEffect(() => {
-    if (selectedConvId) {
-      fetchChatHistory(selectedConvId);
-    } else {
-      setMessages([
-        { 
-          id: 'welcome', 
-          message: `Hello ${user?.full_name || 'Farmer Partner'}! I am AgriGPT, your personal agronomist advisor. Ask me anything about crop diseases, fertilizing, or weather controls.`, 
-          is_ai: true,
-          created_at: new Date()
-        }
-      ]);
-    }
-  }, [selectedConvId]);
+    fetchHistory(activeConvId);
+  }, [activeConvId]);
 
-  // Auto scroll to chat bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
+  }, [messages, liveStreamText, isGenerating]);
 
-  const fetchConversations = async () => {
-    setLoadingConversations(true);
+  const fetchHistory = async (convId: string) => {
     try {
-      const res = await api.get('/chat/conversations');
-      setConversations(res.data);
-    } catch (e) {
-      console.warn('Failed to load conversations list');
-    } finally {
-      setLoadingConversations(false);
-    }
-  };
-
-  const fetchChatHistory = async (convId: string) => {
-    try {
+      setLoadingHistory(true);
       const res = await api.get('/chat/history', { params: { conversation_id: convId } });
-      setMessages(res.data);
-    } catch (e) {
-      console.warn('Failed to load history');
+      const raw = Array.isArray(res.data) ? res.data : [];
+      setMessages(raw);
+
+      // Track conversations in left list
+      if (raw.length > 0 && !conversations.some(c => c.id === convId)) {
+        setConversations(prev => [
+          {
+            id: convId,
+            title: raw[0]?.message?.slice(0, 30) || 'Crop Advisory',
+            date: new Date().toLocaleDateString()
+          },
+          ...prev
+        ]);
+      }
+    } catch {
+      setMessages([]);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
-  const handleCreateNewChat = () => {
-    setSelectedConvId(null);
-    setInput('');
+  const startNewChat = () => {
+    const newId = `conv_${Date.now()}`;
+    setActiveConvId(newId);
+    setMessages([]);
+    setLiveStreamText('');
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!input.trim() || sending) return;
+  const handleSend = async (customText?: string) => {
+    const textToSend = (customText || inputMessage).trim();
+    if (!textToSend || isGenerating) return;
 
-    const messageText = input.trim();
-    setInput('');
-    setSending(true);
-
-    const activeConvId = selectedConvId || `conv_${Date.now()}`;
-
-    // Append user message locally
     const userMsg = {
-      id: Date.now(),
-      message: messageText,
+      id: `user_${Date.now()}`,
+      message: textToSend,
       is_ai: false,
-      created_at: new Date()
+      created_at: new Date().toISOString()
     };
+
     setMessages(prev => [...prev, userMsg]);
+    setInputMessage('');
+    setIsGenerating(true);
+    setLiveStreamText('');
 
-    // Append assistant placeholder message with typing indicator
-    const aiMsgId = Date.now() + 1;
-    const assistantPlaceholder = {
-      id: aiMsgId,
-      message: '',
-      is_ai: true,
-      is_typing: true,
-      created_at: new Date()
-    };
-    setMessages(prev => [...prev, assistantPlaceholder]);
+    let accumulatedAiText = '';
 
-    fetchChatStream(
-      messageText,
+    await fetchChatStream(
+      textToSend,
       activeConvId,
       (token) => {
-        setMessages(prev => prev.map(m => {
-          if (m.id === aiMsgId) {
-            return {
-              ...m,
-              message: m.message + token,
-              is_typing: false
-            };
-          }
-          return m;
-        }));
+        accumulatedAiText += token;
+        setLiveStreamText(accumulatedAiText);
       },
-      (data) => {
-        setMessages(prev => prev.map(m => {
-          if (m.id === aiMsgId) {
-            return {
-              ...m,
-              id: data.id || m.id,
-              message: data.message || m.message,
-              is_typing: false
-            };
-          }
-          return m;
-        }));
-        if (!selectedConvId) {
-          setSelectedConvId(activeConvId);
-          fetchConversations();
-        }
-        setSending(false);
+      (doneData) => {
+        setIsGenerating(false);
+        const finalAiMsg = {
+          id: doneData.id || `ai_${Date.now()}`,
+          message: accumulatedAiText,
+          is_ai: true,
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, finalAiMsg]);
+        setLiveStreamText('');
       },
       (errorMsg) => {
-        setMessages(prev => prev.map(m => {
-          if (m.id === aiMsgId) {
-            return {
-              ...m,
-              message: errorMsg,
-              is_typing: false
-            };
-          }
-          return m;
-        }));
-        setSending(false);
+        setIsGenerating(false);
+        const fallbackMsg = {
+          id: `ai_err_${Date.now()}`,
+          message: errorMsg || 'AgriGPT is experiencing high demand. Please try again in a moment.',
+          is_ai: true,
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, fallbackMsg]);
+        setLiveStreamText('');
       }
     );
   };
 
-  const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this chat conversation?')) return;
-
-    try {
-      await api.delete(`/chat/conversation/${convId}`);
-      if (selectedConvId === convId) {
-        setSelectedConvId(null);
-      }
-      fetchConversations();
-    } catch (err) {
-      alert('Delete request failed.');
-    }
-  };
-
-  const handleStartRename = (conv: any, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingTitleId(conv.id);
-    setEditTitleVal(conv.title);
-  };
-
-  const handleSaveRename = async (convId: string) => {
-    if (!editTitleVal.trim()) return;
-    try {
-      await api.put(`/chat/conversation/${convId}/title`, { message: editTitleVal });
-      setEditingTitleId(null);
-      fetchConversations();
-    } catch (err) {
-      alert('Failed to rename conversation');
-    }
-  };
-
   return (
-    <div className="h-[calc(100vh-8rem)] bg-white rounded-3xl border border-borderDark flex overflow-hidden shadow-sm">
-      
-      {/* ─── SIDEBAR: HISTORICAL CONVERSATIONS (30% Width) ─── */}
-      <aside className="w-80 border-r border-borderDark flex flex-col bg-slate-50/50 shrink-0 hidden md:flex">
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-borderDark flex items-center justify-between bg-white">
-          <h3 className="font-extrabold text-brandDark text-sm">Consultation Logs</h3>
-          <button
-            onClick={handleCreateNewChat}
-            className="p-2 rounded-xl bg-primary text-brandDark hover:bg-emerald-400 font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 text-xs"
-          >
-            <Plus className="w-4 h-4" />
-            New Chat
-          </button>
-        </div>
+    <div className="h-[calc(100vh-6.5rem)] flex gap-5">
 
-        {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {loadingConversations ? (
-            <div className="py-12 text-center text-textSec text-xs flex justify-center items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              Loading history...
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="py-12 text-center text-textSec text-xs">
-              No recent conversations.
+      {/* ─── LEFT COLUMN (250px): CONVERSATION HISTORY ─── */}
+      <div className="hidden md:flex flex-col w-64 bg-white rounded-[22px] border border-[#E0E7DE] p-4 shadow-sm shrink-0">
+        <button
+          onClick={startNewChat}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white font-bold text-xs shadow-md transition-all mb-4 hover:shadow-lg hover:scale-102"
+          style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)' }}
+        >
+          <Plus className="w-4 h-4" />
+          <span>+ New Agronomy Chat</span>
+        </button>
+
+        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+          <p className="text-[10px] font-black uppercase text-[#546E7A] tracking-wider px-2 mb-2">Past Consultations</p>
+          
+          {conversations.length === 0 ? (
+            <div className="p-4 text-center text-xs text-[#546E7A]">
+              No past chats. Start asking crop questions!
             </div>
           ) : (
             conversations.map((conv) => {
-              const isSelected = selectedConvId === conv.id;
+              const isActive = conv.id === activeConvId;
               return (
-                <div
+                <button
                   key={conv.id}
-                  onClick={() => setSelectedConvId(conv.id)}
-                  className={`group w-full p-3 rounded-xl flex items-start justify-between gap-3 text-left transition-all cursor-pointer ${
-                    isSelected 
-                      ? 'bg-brandLight border border-primary/20 text-brandDark font-bold'
-                      : 'hover:bg-slate-100/70 border border-transparent text-textSec'
+                  onClick={() => setActiveConvId(conv.id)}
+                  className={`w-full text-left p-3 rounded-xl transition-all ${
+                    isActive
+                      ? 'bg-[#E8F5E9] border-l-4 border-[#2E7D32] text-[#1B5E20] font-bold shadow-sm'
+                      : 'hover:bg-[#F1F8E9] text-[#1A2E1A]'
                   }`}
                 >
-                  <div className="flex gap-2.5 min-w-0 flex-1 items-center">
-                    <MessageSquare className={`w-4 h-4 shrink-0 mt-0.5 ${isSelected ? 'text-primary' : 'text-slate-400'}`} />
-                    <div className="min-w-0 flex-1">
-                      {editingTitleId === conv.id ? (
-                        <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                          <input
-                            type="text"
-                            className="bg-white border border-slate-200 text-brandDark rounded px-1.5 py-0.5 text-xs font-semibold w-full outline-none"
-                            value={editTitleVal}
-                            onChange={(e) => setEditTitleVal(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRename(conv.id); }}
-                          />
-                          <button onClick={() => handleSaveRename(conv.id)} className="p-1 text-primary hover:bg-slate-150 rounded">
-                            <Check className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <h4 className="text-xs text-brandDark truncate leading-tight font-extrabold">{conv.title}</h4>
-                          <p className="text-[10px] text-textSec truncate mt-0.5 font-medium">{conv.preview}</p>
-                        </>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5 text-[#2E7D32] shrink-0" />
+                    <span className="text-xs truncate">{conv.title}</span>
                   </div>
-
-                  {/* Actions (Rename / Delete) */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => handleStartRename(conv, e)}
-                      className="p-1 hover:bg-slate-200 text-slate-400 hover:text-brandDark rounded"
-                      title="Rename"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteConversation(conv.id, e)}
-                      className="p-1 hover:bg-slate-200 text-slate-400 hover:text-rose rounded"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
+                  <span className="text-[10px] text-[#546E7A] pl-5 block mt-0.5">{conv.date}</span>
+                </button>
               );
             })
           )}
         </div>
-      </aside>
+      </div>
 
-      {/* ─── MAIN CHAT AREA (70% Width) ─── */}
-      <div className="flex-1 flex flex-col bg-white">
+      {/* ─── MIDDLE COLUMN (FLEX): CHAT MESSAGES & INPUT ─── */}
+      <div className="flex-1 flex flex-col bg-white rounded-[24px] border border-[#E0E7DE] shadow-sm overflow-hidden">
         
-        {/* Chat window Header */}
-        <div className="h-16 border-b border-borderDark px-6 flex items-center justify-between bg-white shrink-0">
+        {/* Chat Header */}
+        <div className="px-6 py-4 border-b border-[#E0E7DE] flex items-center justify-between bg-gradient-to-r from-white to-[#F1F8E9]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brandLight text-primary flex items-center justify-center border border-primary/10">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#1B5E20] to-[#66BB6A] flex items-center justify-center text-2xl shadow-inner text-white">
+              🤖
             </div>
             <div>
-              <h2 className="text-sm font-extrabold text-brandDark">AgriGPT Advisory Engine</h2>
-              <p className="text-[10px] text-primary font-bold uppercase tracking-widest leading-none mt-0.5">Active</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-[#1A2E1A]">AgriGPT Advisory Engine</h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#E8F5E9] text-[#1B5E20] border border-[#C8E6C9] text-[10px] font-extrabold flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-[#F9A825]" /> Powered by Llama AI
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-ping"></span>
+                <span className="text-[11px] font-bold text-[#2E7D32]">ACTIVE • Multi-lingual Agronomist</span>
+              </div>
             </div>
           </div>
-          
-          <button 
-            onClick={handleCreateNewChat}
-            className="md:hidden p-2 rounded-xl bg-slate-100 text-brandDark text-xs font-bold flex items-center gap-1"
-          >
-            New Chat
-          </button>
         </div>
 
-        {/* Chat message bubbles scroll */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/20">
-          {messages.map((m) => {
-            const isAI = m.is_ai;
-            return (
-              <div 
-                key={m.id} 
-                className={`flex ${isAI ? 'justify-start' : 'justify-end'}`}
-              >
-                <div className={`flex gap-3 max-w-[80%] ${isAI ? 'flex-row' : 'flex-row-reverse'}`}>
-                  {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border text-xs font-bold bg-white ${
-                    isAI ? 'border-primary/20 text-primary' : 'border-slate-200 text-slate-500'
-                  }`}>
-                    {isAI ? '🤖' : '👩‍🌾'}
-                  </div>
-
-                  {/* Bubble body */}
-                  <div className={`p-4 rounded-2xl shadow-sm text-xs leading-relaxed ${
-                    isAI 
-                      ? 'bg-white border border-borderDark text-brandDark rounded-tl-sm border-l-4 border-l-primary'
-                      : 'bg-brandDark text-white rounded-tr-sm font-semibold'
-                  }`}>
-                    {isAI ? (
-                      (m.is_typing && !m.message) ? (
-                        <div className="flex items-center gap-1.5 py-1 px-1">
-                          {[0, 1, 2].map((i) => (
-                            <motion.span 
-                              key={i} 
-                              className="w-2 h-2 bg-emerald-500 rounded-full" 
-                              animate={{ y: [0, -5, 0] }}
-                              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.2 }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        formatMessageText(m.message)
-                      )
-                    ) : m.message}
-                  </div>
-                </div>
+        {/* Message Viewport */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#F1F8E9]/30">
+          
+          {messages.length === 0 && !isGenerating && (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-[#E8F5E9] flex items-center justify-center text-3xl shadow-sm animate-bounce">
+                🌾
               </div>
+              <h3 className="text-lg font-black text-[#1A2E1A]">Welcome to AgriGPT Advisory</h3>
+              <p className="text-xs text-[#546E7A] leading-relaxed">
+                Powered by Llama 3.3 70B AI. Ask questions regarding crop diseases, chemical & organic treatments, weather risks, and yield enhancement.
+              </p>
+            </div>
+          )}
+
+          {/* Render Messages */}
+          {messages.map((msg, i) => {
+            const isAi = msg.is_ai;
+            return (
+              <motion.div
+                key={msg.id || i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex ${isAi ? 'justify-start' : 'justify-end'}`}
+              >
+                <div
+                  className={`max-w-[85%] sm:max-w-[75%] p-4 text-xs ${
+                    isAi
+                      ? 'bg-white border-l-4 border-[#66BB6A] text-[#1A2E1A] shadow-[0_4px_15px_rgba(27,94,32,0.06)] rounded-[20px_20px_20px_4px]'
+                      : 'text-white rounded-[20px_20px_4px_20px] shadow-md'
+                  }`}
+                  style={!isAi ? { background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)' } : {}}
+                >
+                  {isAi ? formatMessageText(msg.message) : msg.message}
+                </div>
+              </motion.div>
             );
           })}
+
+          {/* Live Streaming Response */}
+          {isGenerating && liveStreamText && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
+              <div className="max-w-[85%] sm:max-w-[75%] p-4 bg-white border-l-4 border-[#66BB6A] text-[#1A2E1A] shadow-md rounded-[20px_20px_20px_4px] text-xs">
+                {formatMessageText(liveStreamText)}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Typing Indicator */}
+          {isGenerating && !liveStreamText && (
+            <div className="flex items-center gap-2 p-3 bg-white border border-[#E0E7DE] rounded-2xl w-fit text-xs text-[#2E7D32] font-bold shadow-sm">
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-bounce"></span>
+                <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-bounce [animation-delay:0.2s]"></span>
+                <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-bounce [animation-delay:0.4s]"></span>
+              </div>
+              <span>AgriGPT is thinking...</span>
+            </div>
+          )}
 
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Chat input box footer */}
-        <div className="p-4 border-t border-borderDark bg-white shrink-0">
-          <form onSubmit={handleSendMessage} className="flex gap-3 items-end">
-            <textarea
-              rows={1}
-              placeholder="Type your agricultural question here... (e.g. 'How do I treat blight in tomato?')"
-              className="flex-1 border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-4 py-3 text-xs text-brandDark placeholder-slate-400 outline-none resize-none max-h-24 transition-all leading-normal"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              disabled={sending}
+        {/* Input Bar */}
+        <div className="p-4 border-t border-[#E0E7DE] bg-white">
+          <form 
+            onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+            className="flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder="Ask AgriGPT about pests, fungicides, fertilizers, soil health..."
+              disabled={isGenerating}
+              className="flex-1 rounded-full bg-[#F1F8E9] border border-[#E0E7DE] px-5 py-3.5 text-xs text-[#1A2E1A] placeholder-[#546E7A] focus:outline-none focus:ring-2 focus:ring-[#2E7D32] transition-all"
             />
             <button
               type="submit"
-              className="p-3.5 rounded-xl bg-primary text-brandDark hover:bg-emerald-400 disabled:opacity-50 transition-all shadow-md flex items-center justify-center"
-              disabled={!input.trim() || sending}
+              disabled={isGenerating || !inputMessage.trim()}
+              className="px-6 py-3.5 rounded-full text-white font-bold text-xs shadow-md transition-all disabled:opacity-40 flex items-center gap-2 hover:scale-105"
+              style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)' }}
             >
-              <Send className="w-4.5 h-4.5" />
+              <span>Send</span>
+              <Send className="w-3.5 h-3.5" />
             </button>
           </form>
         </div>
 
+      </div>
+
+      {/* ─── RIGHT COLUMN (200px): QUICK SUGGESTIONS ─── */}
+      <div className="hidden lg:flex flex-col w-56 bg-white rounded-[22px] border border-[#E0E7DE] p-4 shadow-sm shrink-0 space-y-3">
+        <h4 className="text-xs font-black uppercase tracking-wider text-[#1A2E1A] flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-[#F9A825]" />
+          <span>Quick Inquiries</span>
+        </h4>
+
+        <div className="space-y-2 overflow-y-auto">
+          {quickPrompts.map((p, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSend(p.text)}
+              disabled={isGenerating}
+              className="w-full text-left p-3 rounded-xl bg-[#F1F8E9] hover:bg-[#E8F5E9] hover:scale-102 text-xs font-semibold text-[#1A2E1A] border border-[#E0E7DE] transition-all"
+            >
+              <div className="flex items-start gap-2">
+                <span className="text-base">{p.icon}</span>
+                <span className="text-[11px] leading-tight text-[#1A2E1A]">{p.text}</span>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
     </div>

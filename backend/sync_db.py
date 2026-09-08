@@ -42,6 +42,8 @@ def sync_db(bind_engine=None):
         add_column_if_missing(conn, "users", "bio", "VARCHAR")
         add_column_if_missing(conn, "users", "website", "VARCHAR")
         add_column_if_missing(conn, "users", "is_verified", "BOOLEAN DEFAULT TRUE")
+        add_column_if_missing(conn, "users", "report_count", "INTEGER DEFAULT 0")
+        add_column_if_missing(conn, "users", "is_flagged", "BOOLEAN DEFAULT FALSE")
         add_column_if_missing(conn, "users", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         
         # Other tables column sync
@@ -50,6 +52,8 @@ def sync_db(bind_engine=None):
         add_column_if_missing(conn, "posts", "hashtags", "VARCHAR")
         add_column_if_missing(conn, "posts", "location", "VARCHAR")
         add_column_if_missing(conn, "posts", "crop_category", "VARCHAR")
+        add_column_if_missing(conn, "posts", "report_count", "INTEGER DEFAULT 0")
+        add_column_if_missing(conn, "posts", "is_hidden", "BOOLEAN DEFAULT FALSE")
 
         try:
             print("Cleaning duplicate follows before enforcing unique constraint...")

@@ -169,6 +169,9 @@ class PostOut(BaseModel):
     author_name: Optional[str] = None
     author_avatar: Optional[str] = None
     author_verified: Optional[bool] = False
+    report_count: Optional[int] = 0
+    is_hidden: Optional[bool] = False
+    is_reported_by_me: Optional[bool] = False
 
     @validator('images', pre=True)
     def parse_images(cls, v):
@@ -189,6 +192,23 @@ class PostOut(BaseModel):
 
 # Keep legacy alias
 Post = PostOut
+
+
+# ─── Post Report ─────────────────────────────────────────────────────────────
+class PostReportCreate(BaseModel):
+    reason: str = "spam"  # spam, offensive, harassment, irrelevant, misinformation
+
+class PostReportOut(BaseModel):
+    id: int
+    post_id: int
+    user_id: int
+    reason: str
+    created_at: datetime
+    is_hidden: bool = False
+    message: str = "Post reported successfully"
+
+    class Config:
+        from_attributes = True
 
 
 # ─── Like ─────────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-buildDir = new File("C:/tmp/agrinex_app_build")
+buildDir = new File("C:/tmp/ag_bld")
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -99,7 +99,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments "-DCMAKE_OBJECT_PATH_MAX=260"
+                arguments "-DCMAKE_OBJECT_PATH_MAX=1024"
             }
         }
 

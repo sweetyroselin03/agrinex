@@ -1,22 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --primary: #1B5E20;
+  --primary-light: #2E7D32;
+  --accent: #66BB6A;
+  --gold: #F9A825;
+  --earth: #5D4037;
+  --sky: #0288D1;
+  --cream: #F9F6F0;
+  --surface: #FFFFFF;
+  --text-dark: #1A2E1A;
+  --text-muted: #546E7A;
+  --success: #2E7D32;
+  --warning: #F57F17;
+  --error: #C62828;
+}
+
 body {
-  @apply bg-bgMain text-textMain font-sans antialiased;
+  @apply bg-[#F1F8E9] text-[#1A2E1A] font-sans antialiased;
+  background-image: radial-gradient(rgba(46, 125, 50, 0.04) 1px, transparent 0);
+  background-size: 24px 24px;
 }
 
-.glass-card {
-  @apply bg-white border border-borderDark rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-md transition-all duration-300;
+/* Card aesthetics */
+.farm-card {
+  @apply bg-white border border-[#E0E7DE] rounded-[20px] shadow-[0_4px_20px_rgba(27,94,32,0.08)] transition-all duration-300;
 }
 
-.glass-card:hover {
-  @apply shadow-[0_12px_40px_rgb(0,0,0,0.06)] border-slate-300/40;
+.farm-card:hover {
+  @apply shadow-[0_12px_40px_rgba(27,94,32,0.15)];
 }
 
-/* Custom scrollbars for a premium feel */
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -27,20 +46,135 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 4px;
+  background: #A5D6A7;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: #66BB6A;
 }
 
-/* Custom animations helper */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+/* Animations */
+@keyframes spinSlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.animate-float {
-  animation: float 4s ease-in-out infinite;
+.animate-spin-slow {
+  animation: spinSlow 12s linear infinite;
+}
+
+@keyframes floatLeaf {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-18px) rotate(15deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.8;
+  }
+}
+
+.animate-float-leaf {
+  animation: floatLeaf 4s ease-in-out infinite;
+}
+
+@keyframes floatParticle {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(60px, -120px) rotate(90deg);
+    opacity: 0;
+  }
+}
+
+.animate-particle-1 {
+  animation: floatParticle 8s ease-in-out infinite;
+}
+
+.animate-particle-2 {
+  animation: floatParticle 10s ease-in-out infinite 2s;
+}
+
+.animate-particle-3 {
+  animation: floatParticle 12s ease-in-out infinite 4s;
+}
+
+@keyframes sunRise {
+  0% {
+    transform: translateY(20px) scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(0px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-sun-rise {
+  animation: sunRise 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scanSweep {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 95%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.8;
+  }
+}
+
+.animate-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, #66BB6A 50%, transparent 100%);
+  box-shadow: 0 0 15px #66BB6A;
+  animation: scanSweep 2.5s ease-in-out infinite;
+}
+
+/* Skeleton Shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #E8F5E9 25%, #C8E6C9 50%, #E8F5E9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* Button Ripple Effect */
+.btn-farm-ripple {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-farm-ripple:active {
+  transform: scale(0.98);
 }

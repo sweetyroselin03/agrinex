@@ -23,12 +23,15 @@ class User(Base):
     bio = Column(String, nullable=True)
     website = Column(String, nullable=True)
     is_verified = Column(Boolean, default=True)
+    report_count = Column(Integer, default=0)
+    is_flagged = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")
     likes = relationship("Like", back_populates="user", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
     saved_posts = relationship("SavedPost", back_populates="user", cascade="all, delete-orphan")
+    reports = relationship("PostReport", back_populates="user", cascade="all, delete-orphan")
     followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following")
     following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower")
 
@@ -45,11 +48,14 @@ class Post(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     images = Column(Text, nullable=True)
+    report_count = Column(Integer, default=0)
+    is_hidden = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="posts")
     likes = relationship("Like", back_populates="post", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
     saves = relationship("SavedPost", back_populates="post", cascade="all, delete-orphan")
+    reports = relationship("PostReport", back_populates="post", cascade="all, delete-orphan")
 
 
 class Like(Base):
@@ -304,4 +310,20 @@ class UserOnlineStatus(Base):
     last_seen = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class PostReport(Base):
+    __tablename__ = "post_reports"
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason = Column(String, nullable=False)  # spam, offensive, harassment, irrelevant, misinformation
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    post = relationship("Post", back_populates="reports")
+    user = relationship("User", back_populates="reports")
+
+    __table_args__ = (
+        UniqueConstraint('post_id', 'user_id', name='unique_post_user_report'),
+    )
 

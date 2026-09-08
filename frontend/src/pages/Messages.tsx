@@ -81,12 +81,16 @@ export const Messages: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
   // Initialize conversations & socket
   useEffect(() => {
     fetchConversations();
     if (user?.id) {
       connectWebSocket(user.id);
     }
+    const timer = setTimeout(() => setLoadTimedOut(true), 3000);
+    return () => clearTimeout(timer);
   }, [user?.id]);
 
   // Handle URL target user ID
@@ -375,10 +379,11 @@ export const Messages: React.FC = () => {
                 ))
               )}
             </div>
-          ) : isLoadingConversations ? (
-            <div className="flex flex-col items-center justify-center p-12 text-slate-400 gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-[#16A34A]" />
-              <span className="text-xs font-semibold">Loading conversations...</span>
+          ) : (isLoadingConversations && !loadTimedOut) ? (
+            <div className="space-y-3 p-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-16 rounded-2xl skeleton-shimmer" />
+              ))}
             </div>
           ) : filteredConversations.length > 0 ? (
             filteredConversations.map((c) => (
@@ -391,15 +396,18 @@ export const Messages: React.FC = () => {
               />
             ))
           ) : (
-            <div className="flex flex-col items-center justify-center p-12 text-slate-400 text-center gap-3">
-              <MessageSquare className="w-10 h-10 text-slate-300" />
-              <p className="text-xs font-medium">
-                {activeTab === 'unread'
-                  ? 'No unread messages'
-                  : activeTab === 'archived'
-                  ? 'No archived conversations'
-                  : 'No active conversations. Search a farmer above to start chatting!'}
-              </p>
+            <div className="flex flex-col items-center justify-center p-12 text-[#546E7A] text-center gap-3">
+              <span className="text-4xl block animate-float-leaf">🌾</span>
+              <div className="space-y-1">
+                <h4 className="text-sm font-black text-[#1A2E1A]">No conversations yet 🌾</h4>
+                <p className="text-xs font-medium text-[#546E7A]">
+                  {activeTab === 'unread'
+                    ? 'No unread messages.'
+                    : activeTab === 'archived'
+                    ? 'No archived conversations.'
+                    : 'Search for farmers above to start chatting!'}
+                </p>
+              </div>
             </div>
           )}
         </div>

@@ -1,16 +1,9 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard,
-  Leaf,
-  MessageSquare,
-  Users,
-  User,
-  Bell,
   LogOut,
   Menu,
-  X,
-  Send
+  X
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -29,13 +22,13 @@ export default function MainLayout() {
   }, []);
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/messages', label: 'Direct Messages', icon: Send },
-    { path: '/scan', label: 'AI Crop Diagnostic', icon: Leaf },
-    { path: '/chat', label: 'AgriGPT Chatbot', icon: MessageSquare },
-    { path: '/community', label: 'Community Feed', icon: Users },
-    { path: '/profile', label: 'My Profile', icon: User },
-    { path: '/notifications', label: 'Notifications', icon: Bell },
+    { path: '/dashboard', label: 'Dashboard', emoji: '🌾' },
+    { path: '/messages', label: 'Direct Messages', emoji: '💬' },
+    { path: '/scan', label: 'AI Crop Diagnostic', emoji: '🔬' },
+    { path: '/chat', label: 'AgriGPT Chatbot', emoji: '🤖' },
+    { path: '/community', label: 'Community Feed', emoji: '🌱' },
+    { path: '/profile', label: 'My Profile', emoji: '👤' },
+    { path: '/notifications', label: 'Notifications', emoji: '🔔' },
   ];
 
   const handleLogout = () => {
@@ -44,41 +37,48 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-bgMain flex flex-col md:flex-row text-textMain">
+    <div className="min-h-screen bg-[#F1F8E9] flex flex-col md:flex-row text-[#1A2E1A]">
 
       {/* ─── DESKTOP SIDEBAR ─── */}
-      <aside className="hidden md:flex flex-col w-72 bg-white border-r border-borderDark shrink-0 sticky top-0 h-screen z-20">
-        {/* Logo Section */}
-        <div className="h-20 flex items-center gap-3 px-6 border-b border-borderDark">
-          <div className="w-10 h-10 rounded-xl bg-brandLight flex items-center justify-center border border-primary/20 shadow-sm relative overflow-hidden group">
-            <span className="text-xl group-hover:scale-110 transition-transform">🌱</span>
+      <aside 
+        className="hidden md:flex flex-col w-72 shrink-0 sticky top-0 h-screen z-20 text-white shadow-[4px_0_24px_rgba(27,94,32,0.18)]"
+        style={{
+          background: 'linear-gradient(180deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%)'
+        }}
+      >
+        {/* Logo Section with Rotating Leaf */}
+        <div className="h-24 flex items-center gap-3 px-6 border-b border-white/10">
+          <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/25 shadow-inner">
+            <span className="text-2xl inline-block animate-spin-slow">🌿</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-brandDark">AgriNex <span className="text-primary">AI</span></h1>
-            <p className="text-[10px] text-textSec font-semibold uppercase tracking-widest leading-none">Enterprise OS</p>
+            <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-1.5">
+              AgriNex <span className="text-[#F9A825] font-extrabold text-sm px-1.5 py-0.5 rounded bg-black/20">PRO</span>
+            </h1>
+            <p className="text-[11px] text-green-100/80 font-medium tracking-wide">Agricultural AI Ecosystem</p>
           </div>
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
-            const Icon = item.icon;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
-                    ? 'bg-brandLight text-brandDark shadow-[0_2px_10px_rgba(0,217,139,0.08)] border-l-4 border-primary'
-                    : 'text-textSec hover:text-brandDark hover:bg-slate-50'
-                  }`}
+                className={`group flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'bg-white/20 text-white border-l-4 border-[#F9A825] shadow-[0_4px_20px_rgba(0,0,0,0.12)] backdrop-blur-md'
+                    : 'text-green-100 hover:text-white hover:bg-white/10 hover:translate-x-1'
+                }`}
               >
                 <div className="flex items-center gap-3.5">
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-textSec group-hover:text-brandDark'}`} />
-                  <span>{item.label}</span>
+                  <span className="text-lg transition-transform group-hover:scale-125">{item.emoji}</span>
+                  <span className="tracking-wide">{item.label}</span>
                 </div>
                 {item.path === '/notifications' && unreadCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-rose text-white text-[10px] font-black leading-none animate-pulse">
+                  <span className="px-2 py-0.5 rounded-full bg-[#F9A825] text-[#1A2E1A] text-[11px] font-black leading-none animate-pulse shadow-sm">
                     {unreadCount}
                   </span>
                 )}
@@ -87,22 +87,28 @@ export default function MainLayout() {
           })}
         </nav>
 
-        {/* Bottom Profile / Logout */}
-        <div className="p-4 border-t border-borderDark bg-slate-50/50">
-          <div className="flex items-center gap-3 px-2 py-2 mb-3">
-            <img
-              src={user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'default'}`}
-              alt="avatar"
-              className="w-10 h-10 rounded-full border border-slate-200 object-cover bg-white"
-            />
+        {/* Bottom Profile / Online Indicator / Logout */}
+        <div className="p-4 border-t border-white/10 bg-black/10 backdrop-blur-sm">
+          <div className="flex items-center gap-3 px-3 py-2 mb-3 rounded-2xl bg-white/10 border border-white/10">
+            <div className="relative">
+              <img
+                src={user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'farmer'}`}
+                alt="avatar"
+                className="w-10 h-10 rounded-full border-2 border-white/60 object-cover bg-white"
+              />
+              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[#66BB6A] border-2 border-[#1B5E20] rounded-full ring-1 ring-white/50"></span>
+            </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-textSec uppercase tracking-wider leading-none">Logged in as</p>
-              <h4 className="text-sm font-bold text-brandDark truncate mt-0.5">{user?.full_name || 'Farmer'}</h4>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#66BB6A] animate-ping"></span>
+                <p className="text-[10px] font-bold text-green-200 uppercase tracking-widest leading-none">Online</p>
+              </div>
+              <h4 className="text-sm font-bold text-white truncate mt-1">{user?.full_name || user?.username || 'Farmer'}</h4>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-rose/20 text-rose hover:bg-rose/5 text-sm font-bold transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/40 text-red-100 hover:text-white border border-red-400/30 text-xs font-bold transition-all duration-200"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -111,111 +117,94 @@ export default function MainLayout() {
       </aside>
 
       {/* ─── MOBILE HEADER & MOBILE NAV ─── */}
-      <header className="md:hidden h-16 flex items-center justify-between px-6 bg-white border-b border-borderDark sticky top-0 z-30 shadow-sm">
+      <header className="md:hidden h-16 flex items-center justify-between px-6 bg-[#1B5E20] text-white sticky top-0 z-30 shadow-md">
         <Link to="/dashboard" className="flex items-center gap-2">
-          <span className="text-2xl">🌱</span>
-          <span className="text-md font-bold tracking-tight text-brandDark">AgriNex <span className="text-primary">AI</span></span>
+          <span className="text-2xl animate-spin-slow">🌿</span>
+          <span className="text-lg font-black tracking-tight text-white">AgriNex <span className="text-[#F9A825]">AI</span></span>
         </Link>
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 text-brandDark hover:bg-slate-100 rounded-lg transition-all"
+          className="p-2 text-white hover:bg-white/10 rounded-xl transition-all"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </header>
 
       {/* Mobile Slide-over Drawer */}
-      {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-brandDark/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute right-0 top-0 bottom-0 w-72 bg-white flex flex-col p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-6 border-b border-borderDark mb-6">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🌱</span>
-                <span className="font-bold text-brandDark">AgriNex Menu</span>
-              </div>
-              <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-textSec hover:text-brandDark rounded-lg">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <nav className="flex-1 space-y-1">
-              {navItems.map((item) => {
-                const isActive = location.pathname.startsWith(item.path);
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive
-                        ? 'bg-brandLight text-brandDark border-l-4 border-primary'
-                        : 'text-textSec hover:text-brandDark hover:bg-slate-50'
-                      }`}
-                  >
-                    <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-textSec'}`} />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            <div className="border-t border-borderDark pt-6 mt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <img
-                  src={user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'default'}`}
-                  alt="avatar"
-                  className="w-10 h-10 rounded-full border border-slate-200 object-cover bg-white"
-                />
-                <div>
-                  <h4 className="text-sm font-bold text-brandDark">{user?.full_name || 'Farmer'}</h4>
-                  <p className="text-xs text-textSec truncate max-w-[150px]">{user?.email}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-rose/20 text-rose hover:bg-rose/5 text-sm font-bold transition-all"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* ─── MAIN CONTENT WINDOW ─── */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <div className="flex-1 py-8 px-4 md:px-10 max-w-7xl w-full mx-auto pb-24 md:pb-8">
-          <Outlet />
-        </div>
-      </main>
-
-      {/* ─── MOBILE BOTTOM BAR ─── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-borderDark flex justify-around items-center py-2 px-2 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-        {navItems.slice(0, 5).map((item) => {
-          const isActive = location.pathname.startsWith(item.path);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition-all duration-200 ${isActive ? 'text-primary' : 'text-textSec'
-                }`}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="absolute right-0 top-0 bottom-0 w-72 flex flex-col p-6 shadow-2xl text-white"
+              style={{
+                background: 'linear-gradient(180deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%)'
+              }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <Icon className="w-5.5 h-5.5" />
-              <span className="text-[10px] font-bold mt-1 tracking-wide">{item.label.split(' ')[0]}</span>
-            </Link>
-          );
-        })}
-      </nav>
+              <div className="flex items-center justify-between pb-6 border-b border-white/15 mb-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🌿</span>
+                  <span className="font-bold text-lg text-white">AgriNex</span>
+                </div>
+                <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white/80 hover:text-white rounded-lg">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
 
+              <nav className="flex-1 space-y-1.5 overflow-y-auto">
+                {navItems.map((item) => {
+                  const isActive = location.pathname.startsWith(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                        isActive
+                          ? 'bg-white/25 text-white border-l-4 border-[#F9A825]'
+                          : 'text-green-100 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{item.emoji}</span>
+                        <span>{item.label}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="pt-6 border-t border-white/15 mt-auto">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/30 text-white font-bold text-sm"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── MAIN CONTENT VIEWPORT WITH ROUTE FADE ANIMATION ─── */}
+      <main className="flex-1 min-w-0 overflow-y-auto relative">
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"
+        >
+          <Outlet />
+        </motion.div>
+      </main>
     </div>
   );
 }

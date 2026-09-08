@@ -128,5 +128,28 @@ class ModerationService:
             "reason": "Content is appropriate"
         }
 
+    async def moderate_content_async(self, text: str) -> Dict[str, Any]:
+        """
+        Content moderation using local NLP rule engine only.
+        No external API calls — purely regex and pattern-based.
+        """
+        local_check = self.moderate_text(text)
+        if not local_check["allowed"]:
+            return {
+                "is_safe": False,
+                "reason": local_check["reason"],
+                "category": local_check["category"]
+            }
+
+        return {
+            "is_safe": True,
+            "reason": "Content is safe",
+            "category": "safe"
+        }
+
 
 moderation_service = ModerationService()
+
+
+async def moderate_content(text: str) -> Dict[str, Any]:
+    return await moderation_service.moderate_content_async(text)

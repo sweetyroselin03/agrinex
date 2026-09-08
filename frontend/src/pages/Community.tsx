@@ -1,28 +1,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Heart, 
   MessageCircle, 
   Bookmark, 
-  Trash2, 
-  Plus, 
+  Share2, 
+  MoreVertical,
+  Flag,
+  UserX,
+  EyeOff,
   Image as ImageIcon, 
   MapPin, 
   Send,
   Loader2,
-  Users,
   CheckCircle2,
   X,
   Sparkles,
-  ChevronRight,
-  UserCheck
+  TrendingUp,
+  AlertTriangle,
+  Calendar,
+  Search
 } from 'lucide-react';
 import api from '../api/client';
 import { API_BASE_URL } from '../config/api';
 import { useAuthStore } from '../store/useAuthStore';
-import UserSearchBar from '../components/UserSearchBar';
 import FollowButton from '../components/FollowButton';
 
 const getImageUrl = (url?: string) => {
@@ -34,45 +36,78 @@ const getImageUrl = (url?: string) => {
 };
 
 export default function Community() {
-  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [posts, setPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   
   // Post publisher states
   const [newContent, setNewContent] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedModalImage, setSelectedModalImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [postCategory, setPostCategory] = useState('Farming Tips');
   const [newLocation, setNewLocation] = useState('');
-  const [showPublisher, setShowPublisher] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Comment Thread drawer states
+  // Lightbox modal state
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+  // Action / Moderation states
+  const [activeMenuPostId, setActiveMenuPostId] = useState<number | null>(null);
+  const [reportingPost, setReportingPost] = useState<any | null>(null);
+  const [reportReason, setReportReason] = useState('Offensive');
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [hiddenPostIds, setHiddenPostIds] = useState<number[]>([]);
+  const [blockedUserIds, setBlockedUserIds] = useState<number[]>([]);
+
+  // Comment section state
   const [activePostForComments, setActivePostForComments] = useState<any | null>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [newCommentVal, setNewCommentVal] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
 
+  const categories = ['All', 'Disease Alert', 'Farming Tips', 'Market', 'Q&A', 'Weather'];
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  useEffect(() => {
+    fetchPosts();
+    fetchBlockedUsers();
+  }, []);
+
+  const fetchBlockedUsers = async () => {
+    try {
+      const res = await api.get('/users/blocked');
+      if (Array.isArray(res.data)) {
+        setBlockedUserIds(res.data.map((u: any) => u.id));
+      }
+    } catch (_) {}
+  };
+
+  const fetchPosts = async () => {
+    try {
+      setLoadingPosts(true);
+      const res = await api.get('/posts/feed');
+      setPosts(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      setPosts([]);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const validExts = ['jpg', 'jpeg', 'png', 'webp'];
-
-    if (!validTypes.includes(file.type) && !validExts.includes(ext || '')) {
-      alert('Invalid file format. Please upload a JPG, JPEG, PNG, or WEBP photo.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image file size exceeds 5 MB. Please select a smaller photo.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      showToast('Image file size exceeds 5 MB.');
       return;
     }
 
@@ -80,15 +115,150 @@ export default function Community() {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  const handleRemoveImage = () => {
-    setSelectedFile(null);
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newContent.trim()) {
+      showToast('Please enter post content.');
+      return;
+    }
+
+    try {
+      setPublishing(true);
+      const formData = new FormData();
+      formData.append('content', newContent.trim());
+      formData.append('crop_category', postCategory);
+      if (newLocation) formData.append('location', newLocation);
+      if (selectedFile) formData.append('image', selectedFile);
+
+      const res = await api.post('/posts', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setPosts([res.data, ...posts]);
+      setNewContent('');
+      setSelectedFile(null);
+      setImagePreview(null);
+      setNewLocation('');
+      showToast('🌾 Post published to AgriNex community!');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.detail || 'Failed to publish post.';
+      showToast(errMsg);
+    } finally {
+      setPublishing(false);
+    }
   };
 
-  // React Query for Suggested Farmers
-  const { data: suggestedFarmers = [], isLoading: loadingSuggested } = useQuery({
-    queryKey: ['suggested_users'],
+  const handleLike = async (postId: number) => {
+    try {
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+      
+      const newLikedState = !post.is_liked;
+      const newCount = newLikedState ? (post.likes_count || 0) + 1 : Math.max(0, (post.likes_count || 0) - 1);
+
+      setPosts(posts.map(p => p.id === postId ? { ...p, is_liked: newLikedState, likes_count: newCount } : p));
+      await api.post(`/posts/${postId}/like`);
+    } catch (_) {}
+  };
+
+  const handleBookmark = async (postId: number) => {
+    try {
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+      const newSavedState = !post.is_saved;
+
+      setPosts(posts.map(p => p.id === postId ? { ...p, is_saved: newSavedState } : p));
+      await api.post(`/posts/${postId}/save`);
+      showToast(newSavedState ? 'Post saved to bookmarks' : 'Post removed from bookmarks');
+    } catch (_) {}
+  };
+
+  const handleShare = (post: any) => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'AgriNex Farming Community Post',
+        text: post.content,
+        url: window.location.href,
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(`${window.location.origin}/community#post-${post.id}`);
+      showToast('🔗 Post link copied to clipboard!');
+    }
+  };
+
+  // Moderation & Reporting
+  const handleOpenReport = (post: any) => {
+    setActiveMenuPostId(null);
+    setReportingPost(post);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportingPost) return;
+    try {
+      setSubmittingReport(true);
+      await api.post(`/posts/${reportingPost.id}/report`, { reason: reportReason.toLowerCase() });
+      showToast('🚩 Post reported successfully. Our team is reviewing it.');
+      setHiddenPostIds(prev => [...prev, reportingPost.id]);
+      setReportingPost(null);
+    } catch (err: any) {
+      showToast('Failed to report post. Please try again.');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
+
+  const handleBlockUser = async (targetUserId: number) => {
+    setActiveMenuPostId(null);
+    try {
+      await api.post(`/users/${targetUserId}/block`);
+      setBlockedUserIds(prev => [...prev, targetUserId]);
+      showToast('🚫 User blocked. Their posts will no longer appear in your feed.');
+    } catch (err: any) {
+      showToast(err.response?.data?.detail || 'Failed to block user');
+    }
+  };
+
+  const handleHidePost = (postId: number) => {
+    setActiveMenuPostId(null);
+    setHiddenPostIds(prev => [...prev, postId]);
+    showToast('👁 Post hidden from your feed.');
+  };
+
+  // Comments
+  const handleOpenComments = async (post: any) => {
+    setActivePostForComments(post);
+    setLoadingComments(true);
+    try {
+      const res = await api.get(`/posts/${post.id}/comments`);
+      setComments(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setComments([]);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCommentVal.trim() || !activePostForComments) return;
+    try {
+      setSubmittingComment(true);
+      const res = await api.post(`/posts/${activePostForComments.id}/comments`, {
+        content: newCommentVal.trim()
+      });
+      setComments([...comments, res.data]);
+      setNewCommentVal('');
+      setPosts(posts.map(p => p.id === activePostForComments.id ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
+    } catch (err: any) {
+      showToast('Failed to submit comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // Query suggested farmers
+  const { data: suggestedFarmers = [] } = useQuery({
+    queryKey: ['suggested_users_community'],
     queryFn: async () => {
       try {
         const res = await api.get('/api/users/suggested');
@@ -100,592 +270,587 @@ export default function Community() {
     }
   });
 
-  useEffect(() => {
-    fetchFeed();
-  }, []);
-
-  const fetchFeed = async () => {
-    setLoadingPosts(true);
-    try {
-      const res = await api.get('/posts');
-      setPosts(res.data);
-    } catch (e) {
-      console.warn('Failed to load posts');
-    } finally {
-      setLoadingPosts(false);
-    }
-  };
-
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newContent.trim() || publishing) return;
-    setPublishing(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('content', newContent.trim());
-      if (newLocation.trim()) {
-        formData.append('location', newLocation.trim());
-      }
-      if (selectedFile) {
-        formData.append('image', selectedFile);
-      }
-
-      await api.post('/posts', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      setNewContent('');
-      setSelectedFile(null);
-      setImagePreview(null);
-      setNewLocation('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setShowPublisher(false);
-      fetchFeed();
-    } catch (err: any) {
-      const errorMsg = err?.response?.data?.detail || err?.response?.data?.message || 'Post creation failed.';
-      alert(errorMsg);
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const handleLike = async (postId: number) => {
-    try {
-      const res = await api.post(`/posts/${postId}/like`);
-      setPosts(prev => prev.map(p => 
-        p.id === postId 
-          ? { ...p, is_liked: res.data.liked, likes_count: res.data.likes_count } 
-          : p
-      ));
-    } catch (err) {}
-  };
-
-  const handleSave = async (postId: number) => {
-    try {
-      const res = await api.post(`/posts/${postId}/save`);
-      setPosts(prev => prev.map(p => 
-        p.id === postId 
-          ? { ...p, is_saved: res.data.saved } 
-          : p
-      ));
-    } catch (err) {}
-  };
-
-  const handleDeletePost = async (postId: number) => {
-    if (!confirm('Are you sure you want to delete this community post?')) return;
-    try {
-      await api.delete(`/posts/${postId}`);
-      setPosts(prev => prev.filter(p => p.id !== postId));
-    } catch (err) {
-      alert('Delete request failed.');
-    }
-  };
-
-  // Comments Loading
-  const openCommentsDrawer = async (post: any) => {
-    setActivePostForComments(post);
-    setNewCommentVal('');
-    setComments([]);
-    setLoadingComments(true);
-    try {
-      const res = await api.get(`/posts/${post.id}/comments`);
-      setComments(res.data);
-    } catch (e) {
-      console.warn('Failed to load comments thread');
-    } finally {
-      setLoadingComments(false);
-    }
-  };
-
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCommentVal.trim() || !activePostForComments || submittingComment) return;
-    setSubmittingComment(true);
-
-    try {
-      const res = await api.post(`/posts/${activePostForComments.id}/comments`, {
-        content: newCommentVal.trim()
-      });
-      setComments(prev => [res.data, ...prev]);
-      setNewCommentVal('');
-      setPosts(prev => prev.map(p => 
-        p.id === activePostForComments.id 
-          ? { ...p, comments_count: (p.comments_count || 0) + 1 } 
-          : p
-      ));
-    } catch (err: any) {
-      const errorMsg = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to send comment.';
-      alert(errorMsg);
-    } finally {
-      setSubmittingComment(false);
-    }
-  };
+  // Filter posts
+  const filteredPosts = posts.filter(post => {
+    if (hiddenPostIds.includes(post.id)) return false;
+    if (blockedUserIds.includes(post.user_id)) return false;
+    if (selectedCategory === 'All') return true;
+    return post.crop_category?.toLowerCase() === selectedCategory.toLowerCase();
+  });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative font-sans selection:bg-brandLight selection:text-brandDark">
-      
-      {/* ─── LEFT COLUMN: SOCIAL FEED (8 Cols) ─── */}
-      <div className="lg:col-span-8 space-y-6">
-        
-        {/* Global Farmer Search Bar Header */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-extrabold text-brandDark tracking-tight">AgriNex Social Community</h1>
-              <p className="text-textSec text-xs">Connect with farmers nationwide, share yield updates & local pest alerts.</p>
+    <div className="space-y-8 pb-12">
+
+      {/* ─── TOAST NOTIFICATION ─── */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-6 right-6 z-50 bg-[#1B5E20] text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/20 flex items-center gap-3 text-sm font-bold"
+          >
+            <span>🌾</span>
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── HEADER & CATEGORY TABS ─── */}
+      <div className="bg-white rounded-[24px] p-6 sm:p-8 border border-[#E0E7DE] shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E8F5E9] text-[#2E7D32] text-xs font-black uppercase tracking-wider mb-2">
+              <span>🌾</span> Farmers Community Feed
             </div>
-            
-            <button
-              onClick={() => setShowPublisher(!showPublisher)}
-              className="px-4 py-2.5 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm transition-all shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Post</span>
-            </button>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#1A2E1A]">
+              AgriNex <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1B5E20] via-[#2E7D32] to-[#66BB6A]">Community</span>
+            </h1>
+            <p className="text-sm font-medium text-[#546E7A] mt-1">
+              Connect with 12,000+ progressive farmers, agronomists, and crop specialists nationwide.
+            </p>
           </div>
 
-          <UserSearchBar placeholder="Search farmers by name, username, village, or crops..." />
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-[#2E7D32] animate-ping"></span>
+            <span className="text-xs font-bold text-[#2E7D32]">Moderation Shield Active</span>
+          </div>
         </div>
 
-        {/* Dynamic Post Publisher Card */}
-        <AnimatePresence>
-          {showPublisher && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="glass-card p-6 border-slate-200 overflow-hidden"
+        {/* Category Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pt-6 pb-1 no-scrollbar">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 ${
+                selectedCategory === cat
+                  ? 'bg-[#1B5E20] text-white shadow-[0_4px_15px_rgba(27,94,32,0.25)]'
+                  : 'bg-[#F1F8E9] text-[#1A2E1A] hover:bg-[#E8F5E9]'
+              }`}
             >
-              <form onSubmit={handleCreatePost} className="space-y-4">
+              {cat === 'All' && '🌱 All Discussions'}
+              {cat === 'Disease Alert' && '⚠️ Disease Alerts'}
+              {cat === 'Farming Tips' && '💡 Farming Tips'}
+              {cat === 'Market' && '📈 Market Prices'}
+              {cat === 'Q&A' && '❓ Agronomy Q&A'}
+              {cat === 'Weather' && '🌤️ Weather Intel'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── MAIN 2-COLUMN COMMUNITY LAYOUT ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        
+        {/* LEFT 2 COLUMNS: POST CREATOR & FEED */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Post Creation Card */}
+          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm">
+            <div className="flex items-start gap-4">
+              <img
+                src={user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'user'}`}
+                alt="avatar"
+                className="w-11 h-11 rounded-full border-2 border-[#66BB6A] object-cover shrink-0 bg-white"
+              />
+              <div className="flex-1 space-y-3">
                 <textarea
-                  required
-                  rows={3}
-                  placeholder="Share a farming warning or yield report with your peers..."
-                  className="w-full border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-4 text-xs text-brandDark placeholder-slate-400 outline-none resize-none transition-all leading-normal"
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
+                  placeholder="Share crop progress, ask pest queries, or post farming tips..."
+                  rows={3}
+                  className="w-full rounded-2xl bg-[#F1F8E9] border border-[#E0E7DE] p-4 text-sm text-[#1A2E1A] placeholder-[#546E7A] focus:outline-none focus:ring-2 focus:ring-[#2E7D32] transition-all resize-none"
                 />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                  <div>
+                {/* Preview Image if selected */}
+                {imagePreview && (
+                  <div className="relative rounded-xl overflow-hidden border border-[#E0E7DE] max-h-60">
+                    <img src={imagePreview} alt="upload preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedFile(null); setImagePreview(null); }}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black transition-all"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex items-center gap-2">
                     <input
                       type="file"
                       ref={fileInputRef}
-                      accept="image/jpeg,image/png,image/webp,image/jpg"
                       onChange={handleFileSelect}
+                      accept="image/*"
                       className="hidden"
                     />
-                    {!imagePreview ? (
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full py-2.5 px-4 rounded-xl border border-dashed border-slate-300 hover:border-primary text-xs font-bold text-slate-600 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100/80 transition-all"
-                      >
-                        <ImageIcon className="w-4 h-4 text-primary" />
-                        <span>Upload Photo (Max 5 MB)</span>
-                      </button>
-                    ) : (
-                      <div className="relative rounded-xl overflow-hidden border border-slate-200 group h-20 bg-slate-900 flex items-center justify-center">
-                        <img src={imagePreview} alt="Preview" className="h-full w-full object-cover opacity-90" />
-                        <button
-                          type="button"
-                          onClick={handleRemoveImage}
-                          className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-rose transition-all shadow-md"
-                          title="Remove photo"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="absolute bottom-2 left-2 text-[10px] font-semibold text-white bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-sm truncate max-w-[180px]">
-                          {selectedFile?.name}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <MapPin className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Location (optional)"
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-brandDark outline-none transition-all"
-                      value={newLocation}
-                      onChange={(e) => setNewLocation(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowPublisher(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 text-textSec text-xs font-bold hover:bg-slate-50 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={publishing || !newContent.trim()}
-                    className="px-6 py-2 rounded-xl bg-primary text-brandDark hover:bg-primary/90 font-extrabold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all"
-                  >
-                    {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Publish Update'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Social Feed List */}
-        {loadingPosts ? (
-          <div className="glass-card p-12 text-center text-textSec text-xs flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-            <span>Loading community feed...</span>
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="glass-card p-12 text-center text-textSec text-xs space-y-3">
-            <Sparkles className="w-8 h-8 text-primary mx-auto opacity-70" />
-            <h3 className="font-extrabold text-brandDark text-sm">No community posts yet</h3>
-            <p className="text-slate-400 max-w-sm mx-auto">Be the first farmer to share a field update or pest warning with your network.</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {posts.map((post) => {
-              const isOwner = user && user.id === post.user_id;
-
-              return (
-                <div key={post.id} className="glass-card p-6 space-y-4 hover:border-slate-300 transition-all">
-                  
-                  {/* Post Header with Author Link */}
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Link to={`/profile/${post.user_id}`} className="shrink-0 group">
-                        <img
-                          src={post.author_avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.author_name || post.user_id}`}
-                          alt={post.author_name || 'Author'}
-                          className="w-11 h-11 rounded-full border border-slate-200 object-cover bg-slate-50 group-hover:ring-2 group-hover:ring-primary transition-all"
-                        />
-                      </Link>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Link 
-                            to={`/profile/${post.user_id}`}
-                            className="font-extrabold text-brandDark text-sm truncate hover:text-primary transition-colors"
-                          >
-                            {post.author_name || `Farmer ${post.user_id}`}
-                          </Link>
-                          {post.location && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-textSec bg-slate-100 px-2 py-0.5 rounded-full font-medium shrink-0">
-                              <MapPin className="w-3 h-3 text-primary" />
-                              {post.location}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-textSec mt-0.5">
-                          {new Date(post.created_at).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {!isOwner && (
-                        <FollowButton
-                          userId={post.user_id}
-                          userName={post.author_name}
-                          size="sm"
-                        />
-                      )}
-                      {isOwner && (
-                        <button
-                          onClick={() => handleDeletePost(post.id)}
-                          className="p-2 text-slate-400 hover:text-rose hover:bg-rose/10 rounded-xl transition-all"
-                          title="Delete post"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Post Content */}
-                  <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-line">
-                    {post.content}
-                  </p>
-
-                  {/* Optional Image */}
-                  {post.image_url && (
-                    <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 max-h-96">
-                      <img
-                        src={getImageUrl(post.image_url)}
-                        alt="Post media"
-                        className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                        onClick={() => setSelectedModalImage(getImageUrl(post.image_url))}
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Post Actions Bar */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold text-textSec">
-                    <div className="flex items-center gap-6">
-                      <button
-                        onClick={() => handleLike(post.id)}
-                        className={`flex items-center gap-1.5 transition-colors ${
-                          post.is_liked ? 'text-rose font-extrabold' : 'hover:text-brandDark'
-                        }`}
-                      >
-                        <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-rose text-rose' : ''}`} />
-                        <span>{post.likes_count || 0}</span>
-                      </button>
-
-                      <button
-                        onClick={() => openCommentsDrawer(post)}
-                        className="flex items-center gap-1.5 hover:text-brandDark transition-colors"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span>{post.comments_count || 0}</span>
-                      </button>
-                    </div>
-
                     <button
-                      onClick={() => handleSave(post.id)}
-                      className={`p-1.5 rounded-lg transition-colors ${
-                        post.is_saved ? 'text-primary' : 'hover:text-brandDark'
-                      }`}
-                      title={post.is_saved ? 'Unsave' : 'Save post'}
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F1F8E9] hover:bg-[#E8F5E9] text-xs font-bold text-[#1B5E20] transition-all"
                     >
-                      <Bookmark className={`w-4 h-4 ${post.is_saved ? 'fill-primary' : ''}`} />
+                      <ImageIcon className="w-4 h-4" />
+                      <span>{selectedFile ? 'Change Photo' : 'Attach Photo'}</span>
                     </button>
+
+                    <select
+                      value={postCategory}
+                      onChange={(e) => setPostCategory(e.target.value)}
+                      className="px-3 py-2 rounded-xl bg-[#F1F8E9] text-xs font-bold text-[#1A2E1A] border-none focus:ring-1 focus:ring-[#2E7D32]"
+                    >
+                      <option value="Farming Tips">Farming Tips</option>
+                      <option value="Disease Alert">Disease Alert</option>
+                      <option value="Market">Market</option>
+                      <option value="Q&A">Q&A</option>
+                      <option value="Weather">Weather</option>
+                    </select>
                   </div>
 
+                  <button
+                    onClick={handleCreatePost}
+                    disabled={publishing || !newContent.trim()}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition-all disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)' }}
+                  >
+                    {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    <span>{publishing ? 'Publishing...' : 'Post Update'}</span>
+                  </button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-      </div>
-
-      {/* ─── RIGHT COLUMN: NETWORKING SIDEBAR (4 Cols) ─── */}
-      <div className="lg:col-span-4 space-y-6">
-        
-        {/* Current User Card */}
-        <section className="glass-card p-6 text-center space-y-4">
-          <Link to="/profile" className="inline-block group">
-            <img
-              src={user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'farmer'}`}
-              alt="avatar"
-              className="w-16 h-16 rounded-full border-2 border-slate-200 mx-auto object-cover bg-white group-hover:ring-4 group-hover:ring-primary/20 transition-all"
-            />
-          </Link>
-          <div>
-            <Link to="/profile">
-              <h3 className="font-extrabold text-brandDark text-sm hover:text-primary transition-colors">
-                {user?.full_name || 'My Profile'}
-              </h3>
-            </Link>
-            <p className="text-[10px] text-textSec font-bold uppercase tracking-wider">{user?.village || 'Agricultural Hub'}</p>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-4 text-xs">
-            <div>
-              <span className="font-black text-brandDark text-sm">{user?.posts_count || 0}</span>
-              <span className="text-[9px] text-textSec font-bold uppercase tracking-wider block mt-0.5">Posts</span>
-            </div>
-            <div>
-              <span className="font-black text-brandDark text-sm">{user?.followers_count || 0}</span>
-              <span className="text-[9px] text-textSec font-bold uppercase tracking-wider block mt-0.5">Followers</span>
-            </div>
-            <div>
-              <span className="font-black text-brandDark text-sm">{user?.following_count || 0}</span>
-              <span className="text-[9px] text-textSec font-bold uppercase tracking-wider block mt-0.5">Following</span>
-            </div>
-          </div>
-
-          <Link
-            to="/profile"
-            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-brandDark text-xs font-bold rounded-xl transition-all block"
-          >
-            View Full Profile
-          </Link>
-        </section>
-
-        {/* Suggested Farmers Network Widget */}
-        <section className="glass-card p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="font-extrabold text-brandDark text-sm flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-primary" />
-                <span>Suggested Farmers</span>
-              </h3>
-              <p className="text-textSec text-[10px]">Growers with similar crops and regional proximity.</p>
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-1 divide-y divide-slate-50">
-            {loadingSuggested ? (
-              <div className="text-center text-textSec text-xs flex justify-center items-center gap-2 py-6">
-                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                <span>Finding recommended farmers...</span>
               </div>
-            ) : suggestedFarmers.length === 0 ? (
-              <div className="text-center text-textSec text-xs py-4">
-                You are connected with all suggested farmers!
-              </div>
-            ) : (
-              suggestedFarmers.map((sUser: any) => (
-                <div key={sUser.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3">
-                  <Link to={`/profile/${sUser.id}`} className="flex items-center gap-2.5 min-w-0 group flex-1">
+            </div>
+          </div>
+
+          {/* Posts Feed with Staggered Animation */}
+          {loadingPosts ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-44 rounded-[20px] skeleton-shimmer" />
+              ))}
+            </div>
+          ) : filteredPosts.length === 0 ? (
+            <div className="bg-white rounded-[22px] p-12 text-center border border-[#E0E7DE] shadow-sm space-y-3">
+              <span className="text-5xl block animate-float-leaf">🌾</span>
+              <h3 className="text-lg font-black text-[#1A2E1A]">No posts found in this category</h3>
+              <p className="text-xs text-[#546E7A]">Be the first farmer to start a discussion or share advice!</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {filteredPosts.map((post, index) => {
+                const isHidden = post.is_hidden || (post.report_count || 0) >= 3;
+
+                return (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: index * 0.05 }}
+                    className="bg-white rounded-[20px] p-6 border border-[#E0E7DE] shadow-[0_4px_20px_rgba(27,94,32,0.06)] hover:shadow-[0_8px_30px_rgba(27,94,32,0.12)] transition-all relative"
+                  >
+                    {isHidden ? (
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs font-bold text-[#546E7A] flex items-center justify-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-[#F57F17]" />
+                        <span>Post removed - community guidelines</span>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Author Section */}
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={post.author_avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.user_id || 'farmer'}`}
+                              alt="author"
+                              className="w-11 h-11 rounded-full border-2 border-[#2E7D32] object-cover bg-white ring-2 ring-[#E8F5E9]"
+                            />
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="text-sm font-black text-[#1B5E20]">
+                                  {post.author_name || `Farmer ${post.user_id}`}
+                                </h4>
+                                {post.author_verified && (
+                                  <CheckCircle2 className="w-4 h-4 text-[#2E7D32] fill-green-100" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-[#546E7A] font-medium">
+                                <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                                {post.location && (
+                                  <span className="flex items-center gap-0.5 text-[#2E7D32]">
+                                    <MapPin className="w-3 h-3" /> {post.location}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Options Menu Dropdown */}
+                          <div className="relative">
+                            <button
+                              onClick={() => setActiveMenuPostId(activeMenuPostId === post.id ? null : post.id)}
+                              className="p-2 rounded-xl text-[#546E7A] hover:text-[#1A2E1A] hover:bg-[#F1F8E9] transition-all"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {activeMenuPostId === post.id && (
+                              <div className="absolute right-0 top-10 w-44 bg-white rounded-2xl shadow-xl border border-[#E0E7DE] p-1.5 z-30 space-y-1">
+                                <button
+                                  onClick={() => handleOpenReport(post)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-all text-left"
+                                >
+                                  <Flag className="w-3.5 h-3.5" />
+                                  <span>🚩 Report Post</span>
+                                </button>
+                                {post.user_id !== user?.id && (
+                                  <button
+                                    onClick={() => handleBlockUser(post.user_id)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-[#546E7A] hover:bg-slate-50 transition-all text-left"
+                                  >
+                                    <UserX className="w-3.5 h-3.5" />
+                                    <span>🚫 Block User</span>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleHidePost(post.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-[#546E7A] hover:bg-slate-50 transition-all text-left"
+                                >
+                                  <EyeOff className="w-3.5 h-3.5" />
+                                  <span>👁 Hide Post</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Content text */}
+                        <p className="text-sm text-[#1A2E1A] leading-relaxed whitespace-pre-line mb-4 font-normal">
+                          {post.content}
+                        </p>
+
+                        {/* Attached Image with Lightbox click */}
+                        {post.image_url && (
+                          <div 
+                            onClick={() => setLightboxImage(getImageUrl(post.image_url))}
+                            className="rounded-2xl overflow-hidden border border-[#E0E7DE] mb-4 cursor-pointer group relative max-h-96"
+                          >
+                            <img
+                              src={getImageUrl(post.image_url)}
+                              alt="post attachment"
+                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                            />
+                            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                              🔍 Click to enlarge
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action Bar */}
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-[#546E7A] font-bold">
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() => handleLike(post.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+                                post.is_liked
+                                  ? 'text-red-500 bg-red-50'
+                                  : 'hover:bg-[#F1F8E9] hover:text-[#1B5E20]'
+                              }`}
+                            >
+                              <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-red-500 text-red-500 animate-bounce' : ''}`} />
+                              <span>{post.likes_count || 0}</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleOpenComments(post)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-[#F1F8E9] hover:text-[#1B5E20] transition-all"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                              <span>{post.comments_count || 0}</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleShare(post)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-[#F1F8E9] hover:text-[#1B5E20] transition-all"
+                            >
+                              <Share2 className="w-4 h-4" />
+                              <span>Share</span>
+                            </button>
+                          </div>
+
+                          <button
+                            onClick={() => handleBookmark(post.id)}
+                            className={`p-2 rounded-xl transition-all ${
+                              post.is_saved
+                                ? 'text-[#F9A825] bg-amber-50'
+                                : 'hover:bg-[#F1F8E9] hover:text-[#1A2E1A]'
+                            }`}
+                          >
+                            <Bookmark className={`w-4 h-4 ${post.is_saved ? 'fill-[#F9A825]' : ''}`} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT SIDEBAR: TRENDING TOPICS, SUGGESTED FARMERS, CALENDAR */}
+        <div className="space-y-6">
+
+          {/* Trending Topics */}
+          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm space-y-4">
+            <h3 className="text-sm font-black text-[#1A2E1A] flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#2E7D32]" />
+              <span>Trending Farm Discussions</span>
+            </h3>
+
+            <div className="space-y-2.5">
+              {[
+                { tag: '#KharifPaddy', posts: '2.4k posts', desc: 'Brown plant hopper warning' },
+                { tag: '#TomatoBlight', posts: '1.8k posts', desc: 'Foliar spray remedies' },
+                { tag: '#DripIrrigation', posts: '940 posts', desc: 'Subsidies and timers' },
+                { tag: '#OrganicNeem', posts: '620 posts', desc: 'Pest prevention recipes' },
+              ].map((item, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-[#F1F8E9] hover:bg-[#E8F5E9] transition-all cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#1B5E20]">{item.tag}</span>
+                    <span className="text-[10px] font-bold text-[#546E7A]">{item.posts}</span>
+                  </div>
+                  <p className="text-[11px] text-[#546E7A] mt-0.5">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Suggested Farmers */}
+          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm space-y-4">
+            <h3 className="text-sm font-black text-[#1A2E1A] flex items-center gap-2">
+              <span>🌾</span>
+              <span>Suggested Farmers to Connect</span>
+            </h3>
+
+            <div className="space-y-3">
+              {suggestedFarmers.slice(0, 4).map((f: any) => (
+                <div key={f.id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F1F8E9] transition-all">
+                  <div className="flex items-center gap-2.5">
                     <img
-                      src={sUser.profile_photo || sUser.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${sUser.email}`}
-                      alt="avatar"
-                      className="w-9 h-9 rounded-full border border-slate-200 object-cover bg-white shrink-0 group-hover:ring-2 group-hover:ring-primary transition-all"
+                      src={f.profile_photo || f.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${f.id}`}
+                      alt="farmer"
+                      className="w-9 h-9 rounded-full object-cover border border-[#A5D6A7]"
                     />
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-extrabold text-xs text-brandDark truncate group-hover:text-primary transition-colors">
-                        {sUser.display_name || sUser.full_name || 'Farmer'}
-                      </h4>
-                      <p className="text-[10px] text-textSec truncate">{sUser.village || 'Agricultural Hub'}</p>
+                    <div>
+                      <h5 className="text-xs font-bold text-[#1A2E1A] truncate max-w-[110px]">
+                        {f.display_name || f.full_name || `Farmer ${f.id}`}
+                      </h5>
+                      <p className="text-[10px] text-[#546E7A]">{f.village || 'Progressive Grower'}</p>
                     </div>
-                  </Link>
-
-                  <FollowButton
-                    userId={sUser.id}
-                    userName={sUser.display_name || sUser.full_name}
-                    initialIsFollowing={sUser.is_following || sUser.isFollowing}
-                    initialFollowersCount={sUser.followers_count || sUser.followers || 0}
-                    size="sm"
-                    className="shrink-0"
-                  />
+                  </div>
+                  <FollowButton userId={f.id} initialIsFollowing={f.is_following} size="sm" />
                 </div>
-              ))
-            )}
+              ))}
+            </div>
           </div>
-        </section>
+
+          {/* Active Disease Alerts Widget */}
+          <div className="bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2] rounded-[22px] p-6 border border-[#FFCC80] shadow-sm space-y-3">
+            <div className="flex items-center gap-2 text-xs font-black uppercase text-[#E65100]">
+              <AlertTriangle className="w-4 h-4 text-[#E65100]" />
+              <span>Regional Disease Alert</span>
+            </div>
+            <h4 className="text-sm font-black text-[#5D4037]">Late Blight in Solanaceae Crops</h4>
+            <p className="text-xs text-[#5D4037]/90 leading-relaxed">
+              High humidity & cloud cover triggers spore dispersal. Spray Mancozeb 75% WP @ 2g/L or copper oxychloride preventively.
+            </p>
+          </div>
+
+          {/* Seasonal Farming Calendar */}
+          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm space-y-3">
+            <div className="flex items-center gap-2 text-xs font-black text-[#1B5E20]">
+              <Calendar className="w-4 h-4 text-[#2E7D32]" />
+              <span>Farming Calendar • Sept - Oct</span>
+            </div>
+            <ul className="text-xs space-y-2 text-[#546E7A]">
+              <li className="flex items-start gap-2">
+                <span className="text-[#2E7D32] font-bold">✓</span>
+                <span>Harvest early Kharif groundnut and green gram.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#2E7D32] font-bold">✓</span>
+                <span>Field prep for Rabi wheat, mustard, and chickpea.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#2E7D32] font-bold">✓</span>
+                <span>Deep summer plowing to eliminate pest pupae.</span>
+              </li>
+            </ul>
+          </div>
+
+        </div>
 
       </div>
 
-      {/* ─── SLIDING DRAWER OVERLAY: COMMENT THREADS ─── */}
+      {/* ─── REPORT REASON MODAL ─── */}
       <AnimatePresence>
-        {activePostForComments && (
-          <div 
-            className="fixed inset-0 z-50 bg-brandDark/40 backdrop-blur-xs flex justify-end"
-            onClick={() => setActivePostForComments(null)}
-          >
+        {reportingPost && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-md bg-white h-screen flex flex-col shadow-2xl p-6"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[24px] p-6 max-w-md w-full shadow-2xl border border-[#E0E7DE] space-y-4"
             >
-              {/* Drawer Header */}
-              <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6 shrink-0">
-                <div>
-                  <h3 className="font-extrabold text-brandDark text-md">Comment Thread</h3>
-                  <p className="text-textSec text-[10px] mt-0.5">Replies to {activePostForComments.author_name}'s update</p>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2 text-red-600 font-bold">
+                  <Flag className="w-5 h-5" />
+                  <h3 className="text-base font-black text-[#1A2E1A]">Report Post</h3>
                 </div>
-                <button
-                  onClick={() => setActivePostForComments(null)}
-                  className="p-2 text-textSec hover:text-brandDark hover:bg-slate-100 rounded-xl"
-                >
+                <button onClick={() => setReportingPost(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Thread list scroll */}
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <p className="text-xs text-[#546E7A]">
+                Help us keep AgriNex safe. Select the reason why this post violates agricultural community standards:
+              </p>
+
+              <div className="space-y-2">
+                {['Spam', 'Offensive', 'Harassment', 'Irrelevant', 'Misinformation'].map((reason) => (
+                  <label 
+                    key={reason}
+                    className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                      reportReason === reason
+                        ? 'border-[#2E7D32] bg-[#E8F5E9] text-[#1B5E20]'
+                        : 'border-[#E0E7DE] text-[#1A2E1A] hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{reason}</span>
+                    <input
+                      type="radio"
+                      name="reportReason"
+                      value={reason}
+                      checked={reportReason === reason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      className="text-[#2E7D32] focus:ring-[#2E7D32]"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setReportingPost(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-[#546E7A] hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitReport}
+                  disabled={submittingReport}
+                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md disabled:opacity-50"
+                >
+                  {submittingReport ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── IMAGE LIGHTBOX MODAL ─── */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => setLightboxImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              className="relative max-w-4xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setLightboxImage(null)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-black/60 text-white hover:bg-black transition-all z-10"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <img src={lightboxImage} alt="enlarged crop" className="w-full h-full object-contain max-h-[85vh] rounded-2xl" />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── COMMENT THREAD MODAL / DRAWER ─── */}
+      <AnimatePresence>
+        {activePostForComments && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setActivePostForComments(null)}
+          >
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+              className="bg-white rounded-[24px] p-6 max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-[#E0E7DE]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <h3 className="text-base font-black text-[#1A2E1A]">Comments & Advice</h3>
+                <button onClick={() => setActivePostForComments(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-4 space-y-3">
                 {loadingComments ? (
-                  <div className="py-12 text-center text-textSec text-xs flex justify-center items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                    Loading comments...
+                  <div className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#2E7D32]" />
                   </div>
                 ) : comments.length === 0 ? (
-                  <div className="py-12 text-center text-textSec text-xs">
-                    No comments in this thread. Write one below.
+                  <div className="text-center py-8 text-xs text-[#546E7A]">
+                    No comments yet. Share your agronomic advice below!
                   </div>
                 ) : (
-                  comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-3 text-xs bg-slate-50/50 p-3 rounded-xl border border-slate-100/50">
-                      <img
-                        src={comment.author_avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${comment.author_name}`}
-                        alt="avatar"
-                        className="w-8 h-8 rounded-full object-cover shrink-0 bg-white border border-slate-200"
-                      />
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline gap-2">
-                          <span className="font-extrabold text-brandDark truncate">{comment.author_name}</span>
-                          <span className="text-[9px] text-textSec shrink-0">
-                            {new Date(comment.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-slate-600 leading-normal font-medium">{comment.content}</p>
+                  comments.map((cmt) => (
+                    <div key={cmt.id} className="p-3 rounded-xl bg-[#F1F8E9] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#1B5E20]">
+                          {cmt.author_name || `Farmer ${cmt.user_id}`}
+                        </span>
+                        <span className="text-[10px] text-[#546E7A]">
+                          {new Date(cmt.created_at).toLocaleDateString()}
+                        </span>
                       </div>
+                      <p className="text-xs text-[#1A2E1A]">{cmt.content}</p>
                     </div>
                   ))
                 )}
               </div>
 
-              {/* Comment Input form footer */}
-              <form onSubmit={handleAddComment} className="border-t border-slate-100 pt-4 mt-4 shrink-0 flex gap-2">
+              <form onSubmit={handleAddComment} className="pt-3 border-t border-slate-100 flex items-center gap-2">
                 <input
                   type="text"
-                  required
-                  placeholder="Write a supportive reply..."
-                  className="flex-1 border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-4 py-2.5 text-xs text-brandDark placeholder-slate-400 outline-none transition-all"
                   value={newCommentVal}
                   onChange={(e) => setNewCommentVal(e.target.value)}
-                  disabled={submittingComment}
+                  placeholder="Add your farming advice..."
+                  className="flex-1 rounded-xl bg-[#F1F8E9] border border-[#E0E7DE] px-4 py-2.5 text-xs text-[#1A2E1A] focus:outline-none focus:ring-2 focus:ring-[#2E7D32]"
                 />
                 <button
                   type="submit"
-                  className="p-2.5 rounded-xl bg-primary text-brandDark hover:bg-primary/90 disabled:opacity-50 transition-all shadow-sm flex items-center justify-center shrink-0"
-                  disabled={!newCommentVal.trim() || submittingComment}
+                  disabled={submittingComment || !newCommentVal.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-xs font-bold shadow-sm disabled:opacity-50"
                 >
                   {submittingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </form>
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-
-      {/* Enlarged Image Preview Modal */}
-      <AnimatePresence>
-        {selectedModalImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setSelectedModalImage(null)}
-          >
-            <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl">
-              <button
-                onClick={() => setSelectedModalImage(null)}
-                className="absolute top-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-rose transition-all z-10"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <img
-                src={selectedModalImage}
-                alt="Enlarged Post Preview"
-                className="max-w-full max-h-[85vh] object-contain rounded-xl"
-              />
-            </div>
-          </motion.div>
         )}
       </AnimatePresence>
 
