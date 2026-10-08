@@ -14,6 +14,17 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./agrinex.db")
 if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Ensure compatible PostgreSQL driver resolution if no explicit dialect driver is provided
+if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    try:
+        import psycopg  # noqa: F401
+    except ImportError:
+        try:
+            import psycopg2  # noqa: F401
+            SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+        except ImportError:
+            pass
+
 if "sqlite" in SQLALCHEMY_DATABASE_URL:
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL,
