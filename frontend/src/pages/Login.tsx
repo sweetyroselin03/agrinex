@@ -1,21 +1,27 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { Lock, Mail, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react';
+
+const LOGIN_TIMEOUT_MS = 15000; // 15 seconds
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [localLoading, setLocalLoading] = useState(false); // Own loading state — never stuck
   const [localError, setLocalError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, error, clearError } = useAuthStore();
   const navigate = useNavigate();
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (localLoading) return; // Prevent duplicate submissions
+
     setLocalError(null);
     clearError();
 
@@ -24,12 +30,39 @@ export default function Login() {
       return;
     }
 
+    setLocalLoading(true);
+
+    // Safety timeout — button NEVER stays disabled forever
+    timeoutRef.current = setTimeout(() => {
+      setLocalLoading(false);
+      setLocalError('Sign-in is taking too long. Please check your connection and try again.');
+    }, LOGIN_TIMEOUT_MS);
+
     try {
-      // Remember me preference saved securely
       localStorage.setItem('agrinex_remember_me', rememberMe ? 'true' : 'false');
       await login({ email: email.trim(), password });
-      navigate('/dashboard');
-    } catch (_) {}
+
+      // Clear the timeout — we succeeded
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      navigate('/dashboard', { replace: true });
+    } catch (err: any) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      // Map error codes to user-friendly messages
+      const status = err?.response?.status;
+      if (!err?.response) {
+        setLocalError('Unable to connect to AgriNex services. Please try again.');
+      } else if (status === 401 || status === 403 || status === 422) {
+        setLocalError('Invalid email or password. Please check your credentials.');
+      } else if (status && status >= 500) {
+        setLocalError('AgriNex service is temporarily unavailable. Please try again shortly.');
+      } else {
+        setLocalError(err?.message || 'Sign-in failed. Please try again.');
+      }
+    } finally {
+      // Always reset loading — regardless of outcome
+      setLocalLoading(false);
+    }
   };
 
   const displayError = localError || error;
@@ -132,7 +165,7 @@ export default function Login() {
                 className="agri-input pl-11"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={localLoading}
                 autoComplete="email"
               />
             </div>
@@ -163,7 +196,7 @@ export default function Login() {
                 className="agri-input pl-11 pr-12"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={localLoading}
                 autoComplete="current-password"
               />
               <button
@@ -199,12 +232,12 @@ export default function Login() {
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md"
-              disabled={isLoading}
+              disabled={localLoading}
             >
-              {isLoading ? (
+              {localLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Verifying Credentials...</span>
+                  <span>Signing in...</span>
                 </>
               ) : (
                 <>

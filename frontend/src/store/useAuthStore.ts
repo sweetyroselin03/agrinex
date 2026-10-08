@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import api from '../api/client';
+import api, { setMemoryToken } from '../api/client';
 
 export interface User {
   id: number;
@@ -28,6 +28,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isAuthInitialized: boolean; // NEW: true once auth state is fully determined
   error: string | null;
 
   // Actions
@@ -58,7 +59,10 @@ const formatError = (error: any, defaultMsg: string): string => {
   }
   if (error.response?.data?.message) return error.response.data.message;
   if (error.message === 'Network Error') {
-    return 'Unable to reach backend server. Please check internet connection or server status.';
+    return 'Unable to reach AgriNex services. Please check your internet connection.';
+  }
+  if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
+    return 'Sign-in is taking too long. Please try again.';
   }
   return error.message || defaultMsg;
 };
@@ -70,18 +74,20 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      isAuthInitialized: false,
       error: null,
 
       checkAccount: async (identifier) => {
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/check-account', { identifier });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Check account failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -89,12 +95,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/send-otp', { email });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Failed to send OTP');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -102,12 +109,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/verify-otp', { email, otp });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Invalid OTP code');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -115,12 +123,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/register', userData);
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Registration failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -129,16 +138,20 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/set-password', { email, password });
           const { access_token, user } = response.data;
+          // Sync token to memory immediately so interceptor picks it up
+          setMemoryToken(access_token);
           set({
             token: access_token,
             user,
             isAuthenticated: true,
-            isLoading: false,
+            isAuthInitialized: true,
           });
         } catch (error: any) {
           const msg = formatError(error, 'Failed to set password');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -147,16 +160,21 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/login', credentials);
           const { access_token, user } = response.data;
+          // Sync token to memory immediately so subsequent requests have auth
+          setMemoryToken(access_token);
           set({
             token: access_token,
             user,
             isAuthenticated: true,
-            isLoading: false,
+            isAuthInitialized: true,
           });
         } catch (error: any) {
           const msg = formatError(error, 'Login failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          // Always reset loading — this is the critical fix for stuck spinner
+          set({ isLoading: false });
         }
       },
 
@@ -164,12 +182,13 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await api.post('/auth/forgot-password', { email });
-          set({ isLoading: false });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Recovery request failed');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -177,11 +196,12 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           await api.post('/auth/reset-password', data);
-          set({ isLoading: false });
         } catch (error: any) {
           const msg = formatError(error, 'Failed to reset password');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -202,34 +222,42 @@ export const useAuthStore = create<AuthState>()(
               }
             } else throw e;
           }
-          set({ user: response.data, isLoading: false });
+          set({ user: response.data });
           return response.data;
         } catch (error: any) {
           const msg = formatError(error, 'Failed to update profile');
-          set({ isLoading: false, error: msg });
+          set({ error: msg });
           throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
-
 
       checkAuth: async () => {
         const { token } = get();
         if (!token) {
-          set({ isAuthenticated: false, user: null });
+          set({ isAuthenticated: false, user: null, isAuthInitialized: true });
           return;
         }
+        // Sync token to memory so interceptor includes it
+        setMemoryToken(token);
         try {
           const response = await api.get('/auth/me');
-          set({ user: response.data, isAuthenticated: true });
+          set({ user: response.data, isAuthenticated: true, isAuthInitialized: true });
         } catch (error) {
-          // Token expired or invalid
-          set({ token: null, user: null, isAuthenticated: false });
+          // Token expired or invalid — clear session
+          setMemoryToken(null);
+          set({ token: null, user: null, isAuthenticated: false, isAuthInitialized: true });
         }
       },
 
       logout: () => {
-        set({ token: null, user: null, isAuthenticated: false, error: null });
-        localStorage.removeItem('agrinex-web-auth');
+        setMemoryToken(null);
+        set({ token: null, user: null, isAuthenticated: false, error: null, isAuthInitialized: true });
+        try {
+          localStorage.removeItem('agrinex-web-auth');
+          localStorage.removeItem('agrinex_token');
+        } catch (_) {}
       },
 
       clearError: () => set({ error: null }),
@@ -237,6 +265,23 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'agrinex-web-auth',
       storage: createJSONStorage(() => localStorage),
+      // Only persist token and user — NOT loading/initialized state
+      partialize: (state) => ({
+        token: state.token,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      // On rehydration, ensure isAuthInitialized starts as false so ProtectedRoute waits
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // If we have a token, we'll verify it via checkAuth
+          // If not, we're definitively unauthenticated
+          if (!state.token) {
+            state.isAuthInitialized = true;
+          }
+          // If we have a token, checkAuth() will set isAuthInitialized = true
+        }
+      },
     }
   )
 );
