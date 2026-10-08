@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Heart, 
-  MessageCircle, 
-  Bookmark, 
-  Share2, 
+import {
+  Heart,
+  MessageCircle,
+  Bookmark,
+  Share2,
   MoreVertical,
   Flag,
   UserX,
   EyeOff,
-  Image as ImageIcon, 
-  MapPin, 
+  Image as ImageIcon,
+  Camera,
+  MapPin,
   Send,
   Loader2,
   CheckCircle2,
@@ -40,40 +41,42 @@ export default function Community() {
   const [posts, setPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  
-  // Post publisher states
+
+  // Post composer states
   const [newContent, setNewContent] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [postCategory, setPostCategory] = useState('Farming Tips');
+  const [postCategory, setPostCategory] = useState('Tips');
   const [newLocation, setNewLocation] = useState('');
   const [publishing, setPublishing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Lightbox modal state
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
-  // Action / Moderation states
+  // Moderation & Action states
   const [activeMenuPostId, setActiveMenuPostId] = useState<number | null>(null);
   const [reportingPost, setReportingPost] = useState<any | null>(null);
   const [reportReason, setReportReason] = useState('Offensive');
   const [submittingReport, setSubmittingReport] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'info' | 'error'>('info');
   const [hiddenPostIds, setHiddenPostIds] = useState<number[]>([]);
   const [blockedUserIds, setBlockedUserIds] = useState<number[]>([]);
 
-  // Comment section state
-  const [activePostForComments, setActivePostForComments] = useState<any | null>(null);
-  const [comments, setComments] = useState<any[]>([]);
-  const [newCommentVal, setNewCommentVal] = useState('');
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [submittingComment, setSubmittingComment] = useState(false);
+  // Expanded comments state: map of postId -> boolean
+  const [expandedComments, setExpandedComments] = useState<Record<number, boolean>>({});
+  const [postCommentsMap, setPostCommentsMap] = useState<Record<number, any[]>>({});
+  const [commentInputMap, setCommentInputMap] = useState<Record<number, string>>({});
+  const [loadingCommentsMap, setLoadingCommentsMap] = useState<Record<number, boolean>>({});
 
-  const categories = ['All', 'Disease Alert', 'Farming Tips', 'Market', 'Q&A', 'Weather'];
+  const categories = ['All', 'Disease Alert', 'Tips', 'Market', 'Q&A'];
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, type: 'info' | 'error' = 'info') => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    setToastType(type);
+    setTimeout(() => setToastMessage(null), 4500);
   };
 
   useEffect(() => {
@@ -106,8 +109,8 @@ export default function Community() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image file size exceeds 5 MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('Image file size exceeds 8 MB.', 'error');
       return;
     }
 
@@ -118,7 +121,7 @@ export default function Community() {
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContent.trim()) {
-      showToast('Please enter post content.');
+      showToast('Please enter post content before publishing.', 'error');
       return;
     }
 
@@ -131,7 +134,7 @@ export default function Community() {
       if (selectedFile) formData.append('image', selectedFile);
 
       const res = await api.post('/posts', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       setPosts([res.data, ...posts]);
@@ -141,8 +144,18 @@ export default function Community() {
       setNewLocation('');
       showToast('🌾 Post published to AgriNex community!');
     } catch (err: any) {
-      const errMsg = err.response?.data?.detail || 'Failed to publish post.';
-      showToast(errMsg);
+      const detail = err?.response?.data?.detail || err?.response?.data?.message || '';
+      if (
+        detail.toLowerCase().includes('inappropriate') ||
+        detail.toLowerCase().includes('moderation') ||
+        err?.response?.status === 400 ||
+        err?.response?.status === 422
+      ) {
+        showToast('This post cannot be published because it contains inappropriate content.', 'error');
+      } else {
+        showToast(detail || 'This post cannot be published because it contains inappropriate content.', 'error');
+      }
+      // Note: newContent is PRESERVED so the user can edit their text!
     } finally {
       setPublishing(false);
     }
@@ -150,24 +163,24 @@ export default function Community() {
 
   const handleLike = async (postId: number) => {
     try {
-      const post = posts.find(p => p.id === postId);
+      const post = posts.find((p) => p.id === postId);
       if (!post) return;
-      
+
       const newLikedState = !post.is_liked;
       const newCount = newLikedState ? (post.likes_count || 0) + 1 : Math.max(0, (post.likes_count || 0) - 1);
 
-      setPosts(posts.map(p => p.id === postId ? { ...p, is_liked: newLikedState, likes_count: newCount } : p));
+      setPosts(posts.map((p) => (p.id === postId ? { ...p, is_liked: newLikedState, likes_count: newCount } : p)));
       await api.post(`/posts/${postId}/like`);
     } catch (_) {}
   };
 
   const handleBookmark = async (postId: number) => {
     try {
-      const post = posts.find(p => p.id === postId);
+      const post = posts.find((p) => p.id === postId);
       if (!post) return;
       const newSavedState = !post.is_saved;
 
-      setPosts(posts.map(p => p.id === postId ? { ...p, is_saved: newSavedState } : p));
+      setPosts(posts.map((p) => (p.id === postId ? { ...p, is_saved: newSavedState } : p)));
       await api.post(`/posts/${postId}/save`);
       showToast(newSavedState ? 'Post saved to bookmarks' : 'Post removed from bookmarks');
     } catch (_) {}
@@ -175,18 +188,19 @@ export default function Community() {
 
   const handleShare = (post: any) => {
     if (navigator.share) {
-      navigator.share({
-        title: 'AgriNex Farming Community Post',
-        text: post.content,
-        url: window.location.href,
-      }).catch(() => {});
+      navigator
+        .share({
+          title: 'AgriNex Farming Community Post',
+          text: post.content,
+          url: window.location.href,
+        })
+        .catch(() => {});
     } else {
       navigator.clipboard.writeText(`${window.location.origin}/community#post-${post.id}`);
       showToast('🔗 Post link copied to clipboard!');
     }
   };
 
-  // Moderation & Reporting
   const handleOpenReport = (post: any) => {
     setActiveMenuPostId(null);
     setReportingPost(post);
@@ -197,11 +211,11 @@ export default function Community() {
     try {
       setSubmittingReport(true);
       await api.post(`/posts/${reportingPost.id}/report`, { reason: reportReason.toLowerCase() });
-      showToast('🚩 Post reported successfully. Our team is reviewing it.');
-      setHiddenPostIds(prev => [...prev, reportingPost.id]);
+      showToast('🚩 Post reported. Our moderation team will review it.');
+      setHiddenPostIds((prev) => [...prev, reportingPost.id]);
       setReportingPost(null);
     } catch (err: any) {
-      showToast('Failed to report post. Please try again.');
+      showToast('Failed to report post. Please try again.', 'error');
     } finally {
       setSubmittingReport(false);
     }
@@ -211,54 +225,53 @@ export default function Community() {
     setActiveMenuPostId(null);
     try {
       await api.post(`/users/${targetUserId}/block`);
-      setBlockedUserIds(prev => [...prev, targetUserId]);
-      showToast('🚫 User blocked. Their posts will no longer appear in your feed.');
+      setBlockedUserIds((prev) => [...prev, targetUserId]);
+      showToast('🚫 User blocked. Their updates are now hidden.');
     } catch (err: any) {
-      showToast(err.response?.data?.detail || 'Failed to block user');
+      showToast(err.response?.data?.detail || 'Failed to block user', 'error');
     }
   };
 
   const handleHidePost = (postId: number) => {
     setActiveMenuPostId(null);
-    setHiddenPostIds(prev => [...prev, postId]);
+    setHiddenPostIds((prev) => [...prev, postId]);
     showToast('👁 Post hidden from your feed.');
   };
 
-  // Comments
-  const handleOpenComments = async (post: any) => {
-    setActivePostForComments(post);
-    setLoadingComments(true);
-    try {
-      const res = await api.get(`/posts/${post.id}/comments`);
-      setComments(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      setComments([]);
-    } finally {
-      setLoadingComments(false);
+  const toggleComments = async (postId: number) => {
+    const willOpen = !expandedComments[postId];
+    setExpandedComments((prev) => ({ ...prev, [postId]: willOpen }));
+
+    if (willOpen && !postCommentsMap[postId]) {
+      try {
+        setLoadingCommentsMap((prev) => ({ ...prev, [postId]: true }));
+        const res = await api.get(`/posts/${postId}/comments`);
+        setPostCommentsMap((prev) => ({ ...prev, [postId]: Array.isArray(res.data) ? res.data : [] }));
+      } catch {
+        setPostCommentsMap((prev) => ({ ...prev, [postId]: [] }));
+      } finally {
+        setLoadingCommentsMap((prev) => ({ ...prev, [postId]: false }));
+      }
     }
   };
 
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCommentVal.trim() || !activePostForComments) return;
+  const handleAddComment = async (postId: number) => {
+    const text = (commentInputMap[postId] || '').trim();
+    if (!text) return;
+
     try {
-      setSubmittingComment(true);
-      const res = await api.post(`/posts/${activePostForComments.id}/comments`, {
-        content: newCommentVal.trim()
-      });
-      setComments([...comments, res.data]);
-      setNewCommentVal('');
-      setPosts(posts.map(p => p.id === activePostForComments.id ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
+      const res = await api.post(`/posts/${postId}/comments`, { content: text });
+      const currentList = postCommentsMap[postId] || [];
+      setPostCommentsMap((prev) => ({ ...prev, [postId]: [...currentList, res.data] }));
+      setCommentInputMap((prev) => ({ ...prev, [postId]: '' }));
+      setPosts(posts.map((p) => (p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p)));
     } catch (err: any) {
-      showToast('Failed to submit comment');
-    } finally {
-      setSubmittingComment(false);
+      showToast('Failed to submit comment.', 'error');
     }
   };
 
-  // Query suggested farmers
   const { data: suggestedFarmers = [] } = useQuery({
-    queryKey: ['suggested_users_community'],
+    queryKey: ['suggested_farmers_feed'],
     queryFn: async () => {
       try {
         const res = await api.get('/api/users/suggested');
@@ -267,20 +280,20 @@ export default function Community() {
         const res = await api.get('/users/suggested');
         return res.data;
       }
-    }
+    },
   });
 
-  // Filter posts
-  const filteredPosts = posts.filter(post => {
+  const filteredPosts = posts.filter((post) => {
     if (hiddenPostIds.includes(post.id)) return false;
     if (blockedUserIds.includes(post.user_id)) return false;
     if (selectedCategory === 'All') return true;
-    return post.crop_category?.toLowerCase() === selectedCategory.toLowerCase();
+    const cat = (post.crop_category || '').toLowerCase();
+    const target = selectedCategory.toLowerCase();
+    return cat.includes(target) || target.includes(cat);
   });
 
   return (
-    <div className="space-y-8 pb-12">
-
+    <div className="space-y-8 pb-12 font-sans">
       {/* ─── TOAST NOTIFICATION ─── */}
       <AnimatePresence>
         {toastMessage && (
@@ -288,88 +301,89 @@ export default function Community() {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-6 right-6 z-50 bg-[#1B5E20] text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/20 flex items-center gap-3 text-sm font-bold"
+            className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl border text-sm font-bold flex items-center gap-3 ${
+              toastType === 'error'
+                ? 'bg-red-700 text-white border-red-500'
+                : 'bg-[#123B24] text-white border-[#6BCB45]/40'
+            }`}
           >
-            <span>🌾</span>
+            <span>{toastType === 'error' ? '⚠️' : '🌾'}</span>
             <span>{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ─── HEADER & CATEGORY TABS ─── */}
-      <div className="bg-white rounded-[24px] p-6 sm:p-8 border border-[#E0E7DE] shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E8F5E9] text-[#2E7D32] text-xs font-black uppercase tracking-wider mb-2">
-              <span>🌾</span> Farmers Community Feed
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#1A2E1A]">
-              AgriNex <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1B5E20] via-[#2E7D32] to-[#66BB6A]">Community</span>
-            </h1>
-            <p className="text-sm font-medium text-[#546E7A] mt-1">
-              Connect with 12,000+ progressive farmers, agronomists, and crop specialists nationwide.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-[#2E7D32] animate-ping"></span>
-            <span className="text-xs font-bold text-[#2E7D32]">Moderation Shield Active</span>
-          </div>
+      <div className="farm-card p-6 sm:p-8 space-y-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-[#123B24] tracking-tight">
+            AgriNex Community 🌾
+          </h1>
+          <p className="text-xs sm:text-sm text-[#546E7A] font-medium mt-1">
+            Connect. Share. Grow.
+          </p>
         </div>
 
-        {/* Category Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pt-6 pb-1 no-scrollbar">
+        {/* Category Tabs: All | Disease Alert | Tips | Market | Q&A */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-[#1B5E20] text-white shadow-[0_4px_15px_rgba(27,94,32,0.25)]'
-                  : 'bg-[#F1F8E9] text-[#1A2E1A] hover:bg-[#E8F5E9]'
+                  ? 'bg-[#123B24] text-white shadow-farm-sm'
+                  : 'bg-[#F5F7EF] text-[#1A2E1A] hover:bg-[#EEF3E8]'
               }`}
             >
-              {cat === 'All' && '🌱 All Discussions'}
-              {cat === 'Disease Alert' && '⚠️ Disease Alerts'}
-              {cat === 'Farming Tips' && '💡 Farming Tips'}
-              {cat === 'Market' && '📈 Market Prices'}
-              {cat === 'Q&A' && '❓ Agronomy Q&A'}
-              {cat === 'Weather' && '🌤️ Weather Intel'}
+              {cat === 'All' && '🌱 All'}
+              {cat === 'Disease Alert' && '⚠️ Disease Alert'}
+              {cat === 'Tips' && '💡 Tips'}
+              {cat === 'Market' && '📈 Market'}
+              {cat === 'Q&A' && '❓ Q&A'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ─── MAIN 2-COLUMN COMMUNITY LAYOUT ─── */}
+      {/* ─── MAIN 2-COLUMN LAYOUT ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* LEFT 2 COLUMNS: POST CREATOR & FEED */}
+        {/* LEFT 2 COLUMNS: POST COMPOSER & POSTS */}
         <div className="lg:col-span-2 space-y-6">
-
-          {/* Post Creation Card */}
-          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm">
-            <div className="flex items-start gap-4">
+          {/* Post Composer */}
+          <div className="farm-card p-6 space-y-4">
+            <div className="flex items-start gap-3.5">
               <img
-                src={user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'user'}`}
+                src={
+                  user?.profile_picture ||
+                  `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'farmer'}`
+                }
                 alt="avatar"
-                className="w-11 h-11 rounded-full border-2 border-[#66BB6A] object-cover shrink-0 bg-white"
+                className="w-11 h-11 rounded-full border-2 border-[#185C2B] object-cover bg-white shrink-0"
               />
               <div className="flex-1 space-y-3">
                 <textarea
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
-                  placeholder="Share crop progress, ask pest queries, or post farming tips..."
+                  placeholder="Share a farming observation, ask a crop question, or post a pest alert..."
                   rows={3}
-                  className="w-full rounded-2xl bg-[#F1F8E9] border border-[#E0E7DE] p-4 text-sm text-[#1A2E1A] placeholder-[#546E7A] focus:outline-none focus:ring-2 focus:ring-[#2E7D32] transition-all resize-none"
+                  className="agri-input resize-none bg-[#F5F7EF]"
                 />
 
-                {/* Preview Image if selected */}
+                {/* Attached Image Preview */}
                 {imagePreview && (
-                  <div className="relative rounded-xl overflow-hidden border border-[#E0E7DE] max-h-60">
-                    <img src={imagePreview} alt="upload preview" className="w-full h-full object-cover" />
+                  <div className="relative rounded-2xl overflow-hidden border border-[#EEF3E8] max-h-60 bg-black">
+                    <img
+                      src={imagePreview}
+                      alt="upload preview"
+                      className="w-full h-full object-cover max-h-60"
+                    />
                     <button
                       type="button"
-                      onClick={() => { setSelectedFile(null); setImagePreview(null); }}
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setImagePreview(null);
+                      }}
                       className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black transition-all"
                     >
                       <X className="w-4 h-4" />
@@ -377,8 +391,9 @@ export default function Community() {
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                   <div className="flex items-center gap-2">
+                    {/* Direct image upload */}
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -389,206 +404,302 @@ export default function Community() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F1F8E9] hover:bg-[#E8F5E9] text-xs font-bold text-[#1B5E20] transition-all"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F5F7EF] hover:bg-[#EEF3E8] text-xs font-bold text-[#185C2B] transition-all cursor-pointer"
                     >
                       <ImageIcon className="w-4 h-4" />
-                      <span>{selectedFile ? 'Change Photo' : 'Attach Photo'}</span>
+                      <span>📷 Add Photo</span>
                     </button>
 
+                    {/* Camera upload */}
+                    <input
+                      type="file"
+                      ref={cameraInputRef}
+                      onChange={handleFileSelect}
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F5F7EF] hover:bg-[#EEF3E8] text-xs font-bold text-[#185C2B] transition-all cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Camera</span>
+                    </button>
+
+                    {/* Category selector */}
                     <select
                       value={postCategory}
                       onChange={(e) => setPostCategory(e.target.value)}
-                      className="px-3 py-2 rounded-xl bg-[#F1F8E9] text-xs font-bold text-[#1A2E1A] border-none focus:ring-1 focus:ring-[#2E7D32]"
+                      className="px-3 py-2 rounded-xl bg-[#F5F7EF] text-xs font-bold text-[#123B24] border border-[#EEF3E8] outline-none"
                     >
-                      <option value="Farming Tips">Farming Tips</option>
+                      <option value="Tips">Tips</option>
                       <option value="Disease Alert">Disease Alert</option>
                       <option value="Market">Market</option>
                       <option value="Q&A">Q&A</option>
-                      <option value="Weather">Weather</option>
                     </select>
                   </div>
 
                   <button
                     onClick={handleCreatePost}
                     disabled={publishing || !newContent.trim()}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition-all disabled:opacity-50"
-                    style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)' }}
+                    className="btn-primary py-2.5 px-5 text-xs font-bold rounded-xl"
                   >
-                    {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    <span>{publishing ? 'Publishing...' : 'Post Update'}</span>
+                    {publishing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Posting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Post</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Posts Feed with Staggered Animation */}
+          {/* Post Feed */}
           {loadingPosts ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-44 rounded-[20px] skeleton-shimmer" />
+                <div key={i} className="h-48 rounded-[24px] skeleton-shimmer" />
               ))}
             </div>
           ) : filteredPosts.length === 0 ? (
-            <div className="bg-white rounded-[22px] p-12 text-center border border-[#E0E7DE] shadow-sm space-y-3">
-              <span className="text-5xl block animate-float-leaf">🌾</span>
-              <h3 className="text-lg font-black text-[#1A2E1A]">No posts found in this category</h3>
-              <p className="text-xs text-[#546E7A]">Be the first farmer to start a discussion or share advice!</p>
+            <div className="farm-card p-12 text-center space-y-3">
+              <span className="text-4xl block">🌾</span>
+              <h3 className="text-base font-black text-[#123B24]">No community posts in this category</h3>
+              <p className="text-xs text-[#546E7A]">Be the first farmer to share an update or question!</p>
             </div>
           ) : (
             <div className="space-y-5">
               {filteredPosts.map((post, index) => {
-                const isHidden = post.is_hidden || (post.report_count || 0) >= 3;
+                const isCommentsOpen = Boolean(expandedComments[post.id]);
+                const commentList = postCommentsMap[post.id] || [];
+                const isLoadingComments = Boolean(loadingCommentsMap[post.id]);
 
                 return (
                   <motion.div
                     key={post.id}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: index * 0.05 }}
-                    className="bg-white rounded-[20px] p-6 border border-[#E0E7DE] shadow-[0_4px_20px_rgba(27,94,32,0.06)] hover:shadow-[0_8px_30px_rgba(27,94,32,0.12)] transition-all relative"
+                    transition={{ duration: 0.35, delay: index * 0.04 }}
+                    className="farm-card p-6 space-y-4"
                   >
-                    {isHidden ? (
-                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs font-bold text-[#546E7A] flex items-center justify-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-[#F57F17]" />
-                        <span>Post removed - community guidelines</span>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Author Section */}
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={post.author_avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.user_id || 'farmer'}`}
-                              alt="author"
-                              className="w-11 h-11 rounded-full border-2 border-[#2E7D32] object-cover bg-white ring-2 ring-[#E8F5E9]"
-                            />
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <h4 className="text-sm font-black text-[#1B5E20]">
-                                  {post.author_name || `Farmer ${post.user_id}`}
-                                </h4>
-                                {post.author_verified && (
-                                  <CheckCircle2 className="w-4 h-4 text-[#2E7D32] fill-green-100" />
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 text-[11px] text-[#546E7A] font-medium">
-                                <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                                {post.location && (
-                                  <span className="flex items-center gap-0.5 text-[#2E7D32]">
-                                    <MapPin className="w-3 h-3" /> {post.location}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                    {/* Post Card Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* Avatar with green ring */}
+                        <img
+                          src={
+                            post.author_avatar ||
+                            `https://api.dicebear.com/7.x/adventurer/svg?seed=${post.user_id || 'farmer'}`
+                          }
+                          alt="avatar"
+                          className="w-11 h-11 rounded-full border-2 border-[#185C2B] object-cover bg-white ring-2 ring-[#A7D96A]/60"
+                        />
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="text-sm font-black text-[#123B24]">
+                              {post.author_name || `Farmer ${post.user_id}`}
+                            </h4>
+                            {post.author_verified && (
+                              <CheckCircle2 className="w-4 h-4 text-[#185C2B]" />
+                            )}
                           </div>
-
-                          {/* Options Menu Dropdown */}
-                          <div className="relative">
-                            <button
-                              onClick={() => setActiveMenuPostId(activeMenuPostId === post.id ? null : post.id)}
-                              className="p-2 rounded-xl text-[#546E7A] hover:text-[#1A2E1A] hover:bg-[#F1F8E9] transition-all"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-
-                            {activeMenuPostId === post.id && (
-                              <div className="absolute right-0 top-10 w-44 bg-white rounded-2xl shadow-xl border border-[#E0E7DE] p-1.5 z-30 space-y-1">
-                                <button
-                                  onClick={() => handleOpenReport(post)}
-                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-all text-left"
-                                >
-                                  <Flag className="w-3.5 h-3.5" />
-                                  <span>🚩 Report Post</span>
-                                </button>
-                                {post.user_id !== user?.id && (
-                                  <button
-                                    onClick={() => handleBlockUser(post.user_id)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-[#546E7A] hover:bg-slate-50 transition-all text-left"
-                                  >
-                                    <UserX className="w-3.5 h-3.5" />
-                                    <span>🚫 Block User</span>
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleHidePost(post.id)}
-                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-[#546E7A] hover:bg-slate-50 transition-all text-left"
-                                >
-                                  <EyeOff className="w-3.5 h-3.5" />
-                                  <span>👁 Hide Post</span>
-                                </button>
-                              </div>
+                          <div className="flex items-center gap-2 text-[11px] text-[#546E7A] font-medium">
+                            <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                            {post.location && (
+                              <span className="flex items-center gap-0.5 text-[#185C2B]">
+                                <MapPin className="w-3 h-3" /> {post.location}
+                              </span>
                             )}
                           </div>
                         </div>
+                      </div>
 
-                        {/* Content text */}
-                        <p className="text-sm text-[#1A2E1A] leading-relaxed whitespace-pre-line mb-4 font-normal">
-                          {post.content}
-                        </p>
+                      {/* ⋮ Menu */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setActiveMenuPostId(activeMenuPostId === post.id ? null : post.id)}
+                          className="p-2 rounded-xl text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF] transition-all"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
 
-                        {/* Attached Image with Lightbox click */}
-                        {post.image_url && (
-                          <div 
-                            onClick={() => setLightboxImage(getImageUrl(post.image_url))}
-                            className="rounded-2xl overflow-hidden border border-[#E0E7DE] mb-4 cursor-pointer group relative max-h-96"
-                          >
-                            <img
-                              src={getImageUrl(post.image_url)}
-                              alt="post attachment"
-                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-                            />
-                            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
-                              🔍 Click to enlarge
-                            </div>
+                        {activeMenuPostId === post.id && (
+                          <div className="absolute right-0 top-10 w-44 bg-white rounded-2xl shadow-xl border border-[#EEF3E8] p-1.5 z-30 space-y-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReport(post)}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 text-left transition-all cursor-pointer"
+                            >
+                              <Flag className="w-3.5 h-3.5" />
+                              <span>🚩 Report Post</span>
+                            </button>
+                            {post.user_id !== user?.id && (
+                              <button
+                                type="button"
+                                onClick={() => handleBlockUser(post.user_id)}
+                                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-[#546E7A] hover:bg-[#F5F7EF] text-left transition-all cursor-pointer"
+                              >
+                                <UserX className="w-3.5 h-3.5" />
+                                <span>🚫 Block User</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleHidePost(post.id)}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-[#546E7A] hover:bg-[#F5F7EF] text-left transition-all cursor-pointer"
+                            >
+                              <EyeOff className="w-3.5 h-3.5" />
+                              <span>👁 Hide Post</span>
+                            </button>
                           </div>
                         )}
+                      </div>
+                    </div>
 
-                        {/* Action Bar */}
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-[#546E7A] font-bold">
-                          <div className="flex items-center gap-4">
-                            <button
-                              onClick={() => handleLike(post.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                                post.is_liked
-                                  ? 'text-red-500 bg-red-50'
-                                  : 'hover:bg-[#F1F8E9] hover:text-[#1B5E20]'
-                              }`}
-                            >
-                              <Heart className={`w-4 h-4 ${post.is_liked ? 'fill-red-500 text-red-500 animate-bounce' : ''}`} />
-                              <span>{post.likes_count || 0}</span>
-                            </button>
+                    {/* Content Text */}
+                    <p className="text-xs sm:text-sm text-[#1A2E1A] leading-relaxed whitespace-pre-line font-normal">
+                      {post.content}
+                    </p>
 
-                            <button
-                              onClick={() => handleOpenComments(post)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-[#F1F8E9] hover:text-[#1B5E20] transition-all"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                              <span>{post.comments_count || 0}</span>
-                            </button>
+                    {/* Full-width image with Lightbox click */}
+                    {post.image_url && (
+                      <div
+                        onClick={() => setLightboxImage(getImageUrl(post.image_url))}
+                        className="rounded-2xl overflow-hidden border border-[#EEF3E8] cursor-pointer group relative max-h-96"
+                      >
+                        <img
+                          src={getImageUrl(post.image_url)}
+                          alt="attachment"
+                          className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                          🔍 View Full Image
+                        </div>
+                      </div>
+                    )}
 
+                    {/* Action Row */}
+                    <div className="flex items-center justify-between pt-3 border-t border-[#EEF3E8] text-xs font-bold text-[#546E7A]">
+                      <div className="flex items-center gap-4">
+                        {/* Like button with animated fill */}
+                        <button
+                          type="button"
+                          onClick={() => handleLike(post.id)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                            post.is_liked
+                              ? 'text-red-500 bg-red-50'
+                              : 'hover:bg-[#F5F7EF] hover:text-[#185C2B]'
+                          }`}
+                        >
+                          <Heart
+                            className={`w-4 h-4 ${
+                              post.is_liked ? 'fill-red-500 text-red-500 animate-bounce' : ''
+                            }`}
+                          />
+                          <span>{post.likes_count || 0}</span>
+                        </button>
+
+                        {/* Comment toggle button */}
+                        <button
+                          type="button"
+                          onClick={() => toggleComments(post.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-[#F5F7EF] hover:text-[#185C2B] transition-all cursor-pointer"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          <span>{post.comments_count || 0}</span>
+                        </button>
+
+                        {/* Share button */}
+                        <button
+                          type="button"
+                          onClick={() => handleShare(post)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-[#F5F7EF] hover:text-[#185C2B] transition-all cursor-pointer"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          <span>Share</span>
+                        </button>
+                      </div>
+
+                      {/* Bookmark / Save */}
+                      <button
+                        type="button"
+                        onClick={() => handleBookmark(post.id)}
+                        className={`p-2 rounded-xl transition-all cursor-pointer ${
+                          post.is_saved
+                            ? 'text-[#F9A825] bg-amber-50'
+                            : 'hover:bg-[#F5F7EF] hover:text-[#123B24]'
+                        }`}
+                      >
+                        <Bookmark className={`w-4 h-4 ${post.is_saved ? 'fill-[#F9A825]' : ''}`} />
+                      </button>
+                    </div>
+
+                    {/* Expandable Comments Section */}
+                    <AnimatePresence>
+                      {isCommentsOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-3 border-t border-[#EEF3E8] space-y-3 overflow-hidden"
+                        >
+                          {/* Comment Input */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Write an agronomy comment or advice..."
+                              value={commentInputMap[post.id] || ''}
+                              onChange={(e) =>
+                                setCommentInputMap((prev) => ({ ...prev, [post.id]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleAddComment(post.id);
+                              }}
+                              className="agri-input py-2 text-xs flex-1 bg-[#F5F7EF]"
+                            />
                             <button
-                              onClick={() => handleShare(post)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-[#F1F8E9] hover:text-[#1B5E20] transition-all"
+                              type="button"
+                              onClick={() => handleAddComment(post.id)}
+                              className="btn-primary py-2 px-4 rounded-xl text-xs font-bold"
                             >
-                              <Share2 className="w-4 h-4" />
-                              <span>Share</span>
+                              Send
                             </button>
                           </div>
 
-                          <button
-                            onClick={() => handleBookmark(post.id)}
-                            className={`p-2 rounded-xl transition-all ${
-                              post.is_saved
-                                ? 'text-[#F9A825] bg-amber-50'
-                                : 'hover:bg-[#F1F8E9] hover:text-[#1A2E1A]'
-                            }`}
-                          >
-                            <Bookmark className={`w-4 h-4 ${post.is_saved ? 'fill-[#F9A825]' : ''}`} />
-                          </button>
-                        </div>
-                      </>
-                    )}
+                          {/* Comments List */}
+                          {isLoadingComments ? (
+                            <div className="py-4 text-center text-xs text-[#546E7A] flex items-center justify-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-[#185C2B]" />
+                              <span>Loading comments...</span>
+                            </div>
+                          ) : commentList.length === 0 ? (
+                            <p className="text-[11px] text-[#546E7A] italic py-1">No comments yet. Start the conversation!</p>
+                          ) : (
+                            <div className="space-y-2 pt-1 max-h-60 overflow-y-auto no-scrollbar">
+                              {commentList.map((c) => (
+                                <div key={c.id} className="p-3 rounded-2xl bg-[#F5F7EF] space-y-1">
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <span className="font-bold text-[#123B24]">{c.author_name || `Farmer ${c.user_id}`}</span>
+                                    <span className="text-[#546E7A] text-[10px]">{new Date(c.created_at).toLocaleDateString()}</span>
+                                  </div>
+                                  <p className="text-xs text-[#1A2E1A]">{c.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 );
               })}
@@ -596,27 +707,29 @@ export default function Community() {
           )}
         </div>
 
-        {/* RIGHT SIDEBAR: TRENDING TOPICS, SUGGESTED FARMERS, CALENDAR */}
+        {/* RIGHT SIDEBAR: TRENDING TOPICS & SUGGESTED FARMERS */}
         <div className="space-y-6">
-
           {/* Trending Topics */}
-          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm space-y-4">
-            <h3 className="text-sm font-black text-[#1A2E1A] flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#2E7D32]" />
+          <div className="farm-card p-6 space-y-4">
+            <h3 className="text-sm font-black text-[#123B24] flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#185C2B]" />
               <span>Trending Farm Discussions</span>
             </h3>
 
             <div className="space-y-2.5">
               {[
-                { tag: '#KharifPaddy', posts: '2.4k posts', desc: 'Brown plant hopper warning' },
-                { tag: '#TomatoBlight', posts: '1.8k posts', desc: 'Foliar spray remedies' },
-                { tag: '#DripIrrigation', posts: '940 posts', desc: 'Subsidies and timers' },
-                { tag: '#OrganicNeem', posts: '620 posts', desc: 'Pest prevention recipes' },
+                { tag: '#KharifPaddy', count: '2.4k updates', desc: 'Brown plant hopper warnings' },
+                { tag: '#TomatoBlight', count: '1.8k updates', desc: 'Foliar spray remedies' },
+                { tag: '#DripIrrigation', count: '940 updates', desc: 'Water savings & timers' },
+                { tag: '#OrganicNeem', count: '620 updates', desc: 'Natural pest bio-repellents' },
               ].map((item, idx) => (
-                <div key={idx} className="p-3 rounded-xl bg-[#F1F8E9] hover:bg-[#E8F5E9] transition-all cursor-pointer">
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-[#F5F7EF] hover:bg-[#EEF3E8] transition-all cursor-pointer"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-[#1B5E20]">{item.tag}</span>
-                    <span className="text-[10px] font-bold text-[#546E7A]">{item.posts}</span>
+                    <span className="text-xs font-black text-[#185C2B]">{item.tag}</span>
+                    <span className="text-[10px] font-bold text-[#546E7A]">{item.count}</span>
                   </div>
                   <p className="text-[11px] text-[#546E7A] mt-0.5">{item.desc}</p>
                 </div>
@@ -625,26 +738,30 @@ export default function Community() {
           </div>
 
           {/* Suggested Farmers */}
-          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm space-y-4">
-            <h3 className="text-sm font-black text-[#1A2E1A] flex items-center gap-2">
+          <div className="farm-card p-6 space-y-4">
+            <h3 className="text-sm font-black text-[#123B24] flex items-center gap-2">
               <span>🌾</span>
-              <span>Suggested Farmers to Connect</span>
+              <span>Suggested Farmers</span>
             </h3>
 
             <div className="space-y-3">
               {suggestedFarmers.slice(0, 4).map((f: any) => (
-                <div key={f.id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F1F8E9] transition-all">
+                <div key={f.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F5F7EF] transition-all">
                   <div className="flex items-center gap-2.5">
                     <img
-                      src={f.profile_photo || f.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${f.id}`}
+                      src={
+                        f.profile_photo ||
+                        f.profile_picture ||
+                        `https://api.dicebear.com/7.x/adventurer/svg?seed=${f.id}`
+                      }
                       alt="farmer"
-                      className="w-9 h-9 rounded-full object-cover border border-[#A5D6A7]"
+                      className="w-9 h-9 rounded-full object-cover border border-[#A7D96A]"
                     />
                     <div>
-                      <h5 className="text-xs font-bold text-[#1A2E1A] truncate max-w-[110px]">
+                      <h5 className="text-xs font-bold text-[#123B24] truncate max-w-[110px]">
                         {f.display_name || f.full_name || `Farmer ${f.id}`}
                       </h5>
-                      <p className="text-[10px] text-[#546E7A]">{f.village || 'Progressive Grower'}</p>
+                      <p className="text-[10px] text-[#546E7A]">{f.village || 'Agronomist'}</p>
                     </div>
                   </div>
                   <FollowButton userId={f.id} initialIsFollowing={f.is_following} size="sm" />
@@ -652,44 +769,39 @@ export default function Community() {
               ))}
             </div>
           </div>
-
-          {/* Active Disease Alerts Widget */}
-          <div className="bg-gradient-to-br from-[#FFF3E0] to-[#FFE0B2] rounded-[22px] p-6 border border-[#FFCC80] shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-xs font-black uppercase text-[#E65100]">
-              <AlertTriangle className="w-4 h-4 text-[#E65100]" />
-              <span>Regional Disease Alert</span>
-            </div>
-            <h4 className="text-sm font-black text-[#5D4037]">Late Blight in Solanaceae Crops</h4>
-            <p className="text-xs text-[#5D4037]/90 leading-relaxed">
-              High humidity & cloud cover triggers spore dispersal. Spray Mancozeb 75% WP @ 2g/L or copper oxychloride preventively.
-            </p>
-          </div>
-
-          {/* Seasonal Farming Calendar */}
-          <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-xs font-black text-[#1B5E20]">
-              <Calendar className="w-4 h-4 text-[#2E7D32]" />
-              <span>Farming Calendar • Sept - Oct</span>
-            </div>
-            <ul className="text-xs space-y-2 text-[#546E7A]">
-              <li className="flex items-start gap-2">
-                <span className="text-[#2E7D32] font-bold">✓</span>
-                <span>Harvest early Kharif groundnut and green gram.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-[#2E7D32] font-bold">✓</span>
-                <span>Field prep for Rabi wheat, mustard, and chickpea.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-[#2E7D32] font-bold">✓</span>
-                <span>Deep summer plowing to eliminate pest pupae.</span>
-              </li>
-            </ul>
-          </div>
-
         </div>
-
       </div>
+
+      {/* ─── FULL-SCREEN IMAGE LIGHTBOX MODAL ─── */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <div
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => setLightboxImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              className="relative max-w-4xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-black/60 text-white hover:bg-black transition-all z-10"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <img
+                src={lightboxImage}
+                alt="Enlarged community crop attachment"
+                className="w-full h-full object-contain max-h-[85vh] rounded-2xl"
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ─── REPORT REASON MODAL ─── */}
       <AnimatePresence>
@@ -699,30 +811,34 @@ export default function Community() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-[24px] p-6 max-w-md w-full shadow-2xl border border-[#E0E7DE] space-y-4"
+              className="bg-white rounded-[28px] p-6 max-w-md w-full shadow-2xl border border-[#EEF3E8] space-y-4"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-3 border-b border-[#EEF3E8]">
                 <div className="flex items-center gap-2 text-red-600 font-bold">
                   <Flag className="w-5 h-5" />
-                  <h3 className="text-base font-black text-[#1A2E1A]">Report Post</h3>
+                  <h3 className="text-base font-black text-[#123B24]">Report Community Post</h3>
                 </div>
-                <button onClick={() => setReportingPost(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setReportingPost(null)}
+                  className="p-1 rounded-lg text-[#546E7A] hover:text-[#123B24]"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <p className="text-xs text-[#546E7A]">
-                Help us keep AgriNex safe. Select the reason why this post violates agricultural community standards:
+                Select why this update violates agricultural community standards:
               </p>
 
               <div className="space-y-2">
-                {['Spam', 'Offensive', 'Harassment', 'Irrelevant', 'Misinformation'].map((reason) => (
-                  <label 
+                {['Offensive', 'Spam', 'Harassment', 'Misinformation', 'Other'].map((reason) => (
+                  <label
                     key={reason}
                     className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
                       reportReason === reason
-                        ? 'border-[#2E7D32] bg-[#E8F5E9] text-[#1B5E20]'
-                        : 'border-[#E0E7DE] text-[#1A2E1A] hover:bg-slate-50'
+                        ? 'border-[#185C2B] bg-[#EEF3E8] text-[#123B24]'
+                        : 'border-[#EEF3E8] text-[#1A2E1A] hover:bg-[#F5F7EF]'
                     }`}
                   >
                     <span>{reason}</span>
@@ -732,17 +848,17 @@ export default function Community() {
                       value={reason}
                       checked={reportReason === reason}
                       onChange={(e) => setReportReason(e.target.value)}
-                      className="text-[#2E7D32] focus:ring-[#2E7D32]"
+                      className="text-[#185C2B] focus:ring-[#185C2B]"
                     />
                   </label>
                 ))}
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EEF3E8]">
                 <button
                   type="button"
                   onClick={() => setReportingPost(null)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-[#546E7A] hover:bg-slate-50"
+                  className="px-4 py-2.5 rounded-xl border border-[#EEF3E8] text-xs font-bold text-[#546E7A]"
                 >
                   Cancel
                 </button>
@@ -759,101 +875,6 @@ export default function Community() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* ─── IMAGE LIGHTBOX MODAL ─── */}
-      <AnimatePresence>
-        {lightboxImage && (
-          <div 
-            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-            onClick={() => setLightboxImage(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.85, opacity: 0 }}
-              className="relative max-w-4xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setLightboxImage(null)}
-                className="absolute top-4 right-4 p-2 rounded-full bg-black/60 text-white hover:bg-black transition-all z-10"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              <img src={lightboxImage} alt="enlarged crop" className="w-full h-full object-contain max-h-[85vh] rounded-2xl" />
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ─── COMMENT THREAD MODAL / DRAWER ─── */}
-      <AnimatePresence>
-        {activePostForComments && (
-          <div 
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setActivePostForComments(null)}
-          >
-            <motion.div
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              className="bg-white rounded-[24px] p-6 max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-[#E0E7DE]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <h3 className="text-base font-black text-[#1A2E1A]">Comments & Advice</h3>
-                <button onClick={() => setActivePostForComments(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto py-4 space-y-3">
-                {loadingComments ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#2E7D32]" />
-                  </div>
-                ) : comments.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-[#546E7A]">
-                    No comments yet. Share your agronomic advice below!
-                  </div>
-                ) : (
-                  comments.map((cmt) => (
-                    <div key={cmt.id} className="p-3 rounded-xl bg-[#F1F8E9] space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#1B5E20]">
-                          {cmt.author_name || `Farmer ${cmt.user_id}`}
-                        </span>
-                        <span className="text-[10px] text-[#546E7A]">
-                          {new Date(cmt.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#1A2E1A]">{cmt.content}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <form onSubmit={handleAddComment} className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newCommentVal}
-                  onChange={(e) => setNewCommentVal(e.target.value)}
-                  placeholder="Add your farming advice..."
-                  className="flex-1 rounded-xl bg-[#F1F8E9] border border-[#E0E7DE] px-4 py-2.5 text-xs text-[#1A2E1A] focus:outline-none focus:ring-2 focus:ring-[#2E7D32]"
-                />
-                <button
-                  type="submit"
-                  disabled={submittingComment || !newCommentVal.trim()}
-                  className="px-4 py-2.5 rounded-xl bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-xs font-bold shadow-sm disabled:opacity-50"
-                >
-                  {submittingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
     </div>
   );
 }

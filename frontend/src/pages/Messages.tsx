@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -24,10 +24,9 @@ import MessageInput from '../components/chat/MessageInput';
 import ConversationCard from '../components/chat/ConversationCard';
 import ImageLightbox from '../components/chat/ImageLightbox';
 
-export const Messages: React.FC = () => {
+export default function Messages() {
   const { user } = useAuthStore();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const {
     conversations,
@@ -81,9 +80,9 @@ export const Messages: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 3-second maximum loading safety timeout
   const [loadTimedOut, setLoadTimedOut] = useState(false);
 
-  // Initialize conversations & socket
   useEffect(() => {
     fetchConversations();
     if (user?.id) {
@@ -109,7 +108,6 @@ export const Messages: React.FC = () => {
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
   const otherUser = activeConversation?.other_participant;
 
-  // Fetch block status whenever active participant changes
   useEffect(() => {
     if (otherUser?.user_id) {
       fetchBlockStatus(otherUser.user_id);
@@ -128,7 +126,6 @@ export const Messages: React.FC = () => {
     blockBannerMessage = 'You have been blocked.';
   }
 
-  // Scroll to bottom on new message or conversation select
   const scrollToBottom = (smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
   };
@@ -137,7 +134,6 @@ export const Messages: React.FC = () => {
     scrollToBottom(true);
   }, [activeMessages.length, activeConversationId]);
 
-  // Collect all images in current active conversation for Lightbox navigation
   const allConversationImages = activeMessages
     .flatMap((m) => m.attachments || [])
     .map((att) => att.url);
@@ -150,7 +146,6 @@ export const Messages: React.FC = () => {
     setIsLightboxOpen(true);
   };
 
-  // Scroll position listener for floating scroll-to-bottom button
   const handleScroll = () => {
     if (!messageContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = messageContainerRef.current;
@@ -171,7 +166,7 @@ export const Messages: React.FC = () => {
       setIsSearchingUsers(true);
       try {
         const res = await client.get(`/users/search?q=${encodeURIComponent(searchQuery)}`);
-        setUserSearchResults(res.data);
+        setUserSearchResults(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         setUserSearchResults([]);
       } finally {
@@ -257,7 +252,6 @@ export const Messages: React.FC = () => {
     if (activeTab === 'archived') return c.is_archived;
     if (c.is_archived) return false;
     if (activeTab === 'unread') return c.unread_count > 0;
-    // Filter by conversation search query
     if (searchQuery.trim()) {
       const name = c.other_participant?.full_name || c.other_participant?.username || '';
       return name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -268,46 +262,45 @@ export const Messages: React.FC = () => {
   const activeTypingList = activeConversationId ? typingUsers[activeConversationId] || [] : [];
 
   return (
-    <div className="flex h-full w-full bg-[#F8FAFC] text-slate-900 font-sans select-none relative overflow-hidden">
-      {/* ─── CONVERSATION PANEL ─── */}
+    <div className="flex h-[calc(100vh-6rem)] w-full farm-card overflow-hidden font-sans relative">
+      {/* ─── LEFT CONVERSATION LIST PANEL ─── */}
       <div
         className={`${
           activeConversationId ? 'hidden md:flex' : 'flex'
-        } flex-col w-full md:w-[360px] lg:w-[400px] border-r border-slate-200 bg-white flex-shrink-0 z-10 shadow-sm`}
+        } flex-col w-full md:w-[350px] lg:w-[380px] border-r border-[#EEF3E8] bg-white flex-shrink-0 z-10`}
       >
-        {/* Panel Header */}
-        <div className="p-4 border-b border-slate-100 flex flex-col gap-3">
+        {/* Header & Search */}
+        <div className="p-4 border-b border-[#EEF3E8] space-y-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-extrabold text-slate-900 flex items-center gap-2 tracking-tight">
-              <MessageSquare className="w-5 h-5 text-[#16A34A]" />
+            <h1 className="text-lg font-black text-[#123B24] flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-[#185C2B]" />
               <span>Direct Messages</span>
             </h1>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-[#16A34A] border border-emerald-200 font-bold">
-              AgriNex Direct
+            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#EEF3E8] text-[#185C2B]">
+              🌾 Farm Direct
             </span>
           </div>
 
-          {/* Rounded Search Bar with Smooth Focus Animation */}
           <div className="relative">
-            <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-3 w-4 h-4 text-[#546E7A]" />
             <input
               type="text"
-              placeholder="Search farmers or conversations..."
+              placeholder="Search farmers or chats..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-full bg-slate-100 border border-slate-200 text-slate-900 text-xs placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#16A34A] focus:ring-2 focus:ring-emerald-500/20 transition-all font-sans shadow-sm"
+              className="agri-input pl-10 py-2.5 text-xs bg-[#F5F7EF]"
             />
           </div>
 
-          {/* Filter Tabs */}
+          {/* Tabs: All Chats | Unread | Archived */}
           {!searchQuery && (
-            <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100/80 border border-slate-200/60 text-xs">
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#F5F7EF] border border-[#EEF3E8] text-xs">
               <button
                 onClick={() => setActiveTab('all')}
                 className={`flex-1 py-1.5 rounded-xl font-bold transition-all ${
                   activeTab === 'all'
-                    ? 'bg-white text-[#16A34A] shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-white text-[#123B24] shadow-farm-sm'
+                    : 'text-[#546E7A] hover:text-[#123B24]'
                 }`}
               >
                 All Chats
@@ -316,8 +309,8 @@ export const Messages: React.FC = () => {
                 onClick={() => setActiveTab('unread')}
                 className={`flex-1 py-1.5 rounded-xl font-bold transition-all ${
                   activeTab === 'unread'
-                    ? 'bg-white text-[#16A34A] shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-white text-[#123B24] shadow-farm-sm'
+                    : 'text-[#546E7A] hover:text-[#123B24]'
                 }`}
               >
                 Unread
@@ -326,8 +319,8 @@ export const Messages: React.FC = () => {
                 onClick={() => setActiveTab('archived')}
                 className={`flex-1 py-1.5 rounded-xl font-bold transition-all ${
                   activeTab === 'archived'
-                    ? 'bg-white text-[#16A34A] shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-white text-[#123B24] shadow-farm-sm'
+                    : 'text-[#546E7A] hover:text-[#123B24]'
                 }`}
               >
                 Archived
@@ -336,17 +329,16 @@ export const Messages: React.FC = () => {
           )}
         </div>
 
-        {/* Panel List Body: Conversations OR Search Results */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-slate-200">
+        {/* Conversation List / Search / Empty State (Max 3s Loading) */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 no-scrollbar">
           {searchQuery && userSearchResults.length > 0 ? (
-            /* User Search Results */
             <div className="space-y-2">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2">
-                Farmers Search Results
+              <p className="text-[10px] font-black text-[#546E7A] uppercase tracking-wider px-2">
+                Farmers Found
               </p>
               {isSearchingUsers ? (
-                <div className="flex items-center justify-center p-8 text-slate-400">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#16A34A]" />
+                <div className="flex items-center justify-center p-8 text-[#546E7A]">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#185C2B]" />
                 </div>
               ) : (
                 userSearchResults.map((u) => (
@@ -357,29 +349,30 @@ export const Messages: React.FC = () => {
                       startConversation(u.id);
                       setSearchQuery('');
                     }}
-                    className="flex items-center gap-3 p-3 rounded-[18px] bg-white border border-slate-200 shadow-sm hover:border-[#16A34A] hover:shadow-md cursor-pointer transition-all"
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-[#EEF3E8] hover:border-[#185C2B] hover:shadow-farm-sm cursor-pointer transition-all"
                   >
                     <img
                       src={
                         u.profile_picture ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.username)}&background=16A34A&color=fff`
+                        `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(u.full_name || u.username)}`
                       }
                       alt={u.full_name}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                      className="w-10 h-10 rounded-full object-cover border border-[#EEF3E8]"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="font-bold text-slate-900 text-sm truncate">{u.full_name}</h4>
-                        {u.is_verified && <CheckCircle className="w-3.5 h-3.5 text-[#16A34A]" />}
+                        <h4 className="font-bold text-[#123B24] text-xs truncate">{u.full_name}</h4>
+                        {u.is_verified && <CheckCircle className="w-3.5 h-3.5 text-[#185C2B]" />}
                       </div>
-                      <p className="text-xs text-slate-500 truncate">@{u.username || 'farmer'}</p>
+                      <p className="text-[11px] text-[#546E7A] truncate">@{u.username || 'farmer'}</p>
                     </div>
-                    <UserPlus className="w-4 h-4 text-[#16A34A]" />
+                    <UserPlus className="w-4 h-4 text-[#185C2B]" />
                   </motion.div>
                 ))
               )}
             </div>
-          ) : (isLoadingConversations && !loadTimedOut) ? (
+          ) : isLoadingConversations && !loadTimedOut ? (
+            /* Skeleton shimmer loading */
             <div className="space-y-3 p-2">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="h-16 rounded-2xl skeleton-shimmer" />
@@ -396,11 +389,12 @@ export const Messages: React.FC = () => {
               />
             ))
           ) : (
-            <div className="flex flex-col items-center justify-center p-12 text-[#546E7A] text-center gap-3">
-              <span className="text-4xl block animate-float-leaf">🌾</span>
+            /* Empty state after 3s max */
+            <div className="flex flex-col items-center justify-center p-10 text-[#546E7A] text-center gap-3">
+              <span className="text-4xl block">🌾</span>
               <div className="space-y-1">
-                <h4 className="text-sm font-black text-[#1A2E1A]">No conversations yet 🌾</h4>
-                <p className="text-xs font-medium text-[#546E7A]">
+                <h4 className="text-sm font-black text-[#123B24]">No conversations yet 🌾</h4>
+                <p className="text-xs font-medium text-[#546E7A] max-w-xs">
                   {activeTab === 'unread'
                     ? 'No unread messages.'
                     : activeTab === 'archived'
@@ -413,15 +407,14 @@ export const Messages: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── CHAT WINDOW PANEL ─── */}
+      {/* ─── RIGHT CHAT WINDOW PANEL ─── */}
       <div
         className={`${
           !activeConversationId ? 'hidden md:flex' : 'flex'
-        } flex-1 flex-col bg-[#F8FAFC] relative h-full overflow-hidden`}
+        } flex-1 flex-col bg-[#F5F7EF]/40 relative h-full overflow-hidden`}
       >
         {activeConversationId && activeConversation ? (
           <>
-            {/* Clean White Chat Header */}
             <ChatHeader
               participant={otherUser}
               isPinned={activeConversation.is_pinned}
@@ -436,18 +429,15 @@ export const Messages: React.FC = () => {
               onUnblockClick={() => setShowUnblockModal(true)}
             />
 
-            {/* Scrollable Messages Area with Light Farming Watermark */}
+            {/* Messages Scroll Area */}
             <div
               ref={messageContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-2 scrollbar-thin scrollbar-thumb-slate-200 relative bg-[#F8FAFC]"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2016a34a' fill-opacity='0.03' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")`,
-              }}
+              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-2 no-scrollbar relative"
             >
               {isLoadingMessages ? (
-                <div className="flex items-center justify-center h-full text-slate-400">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#16A34A]" />
+                <div className="flex items-center justify-center h-full text-[#546E7A]">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#185C2B]" />
                 </div>
               ) : activeMessages.length > 0 ? (
                 activeMessages.map((msg) => (
@@ -463,23 +453,27 @@ export const Messages: React.FC = () => {
                   />
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-6 gap-3">
-                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#16A34A] shadow-sm">
-                    <Sparkles className="w-8 h-8" />
+                <div className="flex flex-col items-center justify-center h-full text-center text-[#546E7A] p-6 gap-3">
+                  <div className="w-14 h-14 rounded-full bg-[#EEF3E8] flex items-center justify-center text-[#185C2B]">
+                    <Sparkles className="w-7 h-7" />
                   </div>
-                  <h3 className="font-bold text-slate-900 text-lg">
+                  <h3 className="font-black text-[#123B24] text-base">
                     Say Hello to {otherUser?.full_name || 'Farmer'}!
                   </h3>
-                  <p className="text-xs text-slate-500 max-w-sm">
+                  <p className="text-xs text-[#546E7A] max-w-sm">
                     Start a conversation to share farming techniques, crop updates, or market inquiries.
                   </p>
                 </div>
               )}
 
-              {/* Typing Indicator */}
+              {/* Bouncing typing indicator */}
               {!isBlocked && activeTypingList.length > 0 && (
-                <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white border border-slate-200 text-xs text-[#16A34A] font-semibold w-fit shadow-sm animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-ping" />
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#EEF3E8] text-xs text-[#185C2B] font-semibold w-fit shadow-farm-sm">
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#185C2B] animate-typing-1" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#185C2B] animate-typing-2" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#185C2B] animate-typing-3" />
+                  </div>
                   <span>{activeTypingList.join(', ')} is typing...</span>
                 </div>
               )}
@@ -487,19 +481,18 @@ export const Messages: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Scroll to Bottom Floating Button */}
+            {/* Floating scroll to bottom */}
             {showScrollBottomBtn && (
               <button
                 onClick={() => scrollToBottom(true)}
-                className="absolute bottom-20 right-6 p-3 rounded-full bg-[#16A34A] text-white shadow-xl hover:bg-[#22C55E] transition-all z-20 animate-bounce"
+                className="absolute bottom-20 right-6 p-3 rounded-full bg-[#185C2B] text-white shadow-farm-lg hover:bg-[#1F7A36] transition-all z-20"
                 title="Scroll to bottom"
-                aria-label="Scroll to bottom"
               >
                 <ChevronDown className="w-5 h-5" />
               </button>
             )}
 
-            {/* Clean Message Input Bar */}
+            {/* Message Input */}
             <MessageInput
               onSendMessage={handleSendMessage}
               replyToMessage={replyToMessage}
@@ -513,60 +506,48 @@ export const Messages: React.FC = () => {
             />
           </>
         ) : (
-          /* ─── EMPTY STATE: NO CONVERSATION SELECTED ─── */
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-            className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500 gap-5 bg-white"
-          >
-            <div className="p-6 rounded-full bg-emerald-50 border border-emerald-200 text-[#16A34A] shadow-md">
-              <MessageSquare className="w-14 h-14" />
+          /* Empty Chat state */
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-[#546E7A] gap-4 bg-white">
+            <div className="p-5 rounded-3xl bg-[#EEF3E8] text-[#185C2B] shadow-farm-sm">
+              <MessageSquare className="w-12 h-12" />
             </div>
-            <div className="space-y-2 max-w-md">
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Start a Conversation</h2>
-              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed font-sans">
-                Search for farmers, agronomists or buyers to begin chatting.
+            <div className="space-y-1 max-w-sm">
+              <h2 className="text-xl font-black text-[#123B24]">Start a Conversation</h2>
+              <p className="text-xs text-[#546E7A] leading-relaxed">
+                Connect directly with fellow growers, agricultural researchers, and buyers across India.
               </p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-50 border border-slate-200 text-xs text-slate-500 font-semibold shadow-sm mt-2">
-              <Lock className="w-3.5 h-3.5 text-[#16A34A]" />
-              <span>Enterprise Standard Direct Messaging</span>
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F5F7EF] border border-[#EEF3E8] text-[11px] text-[#546E7A] font-semibold mt-2">
+              <Lock className="w-3.5 h-3.5 text-[#185C2B]" />
+              <span>Encrypted Direct Messaging</span>
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
 
-      {/* ─── BLOCK CONFIRMATION MODAL ─── */}
+      {/* Block & Lightbox Modals */}
       <AnimatePresence>
         {showBlockModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ scale: 0.9, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 10 }}
-              className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center flex flex-col items-center gap-4 font-sans"
+              className="bg-white border border-[#EEF3E8] rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center flex flex-col items-center gap-4"
             >
-              <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
                 <UserX className="w-6 h-6" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-slate-900">Block User?</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  This user won't be able to message or follow you.
-                </p>
+              <div>
+                <h3 className="text-base font-black text-[#123B24]">Block User?</h3>
+                <p className="text-xs text-[#546E7A] mt-1">This user won't be able to message you.</p>
               </div>
               <div className="flex items-center gap-3 w-full mt-2">
                 <button
                   type="button"
                   onClick={() => setShowBlockModal(false)}
                   disabled={isBlockActionLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-[#F5F7EF] text-xs font-bold text-[#546E7A]"
                 >
                   Cancel
                 </button>
@@ -574,46 +555,38 @@ export const Messages: React.FC = () => {
                   type="button"
                   onClick={handleConfirmBlock}
                   disabled={isBlockActionLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-xs font-bold shadow-md flex items-center justify-center"
                 >
                   {isBlockActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Block'}
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
-      {/* ─── UNBLOCK CONFIRMATION MODAL ─── */}
       <AnimatePresence>
         {showUnblockModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ scale: 0.9, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 10 }}
-              className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center flex flex-col items-center gap-4 font-sans"
+              className="bg-white border border-[#EEF3E8] rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center flex flex-col items-center gap-4"
             >
-              <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#16A34A] shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-green-50 text-[#185C2B] flex items-center justify-center">
                 <UserCheck className="w-6 h-6" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-slate-900">Unblock User?</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  This user will be able to message you again.
-                </p>
+              <div>
+                <h3 className="text-base font-black text-[#123B24]">Unblock User?</h3>
+                <p className="text-xs text-[#546E7A] mt-1">This user will be able to message you again.</p>
               </div>
               <div className="flex items-center gap-3 w-full mt-2">
                 <button
                   type="button"
                   onClick={() => setShowUnblockModal(false)}
                   disabled={isBlockActionLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-[#F5F7EF] text-xs font-bold text-[#546E7A]"
                 >
                   Cancel
                 </button>
@@ -621,17 +594,16 @@ export const Messages: React.FC = () => {
                   type="button"
                   onClick={handleConfirmUnblock}
                   disabled={isBlockActionLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#22C55E] text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2"
+                  className="btn-primary flex-1 py-2.5 text-xs font-bold shadow-md flex items-center justify-center"
                 >
                   {isBlockActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Unblock'}
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
-      {/* ─── FULL-SCREEN IMAGE LIGHTBOX MODAL ─── */}
       <ImageLightbox
         isOpen={isLightboxOpen}
         images={lightboxImages}
@@ -641,6 +613,4 @@ export const Messages: React.FC = () => {
       />
     </div>
   );
-};
-
-export default Messages;
+}

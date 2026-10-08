@@ -1,13 +1,32 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  LayoutDashboard,
+  Microscope,
+  Bot,
+  Users,
+  MessageSquare,
+  UserCircle,
+  Bell,
   LogOut,
   Menu,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
+
+const navItems = [
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, emoji: '🌾' },
+  { path: '/messages', label: 'Direct Messages', icon: MessageSquare, emoji: '💬' },
+  { path: '/scan', label: 'AI Crop Diagnostic', icon: Microscope, emoji: '🔬' },
+  { path: '/chat', label: 'AgriGPT', icon: Bot, emoji: '🤖' },
+  { path: '/community', label: 'Community', icon: Users, emoji: '🌱' },
+  { path: '/profile', label: 'My Profile', icon: UserCircle, emoji: '👤' },
+  { path: '/notifications', label: 'Notifications', icon: Bell, emoji: '🔔' },
+];
 
 export default function MainLayout() {
   const location = useLocation();
@@ -15,71 +34,110 @@ export default function MainLayout() {
   const { user, logout, checkAuth } = useAuthStore();
   const { unreadCount, fetchUnreadCount } = useSocialStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     checkAuth();
     fetchUnreadCount();
   }, []);
 
-  const navItems = [
-    { path: '/dashboard', label: 'Dashboard', emoji: '🌾' },
-    { path: '/messages', label: 'Direct Messages', emoji: '💬' },
-    { path: '/scan', label: 'AI Crop Diagnostic', emoji: '🔬' },
-    { path: '/chat', label: 'AgriGPT Chatbot', emoji: '🤖' },
-    { path: '/community', label: 'Community Feed', emoji: '🌱' },
-    { path: '/profile', label: 'My Profile', emoji: '👤' },
-    { path: '/notifications', label: 'Notifications', emoji: '🔔' },
-  ];
-
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  return (
-    <div className="min-h-screen bg-[#F1F8E9] flex flex-col md:flex-row text-[#1A2E1A]">
+  const avatarSrc =
+    user?.profile_picture ||
+    `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user?.email || 'farmer')}`;
 
-      {/* ─── DESKTOP SIDEBAR ─── */}
-      <aside 
-        className="hidden md:flex flex-col w-72 shrink-0 sticky top-0 h-screen z-20 text-white shadow-[4px_0_24px_rgba(27,94,32,0.18)]"
-        style={{
-          background: 'linear-gradient(180deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%)'
-        }}
+  return (
+    <div className="min-h-screen bg-[#F5F7EF] flex flex-col md:flex-row text-[#1A2E1A] font-sans">
+      {/* ═══════════════════════════════
+          DESKTOP SIDEBAR
+      ═══════════════════════════════ */}
+      <motion.aside
+        animate={{ width: collapsed ? 84 : 270 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="hidden md:flex flex-col shrink-0 sticky top-0 h-screen z-20 overflow-hidden shadow-2xl"
+        style={{ background: 'linear-gradient(180deg, #123B24 0%, #185C2B 100%)' }}
       >
-        {/* Logo Section with Rotating Leaf */}
-        <div className="h-24 flex items-center gap-3 px-6 border-b border-white/10">
-          <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/25 shadow-inner">
-            <span className="text-2xl inline-block animate-spin-slow">🌿</span>
+        {/* Glow ambient */}
+        <div className="absolute top-0 right-0 w-44 h-44 bg-[#6BCB45]/10 rounded-full blur-[60px] pointer-events-none" />
+        <div className="absolute bottom-16 left-0 w-36 h-36 bg-[#F9A825]/10 rounded-full blur-[50px] pointer-events-none" />
+
+        {/* Logo & Collapse Header */}
+        <div
+          className={`h-20 flex items-center border-b border-white/10 relative z-10 ${
+            collapsed ? 'justify-center px-3' : 'gap-3 px-5'
+          }`}
+        >
+          <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shrink-0 shadow-sm">
+            <span className="text-xl">🌱</span>
           </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-1.5">
-              AgriNex <span className="text-[#F9A825] font-extrabold text-sm px-1.5 py-0.5 rounded bg-black/20">PRO</span>
-            </h1>
-            <p className="text-[11px] text-green-100/80 font-medium tracking-wide">Agricultural AI Ecosystem</p>
-          </div>
+
+          {!collapsed && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
+              <h1 className="text-base font-black text-white leading-tight">
+                AgriNex <span className="text-[#6BCB45]">AI</span>
+              </h1>
+              <p className="text-[10px] text-[#A7D96A] font-medium tracking-wide">
+                Intelligence for Every Acre
+              </p>
+            </motion.div>
+          )}
+
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={() => setCollapsed(true)}
+              className="ml-auto w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
+        {/* Expand Trigger when Collapsed */}
+        {collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            className="absolute top-6 right-0 translate-x-1/2 w-6 h-6 bg-[#185C2B] border border-white/30 rounded-full flex items-center justify-center text-white z-30 shadow-md hover:bg-[#1F7A36] transition-colors cursor-pointer"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Navigation Items */}
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        <nav className="flex-1 px-3 py-5 space-y-1.5 overflow-y-auto no-scrollbar relative z-10">
           {navItems.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
+            const Icon = item.icon;
+
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`group flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${
+                title={collapsed ? item.label : undefined}
+                className={`group flex items-center gap-3.5 rounded-2xl text-xs font-bold transition-all duration-200 relative ${
+                  collapsed ? 'justify-center p-3' : 'px-4 py-3'
+                } ${
                   isActive
-                    ? 'bg-white/20 text-white border-l-4 border-[#F9A825] shadow-[0_4px_20px_rgba(0,0,0,0.12)] backdrop-blur-md'
-                    : 'text-green-100 hover:text-white hover:bg-white/10 hover:translate-x-1'
+                    ? 'bg-white/20 text-white border-l-4 border-l-[#F9A825] shadow-glow-gold'
+                    : 'text-white/80 hover:text-white hover:bg-white/10 hover:translate-x-1'
                 }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <span className="text-lg transition-transform group-hover:scale-125">{item.emoji}</span>
-                  <span className="tracking-wide">{item.label}</span>
-                </div>
+                <span className="text-base shrink-0">{item.emoji}</span>
+                {!collapsed && <span className="truncate tracking-wide">{item.label}</span>}
                 {item.path === '/notifications' && unreadCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#F9A825] text-[#1A2E1A] text-[11px] font-black leading-none animate-pulse shadow-sm">
-                    {unreadCount}
+                  <span
+                    className={`text-[9px] font-black rounded-full bg-[#F9A825] text-[#123B24] leading-none ${
+                      collapsed
+                        ? 'absolute top-1 right-1 w-4 h-4 flex items-center justify-center'
+                        : 'ml-auto px-1.5 py-0.5'
+                    }`}
+                  >
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </Link>
@@ -87,75 +145,131 @@ export default function MainLayout() {
           })}
         </nav>
 
-        {/* Bottom Profile / Online Indicator / Logout */}
-        <div className="p-4 border-t border-white/10 bg-black/10 backdrop-blur-sm">
-          <div className="flex items-center gap-3 px-3 py-2 mb-3 rounded-2xl bg-white/10 border border-white/10">
-            <div className="relative">
-              <img
-                src={user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.email || 'farmer'}`}
-                alt="avatar"
-                className="w-10 h-10 rounded-full border-2 border-white/60 object-cover bg-white"
-              />
-              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[#66BB6A] border-2 border-[#1B5E20] rounded-full ring-1 ring-white/50"></span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#66BB6A] animate-ping"></span>
-                <p className="text-[10px] font-bold text-green-200 uppercase tracking-widest leading-none">Online</p>
+        {/* Bottom User Area */}
+        <div className="p-3 border-t border-white/10 relative z-10 space-y-2">
+          {!collapsed ? (
+            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl bg-white/10 border border-white/10">
+              <div className="relative shrink-0">
+                <img
+                  src={avatarSrc}
+                  alt="avatar"
+                  className="w-9 h-9 rounded-full border-2 border-white/40 object-cover bg-white"
+                />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#6BCB45] border-2 border-[#123B24] rounded-full" />
               </div>
-              <h4 className="text-sm font-bold text-white truncate mt-1">{user?.full_name || user?.username || 'Farmer'}</h4>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#6BCB45] animate-ping" />
+                  <p className="text-[9px] font-bold text-[#A7D96A] uppercase tracking-widest leading-none">
+                    Online
+                  </p>
+                </div>
+                <h4 className="text-xs font-bold text-white truncate mt-0.5">
+                  {user?.full_name || user?.username || 'Farmer'}
+                </h4>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex justify-center">
+              <div className="relative">
+                <img
+                  src={avatarSrc}
+                  alt="avatar"
+                  className="w-9 h-9 rounded-full border-2 border-white/40 object-cover bg-white"
+                />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#6BCB45] border-2 border-[#123B24] rounded-full" />
+              </div>
+            </div>
+          )}
+
           <button
+            type="button"
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/40 text-red-100 hover:text-white border border-red-400/30 text-xs font-bold transition-all duration-200"
+            title={collapsed ? 'Sign Out' : undefined}
+            className={`w-full flex items-center gap-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/30 text-red-200 hover:text-white border border-red-400/20 text-xs font-bold transition-all cursor-pointer ${
+              collapsed ? 'justify-center p-3' : 'px-4 py-2.5'
+            }`}
           >
-            <LogOut className="w-4 h-4" />
-            Sign Out
+            <LogOut className="w-4 h-4 shrink-0" />
+            {!collapsed && <span>Sign Out</span>}
           </button>
         </div>
-      </aside>
+      </motion.aside>
 
-      {/* ─── MOBILE HEADER & MOBILE NAV ─── */}
-      <header className="md:hidden h-16 flex items-center justify-between px-6 bg-[#1B5E20] text-white sticky top-0 z-30 shadow-md">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <span className="text-2xl animate-spin-slow">🌿</span>
-          <span className="text-lg font-black tracking-tight text-white">AgriNex <span className="text-[#F9A825]">AI</span></span>
+      {/* ═══════════════════════════════
+          MOBILE TOP HEADER
+      ═══════════════════════════════ */}
+      <header
+        className="md:hidden h-16 flex items-center justify-between px-5 sticky top-0 z-30 shadow-farm-md text-white"
+        style={{ background: 'linear-gradient(90deg, #123B24 0%, #185C2B 100%)' }}
+      >
+        <Link to="/dashboard" className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+            <span className="text-lg">🌱</span>
+          </div>
+          <span className="text-base font-black tracking-tight">
+            AgriNex <span className="text-[#6BCB45]">AI</span>
+          </span>
         </Link>
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 text-white hover:bg-white/10 rounded-xl transition-all"
-        >
-          {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <Link to="/notifications" className="relative p-2">
+              <Bell className="w-5 h-5 text-white/90" />
+              <span className="absolute top-1 right-1 w-4 h-4 bg-[#F9A825] text-[#123B24] text-[9px] font-black rounded-full flex items-center justify-center">
+                {unreadCount}
+              </span>
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-white hover:bg-white/10 rounded-xl transition-all"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </header>
 
-      {/* Mobile Slide-over Drawer */}
+      {/* Mobile Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          >
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute right-0 top-0 bottom-0 w-72 flex flex-col p-6 shadow-2xl text-white"
-              style={{
-                background: 'linear-gradient(180deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%)'
-              }}
+              transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+              className="absolute right-0 top-0 bottom-0 w-72 flex flex-col overflow-hidden shadow-2xl text-white"
+              style={{ background: 'linear-gradient(180deg, #123B24 0%, #185C2B 100%)' }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between pb-6 border-b border-white/15 mb-6">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">🌿</span>
-                  <span className="font-bold text-lg text-white">AgriNex</span>
+              <div className="flex items-center justify-between p-5 border-b border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src={avatarSrc}
+                    alt="avatar"
+                    className="w-9 h-9 rounded-full border-2 border-white/40 object-cover bg-white"
+                  />
+                  <div>
+                    <p className="text-white text-xs font-bold">{user?.full_name || user?.username || 'Farmer'}</p>
+                    <p className="text-[#A7D96A] text-[10px]">AgriNex Member</p>
+                  </div>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white/80 hover:text-white rounded-lg">
-                  <X className="w-6 h-6" />
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 text-white/60 hover:text-white rounded-lg"
+                >
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <nav className="flex-1 space-y-1.5 overflow-y-auto">
+              <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
                 {navItems.map((item) => {
                   const isActive = location.pathname.startsWith(item.path);
                   return (
@@ -163,28 +277,34 @@ export default function MainLayout() {
                       key={item.path}
                       to={item.path}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                      className={`flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                         isActive
-                          ? 'bg-white/25 text-white border-l-4 border-[#F9A825]'
-                          : 'text-green-100 hover:bg-white/10'
+                          ? 'bg-white/20 text-white border-l-4 border-l-[#F9A825]'
+                          : 'text-white/80 hover:bg-white/10'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-xl">{item.emoji}</span>
+                        <span className="text-base">{item.emoji}</span>
                         <span>{item.label}</span>
                       </div>
+                      {item.path === '/notifications' && unreadCount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-[#F9A825] text-[#123B24] text-[10px] font-black">
+                          {unreadCount}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
               </nav>
 
-              <div className="pt-6 border-t border-white/15 mt-auto">
+              <div className="p-4 border-t border-white/10">
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/30 text-white font-bold text-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-red-500/20 hover:bg-red-500/35 text-white font-bold text-xs border border-red-400/20 transition-all cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
-                  Sign Out
+                  <span>Sign Out</span>
                 </button>
               </div>
             </motion.div>
@@ -192,8 +312,41 @@ export default function MainLayout() {
         )}
       </AnimatePresence>
 
-      {/* ─── MAIN CONTENT VIEWPORT WITH ROUTE FADE ANIMATION ─── */}
-      <main className="flex-1 min-w-0 overflow-y-auto relative">
+      {/* ═══════════════════════════════
+          MOBILE BOTTOM BAR
+      ═══════════════════════════════ */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-xl border-t border-[#EEF3E8] shadow-farm-xl">
+        <div className="flex items-center justify-around px-2 py-2">
+          {navItems.slice(0, 5).map((item) => {
+            const isActive = location.pathname.startsWith(item.path);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all ${
+                  isActive ? 'text-[#185C2B]' : 'text-[#546E7A]'
+                }`}
+              >
+                <div
+                  className={`w-7 h-7 flex items-center justify-center rounded-xl transition-all text-sm ${
+                    isActive ? 'bg-[#EEF3E8]' : ''
+                  }`}
+                >
+                  <span>{item.emoji}</span>
+                </div>
+                <span className={`text-[9px] font-bold ${isActive ? 'text-[#185C2B]' : 'text-[#546E7A]'}`}>
+                  {item.label.split(' ')[0]}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════
+          MAIN CONTENT VIEWPORT
+      ═══════════════════════════════ */}
+      <main className="flex-1 min-w-0 overflow-y-auto relative pb-16 md:pb-0">
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0, y: 15 }}

@@ -1,20 +1,19 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, ArrowLeft, ShieldCheck, ArrowRight } from 'lucide-react';
 
 export default function ForgotPassword() {
-  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Email, 2: OTP & New Password, 3: Success
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
   const [localError, setLocalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  
+
   const { forgotPassword, resetPassword, isLoading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
 
@@ -22,26 +21,21 @@ export default function ForgotPassword() {
     e.preventDefault();
     setLocalError(null);
     clearError();
-
     if (!email.trim()) {
       setLocalError('Please enter your email address.');
       return;
     }
-
     try {
       const res = await forgotPassword(email.trim());
       setSuccessMessage(res.message || 'Verification code sent to your email.');
       setStep(2);
-    } catch (err: any) {
-      // Error is stored in AuthStore
-    }
+    } catch (_) {}
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     clearError();
-
     if (!otp.trim()) {
       setLocalError('Please enter the 6-digit verification code.');
       return;
@@ -58,98 +52,85 @@ export default function ForgotPassword() {
       setLocalError('Passwords do not match.');
       return;
     }
-
     try {
-      await resetPassword({
-        email: email.trim(),
-        otp: otp.trim(),
-        new_password: newPassword,
-      });
+      await resetPassword({ email: email.trim(), otp: otp.trim(), new_password: newPassword });
       setStep(3);
-    } catch (err: any) {
-      // Error is stored in AuthStore
-    }
+    } catch (_) {}
   };
 
+  const displayError = localError || error;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans selection:bg-brandLight selection:text-brandDark">
-      
-      {/* ─── LEFT PANEL: CINEMATIC BRANDING ─── */}
-      <div className="hidden lg:flex lg:w-1/2 bg-brandDark text-white p-16 flex-col justify-between relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,217,139,0.18),transparent_55%)]" />
-        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-primary/10 rounded-full blur-[100px]" />
-        
-        {/* Header Logo */}
-        <div className="flex items-center gap-3 relative z-10">
-          <span className="text-3xl">🌱</span>
-          <h2 className="text-xl font-extrabold tracking-tight">AgriNex <span className="text-primary">AI</span></h2>
-        </div>
-
-        {/* Feature Pitch */}
-        <div className="space-y-6 relative z-10 max-w-lg">
-          <span className="bg-primary/20 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-            Secure Recovery
-          </span>
-          <h1 className="text-4xl sm:text-5xl font-black leading-tight tracking-tight">
-            Protect and Recover Your Farm Data
-          </h1>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Verify identity with secure verification keys. Your passwords are encrypted with industrial hashing standards to keep operations and crop intelligence records safe.
-          </p>
-        </div>
-
-        {/* Footer info */}
-        <div className="relative z-10 flex justify-between items-center text-xs text-slate-500">
-          <span>&copy; {new Date().getFullYear()} AgriNex Inc.</span>
-          <span>v2.4.0</span>
-        </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden font-sans"
+    >
+      {/* ─── FULL-SCREEN FARM BACKGROUND ─── */}
+      <div className="absolute inset-0 z-0">
+        <img
+          src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=2000&q=80"
+          alt="Lush agricultural landscape"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#123B24]/90 via-[#185C2B]/85 to-[#123B24]/95 backdrop-blur-[2px]" />
       </div>
 
-      {/* ─── RIGHT PANEL: RECOVERY CARD ─── */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 md:p-20 bg-white">
-        <div className="w-full max-w-md space-y-8">
-          
-          {/* Mobile logo header */}
-          <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
-            <span className="text-3xl">🌱</span>
-            <h1 className="text-xl font-extrabold tracking-tight text-brandDark">AgriNex <span className="text-primary">AI</span></h1>
-          </div>
+      {/* Floating ambient glow */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#6BCB45]/15 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#A7D96A]/15 rounded-full blur-[100px] pointer-events-none" />
 
+      {/* ─── CENTERED GLASS CARD ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 25, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 sm:p-10 shadow-2xl border border-white/60"
+      >
+        <AnimatePresence mode="wait">
+          {/* STEP 1: Request OTP */}
           {step === 1 && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              key="fp_step1"
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
               className="space-y-6"
             >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-extrabold text-brandDark tracking-tight">Reset Password</h2>
-                <p className="text-sm text-textSec font-medium">
-                  Enter your registered email address to receive a secure recovery code.
+              <div className="text-center">
+                <div className="w-14 h-14 mx-auto rounded-3xl bg-gradient-to-br from-[#123B24] to-[#185C2B] flex items-center justify-center text-2xl shadow-farm-md mb-3 border border-white/20">
+                  🔑
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-black text-[#123B24] tracking-tight">
+                  Recover Your AgriNex Account
+                </h1>
+                <p className="text-xs sm:text-sm text-[#546E7A] font-medium mt-1">
+                  Enter your email address to receive a secure recovery code.
                 </p>
               </div>
 
-              {/* Error notifications */}
-              {(localError || error) && (
-                <div className="p-4 rounded-xl bg-rose/5 border border-rose/10 flex items-start gap-3 text-rose text-sm">
-                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Recovery Failed:</span>
-                    <p className="mt-0.5">{localError || error}</p>
-                  </div>
+              {displayError && (
+                <div className="p-4 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-red-700 text-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <p>{displayError}</p>
                 </div>
               )}
 
-              <form onSubmit={handleSendOTP} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Email Address</label>
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                    Email Address
+                  </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="w-5 h-5" />
-                    </div>
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
                     <input
+                      id="fp-email"
                       type="email"
-                      placeholder="name@farm.com"
-                      className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
+                      required
+                      placeholder="farmer@agrinex.ai"
+                      className="agri-input pl-11"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
@@ -157,92 +138,90 @@ export default function ForgotPassword() {
                   </div>
                 </div>
 
-                <button
+                <motion.button
+                  id="fp-send-otp-btn"
                   type="submit"
-                  className="w-full py-4 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md"
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Sending Code...
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Sending Code...</span>
                     </>
                   ) : (
-                    'Send Reset Code'
+                    <>
+                      <span>Send Recovery Code</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
                   )}
-                </button>
+                </motion.button>
               </form>
-
-              <div className="text-center pt-4 border-t border-slate-100">
-                <Link to="/login" className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline">
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to Login
-                </Link>
-              </div>
             </motion.div>
           )}
 
+          {/* STEP 2: Verify OTP + New Password */}
           {step === 2 && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              key="fp_step2"
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
               className="space-y-6"
             >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-extrabold text-brandDark tracking-tight">Enter Verification Code</h2>
-                <p className="text-sm text-textSec font-medium">
-                  We've sent a verification code to <span className="font-bold text-brandDark">{email}</span>.
-                </p>
+              <div className="text-center">
+                <div className="w-14 h-14 mx-auto rounded-3xl bg-gradient-to-br from-[#123B24] to-[#185C2B] flex items-center justify-center text-2xl shadow-farm-md mb-3 border border-white/20">
+                  📧
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-black text-[#123B24] tracking-tight">
+                  Set New Password
+                </h1>
+                {successMessage && (
+                  <p className="text-xs text-[#185C2B] font-bold bg-[#EEF3E8] py-1.5 px-3 rounded-xl mt-2 inline-block">
+                    {successMessage}
+                  </p>
+                )}
               </div>
 
-              {/* Success Alert */}
-              {successMessage && (
-                <div className="p-4 rounded-xl bg-primary/10 border border-primary/25 text-brandDark text-sm flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Code Sent:</span>
-                    <p className="mt-0.5">{successMessage}</p>
-                  </div>
+              {displayError && (
+                <div className="p-4 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-red-700 text-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <p>{displayError}</p>
                 </div>
               )}
 
-              {/* Error notifications */}
-              {(localError || error) && (
-                <div className="p-4 rounded-xl bg-rose/5 border border-rose/10 flex items-start gap-3 text-rose text-sm">
-                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Verification Failed:</span>
-                    <p className="mt-0.5">{localError || error}</p>
-                  </div>
-                </div>
-              )}
-
-              <form onSubmit={handleResetPassword} className="space-y-6">
-                {/* OTP Field */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">6-Digit Code</label>
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="space-y-1.5 text-center">
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                    6-Digit Verification Code
+                  </label>
                   <input
+                    id="fp-otp"
                     type="text"
+                    required
                     maxLength={6}
-                    placeholder="123456"
-                    className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-center text-lg tracking-widest font-bold transition-all"
+                    placeholder="• • • • • •"
+                    className="agri-input text-center text-2xl font-black tracking-[0.3em] py-3"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     disabled={isLoading}
                   />
                 </div>
 
-                {/* New Password Field */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">New Password</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                    New Password
+                  </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-5 h-5" />
-                    </div>
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
                     <input
+                      id="fp-new-password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
+                      required
+                      placeholder="Min 6 characters"
+                      className="agri-input pl-11 pr-12"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       disabled={isLoading}
@@ -250,24 +229,25 @@ export default function ForgotPassword() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#546E7A] hover:text-[#123B24]"
                     >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
-                {/* Confirm Password Field */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Confirm New Password</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                    Confirm New Password
+                  </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-5 h-5" />
-                    </div>
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
                     <input
+                      id="fp-confirm-password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
+                      required
+                      placeholder="Retype password"
+                      className="agri-input pl-11"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       disabled={isLoading}
@@ -275,65 +255,73 @@ export default function ForgotPassword() {
                   </div>
                 </div>
 
-                <button
+                <motion.button
+                  id="fp-reset-submit-btn"
                   type="submit"
-                  className="w-full py-4 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md"
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Updating Password...
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Resetting Password...</span>
                     </>
                   ) : (
-                    'Reset Password'
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Update Password</span>
+                    </>
                   )}
-                </button>
+                </motion.button>
               </form>
-
-              <div className="text-center pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => { setStep(1); clearError(); setLocalError(null); }}
-                  className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Try Different Email
-                </button>
-              </div>
             </motion.div>
           )}
 
+          {/* STEP 3: Success Confirmation */}
           {step === 3 && (
             <motion.div
+              key="fp_step3"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-6"
+              className="text-center py-4 space-y-5"
             >
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle className="w-10 h-10 text-primary" />
+              <div className="w-20 h-20 rounded-full bg-[#EEF3E8] flex items-center justify-center text-4xl mx-auto shadow-farm-md">
+                ✅
               </div>
-
-              <div className="space-y-2">
-                <h2 className="text-3xl font-extrabold text-brandDark tracking-tight">Password Reset</h2>
-                <p className="text-sm text-textSec font-medium">
-                  Your credentials have been securely updated. You can now login with your new password.
-                </p>
-              </div>
-
-              <button
-                type="button"
+              <h2 className="text-2xl font-black text-[#123B24]">
+                Password Reset Successful!
+              </h2>
+              <p className="text-xs sm:text-sm text-[#546E7A] font-medium leading-relaxed">
+                Your credentials have been securely updated. You can now sign in with your new password.
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/login')}
-                className="w-full py-4 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 transition-all cursor-pointer"
+                className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md flex items-center justify-center gap-2"
               >
-                Log In Now
-              </button>
+                <CheckCircle className="w-4 h-4" />
+                <span>Return to Sign In</span>
+              </motion.button>
             </motion.div>
           )}
+        </AnimatePresence>
 
-        </div>
-      </div>
-
-    </div>
+        {/* Footer */}
+        {step !== 3 && (
+          <div className="mt-8 pt-6 border-t border-[#EEF3E8] text-center">
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#546E7A] hover:text-[#185C2B] transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Sign In</span>
+            </Link>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }

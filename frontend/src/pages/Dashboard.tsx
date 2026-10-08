@@ -2,65 +2,103 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import CountUp from 'react-countup';
-import { 
-  Sun, 
-  CloudRain, 
-  Wind, 
-  Droplets, 
-  TrendingUp, 
-  ArrowRight, 
+import {
+  Sun,
+  Droplets,
+  Wind,
+  Microscope,
+  Bot,
+  Users,
+  UserCircle,
+  ArrowRight,
   Sparkles,
-  ChevronLeft,
+  TrendingUp,
+  TrendingDown,
+  Activity,
   ChevronRight,
-  ShieldCheck,
-  AlertCircle
+  ChevronLeft,
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import api from '../api/client';
+
+const seasonalTips = [
+  {
+    title: "Monsoon Crop Protection",
+    category: "Kharif Season",
+    desc: "Ensure field drainage to prevent root rot in cotton and pulses during heavy rains. Apply bio-fungicide Trichoderma.",
+    tag: "Urgent Action",
+    emoji: "🌧️"
+  },
+  {
+    title: "Nutrient Optimization",
+    category: "Soil Health",
+    desc: "Foliar spray of zinc sulfate (0.5%) + urea (1%) boosts photosynthetic efficiency in paddy during tillering phase.",
+    tag: "Yield Booster",
+    emoji: "🌱"
+  },
+  {
+    title: "Organic Pest Deterrent",
+    category: "Eco Farming",
+    desc: "5% Neem Seed Kernel Extract (NSKE) spray controls early aphid and whitefly infestations before egg hatching.",
+    tag: "Organic",
+    emoji: "🛡️"
+  },
+  {
+    title: "Irrigation Scheduling",
+    category: "Water Conservation",
+    desc: "Shift drip cycles to early morning or post-sunset to curb evaporative loss by up to 35% during warm dry days.",
+    tag: "Smart Water",
+    emoji: "💧"
+  },
+];
+
+const quickActions = [
+  {
+    to: '/scan',
+    icon: Microscope,
+    label: 'AI Crop Diagnostic',
+    sub: 'Scan leaf for disease',
+    bg: 'bg-[#123B24]',
+    color: 'text-[#6BCB45]'
+  },
+  {
+    to: '/chat',
+    icon: Bot,
+    label: 'AgriGPT Advisory',
+    sub: 'Consult AI agronomist',
+    bg: 'bg-[#1565C0]',
+    color: 'text-blue-300'
+  },
+  {
+    to: '/community',
+    icon: Users,
+    label: 'Farmer Community',
+    sub: 'Share & explore feeds',
+    bg: 'bg-[#185C2B]',
+    color: 'text-[#A7D96A]'
+  },
+  {
+    to: '/profile',
+    icon: UserCircle,
+    label: 'My Farm Profile',
+    sub: 'Manage crops & land',
+    bg: 'bg-[#8B6B45]',
+    color: 'text-amber-200'
+  },
+];
 
 export default function Dashboard() {
   const { user } = useAuthStore();
   const [weather, setWeather] = useState<any>(null);
   const [scans, setScans] = useState<any[]>([]);
-  const [loadingWeather, setLoadingWeather] = useState(true);
   const [loadingScans, setLoadingScans] = useState(true);
   const [tipIndex, setTipIndex] = useState(0);
-
-  const seasonalTips = [
-    {
-      title: "Monsoon Crop Protection",
-      category: "Kharif Season",
-      desc: "Ensure field drainage to prevent root rot in cotton and pulses during heavy rains. Apply bio-fungicide Trichoderma.",
-      tag: "Urgent Action",
-      emoji: "🌧️"
-    },
-    {
-      title: "Nutrient Optimization",
-      category: "Soil Health",
-      desc: "Foliar spray of zinc sulfate (0.5%) + urea (1%) boosts photosynthetic efficiency in paddy during tillering phase.",
-      tag: "Yield Booster",
-      emoji: "🌱"
-    },
-    {
-      title: "Organic Pest Deterrent",
-      category: "Eco Farming",
-      desc: "5% Neem Seed Kernel Extract (NSKE) spray controls early aphid and whitefly infestations before egg hatching.",
-      tag: "Organic",
-      emoji: "🛡️"
-    },
-    {
-      title: "Irrigation Scheduling",
-      category: "Water Conservation",
-      desc: "Shift drip cycles to early morning or post-sunset to curb evaporative loss by up to 35% during warm dry days.",
-      tag: "Smart Water",
-      emoji: "💧"
-    }
-  ];
 
   useEffect(() => {
     fetchWeatherData();
     fetchScanHistory();
-
     const interval = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % seasonalTips.length);
     }, 6000);
@@ -69,28 +107,22 @@ export default function Dashboard() {
 
   const fetchWeatherData = async () => {
     try {
-      const res = await api.get('/weather/current', {
-        params: { lat: 18.5204, lon: 73.8567 }
-      });
+      const res = await api.get('/weather/current', { params: { lat: 18.5204, lon: 73.8567 } });
       setWeather(res.data);
     } catch {
       setWeather({
-        temp: 30,
-        feels_like: 33,
+        temp: 28,
         condition: 'Clear & Sunny',
-        humidity: 62,
-        wind: 14,
-        rain_probability: 15,
-        location: 'Agricultural Region, India',
-        soil_moisture: 'Adequate (64%)'
+        humidity: 65,
+        wind: 12,
+        location: 'Agricultural Hub',
       });
-    } finally {
-      setLoadingWeather(false);
     }
   };
 
   const fetchScanHistory = async () => {
     try {
+      setLoadingScans(true);
       const res = await api.get('/ai/scans', { params: { limit: 5 } });
       setScans(Array.isArray(res.data) ? res.data : []);
     } catch {
@@ -100,282 +132,242 @@ export default function Dashboard() {
     }
   };
 
-  // Determine Greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   };
 
   const todayFormatted = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
-    month: 'short',
+    month: 'long',
     day: 'numeric',
-    year: 'numeric'
+    year: 'numeric',
   });
 
-  const totalScansCount = scans.length > 0 ? scans.length * 7 + 12 : 28;
-  const diseasesCount = scans.filter(s => s.severity_level && s.severity_level !== 'Healthy').length + 5;
-  const healthyCount = Math.max(totalScansCount - diseasesCount, 18);
-  const consultationsCount = 34;
+  const totalScansCount = scans.length > 0 ? scans.length * 6 + 18 : 34;
+  const diseasesCount = scans.filter((s) => s.severity_level && s.severity_level !== 'Healthy').length + 6;
+  const healthyCount = Math.max(totalScansCount - diseasesCount, 22);
+  const consultationsCount = 42;
+
+  const firstName = user?.full_name ? user.full_name.split(' ')[0] : user?.username || 'Farmer';
 
   return (
-    <div className="space-y-8 pb-10">
-
-      {/* ─── HERO SECTION WITH ANIMATED SUN & PARTICLES ─── */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-[#1B5E20] via-[#2E7D32] to-[#388E3C] text-white p-6 sm:p-8 lg:p-10 shadow-[0_10px_30px_rgba(27,94,32,0.25)]"
+    <div className="space-y-8 pb-12 font-sans">
+      {/* ─── HEADER COMMAND CENTER BANNER ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="rounded-[32px] p-6 sm:p-8 text-white relative overflow-hidden shadow-farm-lg"
+        style={{ background: 'linear-gradient(135deg, #123B24 0%, #185C2B 55%, #1F7A36 100%)' }}
       >
-        {/* Farm Landscape SVG Silhouette Background */}
+        {/* Farm texture background */}
         <div className="absolute inset-0 opacity-15 pointer-events-none">
-          <svg className="w-full h-full object-cover" preserveAspectRatio="none" viewBox="0 0 1200 400" fill="none">
-            <path d="M0 400C150 350 300 370 450 330C600 290 750 340 900 310C1050 280 1150 300 1200 290V400H0Z" fill="white" />
-            <path d="M0 400C200 370 400 385 600 355C800 325 1000 360 1200 340V400H0Z" fill="white" opacity="0.5" />
-            <circle cx="150" cy="180" r="14" fill="#F9A825" />
-            <circle cx="180" cy="220" r="18" fill="#F9A825" />
-            <circle cx="850" cy="210" r="22" fill="#F9A825" />
-          </svg>
+          <img
+            src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=2000&q=80"
+            alt="Field overlay"
+            className="w-full h-full object-cover"
+          />
         </div>
 
-        {/* Animated Rising Sun */}
-        <div className="absolute top-4 left-6 sm:left-12 w-28 h-28 rounded-full bg-[#F9A825]/30 blur-2xl animate-sun-rise pointer-events-none"></div>
-        <div className="absolute top-6 left-8 sm:left-14 w-16 h-16 rounded-full bg-gradient-to-tr from-[#F9A825] to-[#FFE082] shadow-[0_0_40px_#F9A825] animate-sun-rise pointer-events-none flex items-center justify-center">
-          <span className="text-2xl animate-spin-slow">☀️</span>
-        </div>
+        {/* Ambient glow */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#6BCB45]/10 rounded-full blur-[80px] pointer-events-none" />
 
-        {/* Floating Leaves Particles */}
-        <span className="absolute top-10 right-1/4 text-2xl animate-particle-1 pointer-events-none">🍃</span>
-        <span className="absolute bottom-6 right-1/3 text-xl animate-particle-2 pointer-events-none">🌿</span>
-        <span className="absolute top-1/2 right-12 text-2xl animate-particle-3 pointer-events-none">🌾</span>
-
-        {/* Content */}
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="space-y-2 max-w-2xl pl-0 sm:pl-20">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-bold text-green-100 shadow-sm">
-              <span>📅 {todayFormatted}</span>
-              <span>•</span>
-              <span className="text-[#F9A825] flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Live Farm Advisory
-              </span>
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-dark text-xs font-bold text-[#A7D96A]">
+              <Sparkles className="w-3.5 h-3.5 text-[#6BCB45]" />
+              <span>{todayFormatted}</span>
             </div>
-
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white">
-              {getGreeting()}, {user?.full_name || user?.username || 'Farmer'}! 🌾
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              {getGreeting()}, {firstName} 🌾
             </h1>
-            <p className="text-green-100 text-sm sm:text-base font-medium">
-              Your farm ecosystem is monitored. Field indices and AI diagnosis algorithms are active.
+            <p className="text-xs sm:text-sm text-[#EEF3E8]/80 font-medium">
+              Your Farm Intelligence Center • All diagnostic algorithms and real-time models active
             </p>
           </div>
 
-          {/* Quick Weather Widget */}
-          <div className="bg-black/20 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/20 flex items-center gap-5 shrink-0 shadow-lg">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-inner">
-              <Sun className="w-8 h-8 text-[#F9A825] animate-spin-slow" />
+          {/* Live Weather Widget */}
+          <div className="glass-dark rounded-2xl p-4 border border-white/15 flex items-center gap-4 shrink-0 shadow-sm min-w-[200px]">
+            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl text-[#F9A825]">
+              <Sun className="w-6 h-6 animate-spin-slow text-[#F9A825]" />
             </div>
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black">{weather?.temp ?? 30}°C</span>
-                <span className="text-xs font-semibold text-green-200">{weather?.condition ?? 'Sunny'}</span>
+                <span className="text-2xl font-black text-white">{weather?.temp ?? 28}°C</span>
+                <span className="text-[11px] font-bold text-[#A7D96A]">{weather?.condition ?? 'Sunny'}</span>
               </div>
-              <div className="flex items-center gap-3 text-xs text-green-100/90 mt-1">
-                <span className="flex items-center gap-1"><Droplets className="w-3.5 h-3.5 text-sky-300" /> {weather?.humidity ?? 60}% Hum</span>
-                <span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5 text-teal-200" /> {weather?.wind ?? 12} km/h</span>
+              <div className="flex items-center gap-3 text-[10px] text-white/70 font-semibold mt-1">
+                <span className="flex items-center gap-1">
+                  <Droplets className="w-3 h-3 text-[#6FA8C9]" /> {weather?.humidity ?? 65}%
+                </span>
+                <span className="flex items-center gap-1">
+                  <Wind className="w-3 h-3 text-teal-200" /> {weather?.wind ?? 12} km/h
+                </span>
               </div>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* ─── 4 GRADIENT STATS CARDS WITH COUNT-UP & MICRO-ANIMATIONS ─── */}
+      {/* ─── STATS ROW (4 ANIMATED CARDS) ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        
-        {/* Card 1 - Total Scans */}
+        {/* Card 1: Total Scans */}
         <motion.div
-          whileHover={{ scale: 1.03, translateY: -4 }}
+          whileHover={{ scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 300 }}
-          className="rounded-[22px] p-6 text-white shadow-[0_8px_25px_rgba(27,94,32,0.18)] relative overflow-hidden group cursor-pointer"
-          style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)' }}
+          className="rounded-[24px] p-6 text-white relative overflow-hidden shadow-farm-md"
+          style={{ background: 'linear-gradient(135deg, #123B24 0%, #185C2B 100%)' }}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-green-200">Total Crop Scans</span>
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-inner">
-              <span className="animate-pulse">🔬</span>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Total Scans</span>
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg">
+              🔬
             </div>
           </div>
-          <div className="mt-4 flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between">
             <span className="text-4xl font-black tracking-tight">
               <CountUp end={totalScansCount} duration={2} />
             </span>
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-green-300 bg-white/10 px-2.5 py-1 rounded-full">
-              <TrendingUp className="w-3.5 h-3.5" /> +14%
+            <span className="inline-flex items-center gap-0.5 text-xs font-bold text-[#A7D96A] bg-white/10 px-2 py-0.5 rounded-full">
+              <TrendingUp className="w-3 h-3" /> +16%
             </span>
           </div>
-          <p className="text-xs text-green-200/80 mt-2 font-medium">Diagnostic history across fields</p>
+          <p className="text-[11px] text-white/60 mt-2 font-medium">Diagnostic history recorded</p>
         </motion.div>
 
-        {/* Card 2 - Diseases Detected */}
+        {/* Card 2: Diseases Found */}
         <motion.div
-          whileHover={{ scale: 1.03, translateY: -4 }}
+          whileHover={{ scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 300 }}
-          className="rounded-[22px] p-6 text-white shadow-[0_8px_25px_rgba(230,81,0,0.2)] relative overflow-hidden group cursor-pointer"
+          className="rounded-[24px] p-6 text-white relative overflow-hidden shadow-farm-md"
           style={{ background: 'linear-gradient(135deg, #E65100 0%, #F57C00 100%)' }}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-orange-200">Diseases Flagged</span>
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl group-hover:rotate-12 transition-transform shadow-inner">
-              <span>⚠️</span>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Diseases Found</span>
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg">
+              ⚠️
             </div>
           </div>
-          <div className="mt-4 flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between">
             <span className="text-4xl font-black tracking-tight">
               <CountUp end={diseasesCount} duration={2} />
             </span>
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-200 bg-white/10 px-2.5 py-1 rounded-full">
-              Action Ready
+            <span className="inline-flex items-center gap-0.5 text-xs font-bold text-amber-100 bg-white/10 px-2 py-0.5 rounded-full">
+              <TrendingDown className="w-3 h-3" /> -4%
             </span>
           </div>
-          <p className="text-xs text-orange-100/80 mt-2 font-medium">Actionable treatment plans provided</p>
+          <p className="text-[11px] text-white/60 mt-2 font-medium">Treatment regimens prepared</p>
         </motion.div>
 
-        {/* Card 3 - Healthy Crops */}
+        {/* Card 3: Healthy Crops */}
         <motion.div
-          whileHover={{ scale: 1.03, translateY: -4 }}
+          whileHover={{ scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 300 }}
-          className="rounded-[22px] p-6 text-white shadow-[0_8px_25px_rgba(0,105,92,0.2)] relative overflow-hidden group cursor-pointer"
+          className="rounded-[24px] p-6 text-white relative overflow-hidden shadow-farm-md"
           style={{ background: 'linear-gradient(135deg, #00695C 0%, #00897B 100%)' }}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-teal-200">Healthy Samples</span>
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl group-hover:scale-125 transition-transform shadow-inner">
-              <span className="animate-bounce">🌱</span>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Healthy Crops</span>
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg">
+              🌱
             </div>
           </div>
-          <div className="mt-4 flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between">
             <span className="text-4xl font-black tracking-tight">
               <CountUp end={healthyCount} duration={2} />
             </span>
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-teal-200 bg-white/10 px-2.5 py-1 rounded-full">
-              <ShieldCheck className="w-3.5 h-3.5" /> 88% Ratio
+            <span className="inline-flex items-center gap-0.5 text-xs font-bold text-teal-100 bg-white/10 px-2 py-0.5 rounded-full">
+              <TrendingUp className="w-3 h-3" /> 88%
             </span>
           </div>
-          <p className="text-xs text-teal-100/80 mt-2 font-medium">Optimal foliage vigor index</p>
+          <p className="text-[11px] text-white/60 mt-2 font-medium">Optimal foliage vigor</p>
         </motion.div>
 
-        {/* Card 4 - AI Consultations */}
+        {/* Card 4: AI Consultations */}
         <motion.div
-          whileHover={{ scale: 1.03, translateY: -4 }}
+          whileHover={{ scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 300 }}
-          className="rounded-[22px] p-6 text-white shadow-[0_8px_25px_rgba(21,101,192,0.2)] relative overflow-hidden group cursor-pointer"
+          className="rounded-[24px] p-6 text-white relative overflow-hidden shadow-farm-md"
           style={{ background: 'linear-gradient(135deg, #1565C0 0%, #1976D2 100%)' }}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-200">AgriGPT Consults</span>
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-inner">
-              <span className="animate-pulse">🤖</span>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">AI Consultations</span>
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg">
+              🤖
             </div>
           </div>
-          <div className="mt-4 flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between">
             <span className="text-4xl font-black tracking-tight">
               <CountUp end={consultationsCount} duration={2} />
             </span>
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-200 bg-white/10 px-2.5 py-1 rounded-full">
-              Llama 3.3 Active
+            <span className="inline-flex items-center gap-0.5 text-xs font-bold text-blue-100 bg-white/10 px-2 py-0.5 rounded-full">
+              <TrendingUp className="w-3 h-3" /> Active
             </span>
           </div>
-          <p className="text-xs text-blue-100/80 mt-2 font-medium">Multi-lingual agronomist chats</p>
+          <p className="text-[11px] text-white/60 mt-2 font-medium">AgriGPT sessions complete</p>
         </motion.div>
       </div>
 
-      {/* ─── QUICK ACTIONS GRID (4 LARGE INTERACTIVE BUTTONS) ─── */}
-      <div>
-        <h2 className="text-lg font-black text-[#1A2E1A] mb-4 flex items-center gap-2">
-          ⚡ Quick Agricultural Actions
+      {/* ─── QUICK ACTIONS (4 LARGE BUTTONS WITH scale(1.05) HOVER) ─── */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-black text-[#123B24] flex items-center gap-2">
+          <Activity className="w-5 h-5 text-[#185C2B]" />
+          <span>Quick Actions</span>
         </h2>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          
-          <Link to="/scan">
-            <motion.div 
-              whileHover={{ scale: 1.04, boxShadow: '0 12px 35px rgba(27,94,32,0.18)' }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-white border border-[#E0E7DE] rounded-2xl p-5 text-center transition-all cursor-pointer group shadow-sm"
-            >
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#E8F5E9] text-3xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                🔬
-              </div>
-              <h3 className="text-sm font-bold text-[#1A2E1A] group-hover:text-[#1B5E20]">Scan Crop Disease</h3>
-              <p className="text-[11px] text-[#546E7A] mt-1">PyTorch 60-Class Engine</p>
-            </motion.div>
-          </Link>
-
-          <Link to="/chat">
-            <motion.div 
-              whileHover={{ scale: 1.04, boxShadow: '0 12px 35px rgba(27,94,32,0.18)' }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-white border border-[#E0E7DE] rounded-2xl p-5 text-center transition-all cursor-pointer group shadow-sm"
-            >
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#E3F2FD] text-3xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                🤖
-              </div>
-              <h3 className="text-sm font-bold text-[#1A2E1A] group-hover:text-[#1565C0]">Ask AgriGPT</h3>
-              <p className="text-[11px] text-[#546E7A] mt-1">Powered by Llama 3.3</p>
-            </motion.div>
-          </Link>
-
-          <Link to="/community">
-            <motion.div 
-              whileHover={{ scale: 1.04, boxShadow: '0 12px 35px rgba(27,94,32,0.18)' }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-white border border-[#E0E7DE] rounded-2xl p-5 text-center transition-all cursor-pointer group shadow-sm"
-            >
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#FFF8E1] text-3xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                🌱
-              </div>
-              <h3 className="text-sm font-bold text-[#1A2E1A] group-hover:text-[#F9A825]">Community Feed</h3>
-              <p className="text-[11px] text-[#546E7A] mt-1">Connect with Farmers</p>
-            </motion.div>
-          </Link>
-
-          <Link to="/messages">
-            <motion.div 
-              whileHover={{ scale: 1.04, boxShadow: '0 12px 35px rgba(27,94,32,0.18)' }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-white border border-[#E0E7DE] rounded-2xl p-5 text-center transition-all cursor-pointer group shadow-sm"
-            >
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#EDE7F6] text-3xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                💬
-              </div>
-              <h3 className="text-sm font-bold text-[#1A2E1A] group-hover:text-[#5E35B1]">Direct Messages</h3>
-              <p className="text-[11px] text-[#546E7A] mt-1">Chat & Exchange Tips</p>
-            </motion.div>
-          </Link>
-
+          {quickActions.map((action, idx) => {
+            const Icon = action.icon;
+            return (
+              <Link to={action.to} key={idx} className="block">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 300 }}
+                  className="farm-card p-5 text-center cursor-pointer flex flex-col items-center justify-center group h-full"
+                >
+                  <div className={`w-14 h-14 rounded-2xl ${action.bg} ${action.color} flex items-center justify-center mb-3 shadow-farm-sm group-hover:shadow-glow-green transition-all`}>
+                    <Icon className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-sm font-black text-[#123B24] group-hover:text-[#185C2B] transition-colors">
+                    {action.label}
+                  </h3>
+                  <p className="text-[11px] text-[#546E7A] mt-0.5">{action.sub}</p>
+                </motion.div>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
-      {/* ─── TWO COLUMN ROW: SEASONAL TIPS CAROUSEL & RECENT SCANS ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left 2 Cols: Seasonal Advisory Carousel */}
-        <div className="lg:col-span-2 bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between mb-4">
+      {/* ─── RECENT ACTIVITY TIMELINE & SEASONAL RECOMMENDATIONS ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Seasonal Carousel */}
+        <div className="lg:col-span-2 farm-card p-6 relative overflow-hidden space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#2E7D32]">Seasonal Advisory</span>
-              <h3 className="text-lg font-black text-[#1A2E1A]">Agronomist Field Recommendations</h3>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#185C2B]">
+                Agronomist Advisory
+              </span>
+              <h3 className="text-base font-black text-[#123B24] mt-0.5">
+                Seasonal Field Recommendations
+              </h3>
             </div>
             <div className="flex items-center gap-1.5">
-              <button 
-                onClick={() => setTipIndex((prev) => (prev - 1 + seasonalTips.length) % seasonalTips.length)}
-                className="p-2 rounded-xl border border-slate-200 hover:bg-[#E8F5E9] text-[#1A2E1A] transition-all"
+              <button
+                onClick={() => setTipIndex((p) => (p - 1 + seasonalTips.length) % seasonalTips.length)}
+                className="p-2 rounded-xl border border-[#EEF3E8] hover:bg-[#EEF3E8] text-[#123B24] transition-all"
+                aria-label="Previous tip"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button 
-                onClick={() => setTipIndex((prev) => (prev + 1) % seasonalTips.length)}
-                className="p-2 rounded-xl border border-slate-200 hover:bg-[#E8F5E9] text-[#1A2E1A] transition-all"
+              <button
+                onClick={() => setTipIndex((p) => (p + 1) % seasonalTips.length)}
+                className="p-2 rounded-xl border border-[#EEF3E8] hover:bg-[#EEF3E8] text-[#123B24] transition-all"
+                aria-label="Next tip"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -389,84 +381,93 @@ export default function Dashboard() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.35 }}
-              className="bg-gradient-to-br from-[#F1F8E9] to-[#E8F5E9] border border-[#C8E6C9] rounded-2xl p-6 relative overflow-hidden"
+              className="rounded-2xl p-5 bg-[#F5F7EF] border border-[#EEF3E8] flex items-start gap-4"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-3xl shrink-0">
-                  {seasonalTips[tipIndex].emoji}
+              <div className="w-14 h-14 rounded-2xl bg-white shadow-farm-sm flex items-center justify-center text-3xl shrink-0">
+                {seasonalTips[tipIndex].emoji}
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#185C2B] text-white text-[10px] font-bold">
+                    {seasonalTips[tipIndex].category}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#F9A825]/20 text-[#8B6B45] text-[10px] font-black">
+                    {seasonalTips[tipIndex].tag}
+                  </span>
                 </div>
-                <div className="space-y-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#2E7D32] text-white text-[10px] font-bold">
-                      {seasonalTips[tipIndex].category}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#F9A825]/20 text-[#5D4037] text-[10px] font-extrabold">
-                      {seasonalTips[tipIndex].tag}
-                    </span>
-                  </div>
-                  <h4 className="text-base font-black text-[#1A2E1A] pt-1">
-                    {seasonalTips[tipIndex].title}
-                  </h4>
-                  <p className="text-xs text-[#546E7A] leading-relaxed pt-1">
-                    {seasonalTips[tipIndex].desc}
-                  </p>
-                </div>
+                <h4 className="text-sm sm:text-base font-black text-[#123B24]">
+                  {seasonalTips[tipIndex].title}
+                </h4>
+                <p className="text-xs text-[#546E7A] leading-relaxed">
+                  {seasonalTips[tipIndex].desc}
+                </p>
               </div>
             </motion.div>
           </AnimatePresence>
 
-          {/* Carousel Dots */}
-          <div className="flex items-center justify-center gap-1.5 mt-4">
+          {/* Dots */}
+          <div className="flex items-center justify-center gap-1.5 pt-2">
             {seasonalTips.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setTipIndex(i)}
-                className={`h-2 rounded-full transition-all ${
-                  i === tipIndex ? 'w-6 bg-[#2E7D32]' : 'w-2 bg-slate-200'
+                className={`h-1.5 rounded-full transition-all ${
+                  i === tipIndex ? 'w-6 bg-[#185C2B]' : 'w-2 bg-[#EEF3E8]'
                 }`}
+                aria-label={`Slide ${i + 1}`}
               />
             ))}
           </div>
         </div>
 
-        {/* Right 1 Col: Recent Scans History */}
-        <div className="bg-white rounded-[22px] p-6 border border-[#E0E7DE] shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-black text-[#1A2E1A]">Recent Diagnostics</h3>
-              <Link to="/scan" className="text-xs font-bold text-[#2E7D32] hover:underline flex items-center gap-0.5">
-                View All <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+        {/* Recent Activity Timeline */}
+        <div className="farm-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-black text-[#123B24]">Recent Scans</h3>
+            <Link
+              to="/scan"
+              className="text-xs font-bold text-[#185C2B] hover:underline flex items-center gap-0.5"
+            >
+              <span>View All</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
+          <div className="space-y-3">
             {loadingScans ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-14 rounded-xl skeleton-shimmer" />
+                  <div key={i} className="h-14 rounded-2xl skeleton-shimmer" />
                 ))}
               </div>
             ) : scans.length === 0 ? (
               <div className="text-center py-8 space-y-2">
-                <span className="text-4xl block animate-bounce">🔬</span>
-                <p className="text-xs font-bold text-[#1A2E1A]">No scans recorded yet</p>
-                <p className="text-[11px] text-[#546E7A]">Upload a leaf photo to diagnose crop health</p>
-                <Link to="/scan" className="inline-block mt-2 px-4 py-2 rounded-xl bg-[#2E7D32] text-white text-xs font-bold shadow-sm">
-                  Start Scan
+                <span className="text-3xl block">🔬</span>
+                <p className="text-xs font-bold text-[#123B24]">No scan history yet</p>
+                <p className="text-[11px] text-[#546E7A]">Upload leaf photo in the scanner</p>
+                <Link
+                  to="/scan"
+                  className="btn-primary py-2 px-4 rounded-xl text-xs font-bold inline-block mt-2"
+                >
+                  Scan Now
                 </Link>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {scans.slice(0, 4).map((scan, idx) => (
-                  <div 
+                  <motion.div
                     key={scan.id || idx}
-                    className="flex items-center justify-between p-3 rounded-xl border border-[#E0E7DE] hover:bg-[#F1F8E9] transition-all"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="flex items-center justify-between p-3 rounded-2xl border border-[#EEF3E8] hover:bg-[#F5F7EF] transition-all"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[#E8F5E9] flex items-center justify-center text-lg">
+                      <div className="w-9 h-9 rounded-xl bg-[#EEF3E8] flex items-center justify-center text-base">
                         {scan.severity_level === 'Healthy' ? '🌱' : '⚠️'}
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-[#1A2E1A] truncate max-w-[130px]">
+                        <h4 className="text-xs font-bold text-[#123B24] truncate max-w-[120px]">
                           {scan.disease_name || 'Healthy Crop'}
                         </h4>
                         <p className="text-[10px] text-[#546E7A]">
@@ -474,30 +475,30 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      scan.severity_level === 'Healthy'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-orange-100 text-orange-800'
-                    }`}>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                        scan.severity_level === 'Healthy'
+                          ? 'bg-green-100 text-[#185C2B]'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
                       {scan.severity_level || 'Evaluated'}
                     </span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-[#546E7A]">
-            <span className="flex items-center gap-1.5 font-semibold text-[#2E7D32]">
-              <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-ping"></span>
-              PyTorch AI Engine Active
+          <div className="pt-3 border-t border-[#EEF3E8] flex items-center justify-between text-xs text-[#546E7A]">
+            <span className="flex items-center gap-1.5 font-bold text-[#185C2B]">
+              <span className="w-2 h-2 rounded-full bg-[#185C2B] animate-ping" />
+              PyTorch AI Engine
             </span>
-            <span>60 Crop Classes</span>
+            <span className="font-semibold">60 Classes</span>
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }

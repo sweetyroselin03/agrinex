@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-  User, 
-  Settings, 
-  Lock, 
-  Loader2, 
-  CheckCircle, 
+import {
+  User,
+  Settings,
+  Lock,
+  Loader2,
+  CheckCircle,
   AlertCircle,
   MapPin,
   Sprout,
@@ -24,7 +24,10 @@ import {
   Check,
   Globe,
   BadgeCheck,
-  Save
+  Save,
+  Microscope,
+  Activity,
+  Leaf
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
@@ -41,12 +44,16 @@ export default function Profile() {
   const isOwnProfile = !userId || (currentUser && String(currentUser.id) === String(userId));
   const targetId = isOwnProfile ? currentUser?.id : Number(userId);
 
-  const initialTab = (searchParams.get('tab') as 'posts' | 'overview' | 'settings' | 'security') || 'posts';
-  const [activeTab, setActiveTab] = useState<'posts' | 'overview' | 'settings' | 'security'>(initialTab);
-  const [networkModal, setNetworkModal] = useState<'followers' | 'following' | null>(null);
+  const initialTab =
+    (searchParams.get('tab') as 'posts' | 'farm_profile' | 'disease_reports' | 'activity' | 'settings' | 'security') ||
+    'farm_profile';
+  const [activeTab, setActiveTab] = useState<
+    'posts' | 'farm_profile' | 'disease_reports' | 'activity' | 'settings' | 'security'
+  >(initialTab);
+
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Fetch Target User Profile via React Query
+  // Fetch Target User Profile
   const { data: profileData, isLoading: loadingProfile } = useQuery({
     queryKey: ['user_profile', targetId],
     queryFn: async () => {
@@ -62,7 +69,7 @@ export default function Profile() {
     enabled: Boolean(targetId),
   });
 
-  // Fetch User Posts via React Query
+  // Fetch User Posts
   const { data: userPosts = [], isLoading: loadingPosts } = useQuery({
     queryKey: ['user_posts', targetId],
     queryFn: async () => {
@@ -78,24 +85,33 @@ export default function Profile() {
     enabled: Boolean(targetId),
   });
 
-  // Fetch Network (Followers / Following) when Modal is Open
-  const { data: networkList = [], isLoading: loadingNetwork } = useQuery({
-    queryKey: ['user_network', targetId, networkModal],
+  // Fetch Disease Reports
+  const { data: userScans = [], isLoading: loadingScans } = useQuery({
+    queryKey: ['user_scans_profile', targetId],
     queryFn: async () => {
-      if (!targetId || !networkModal) return [];
       try {
-        const res = await api.get(`/api/users/${targetId}/${networkModal}`);
-        return res.data;
-      } catch (err) {
-        const res = await api.get(`/users/${targetId}/${networkModal}`);
-        return res.data;
+        const res = await api.get('/ai/scans');
+        return Array.isArray(res.data) ? res.data : [];
+      } catch {
+        return [];
       }
     },
-    enabled: Boolean(targetId) && Boolean(networkModal),
+    enabled: Boolean(targetId),
   });
 
+  const profile = profileData || currentUser;
+  const displayName = profile?.display_name || profile?.full_name || 'Farmer';
+  const username = profile?.username || profile?.email?.split('@')[0] || 'farmer';
+  const followersCount = profile?.followers_count ?? 0;
+  const followingCount = profile?.following_count ?? 0;
+  const postsCount = profile?.posts_count ?? userPosts.length ?? 0;
+  const isFollowing = profile?.is_following ?? profile?.isFollowing ?? false;
+  const avatarSrc =
+    profile?.profile_photo ||
+    profile?.profile_picture ||
+    `https://api.dicebear.com/7.x/adventurer/svg?seed=${profile?.email || 'farmer'}`;
+
   // Form states for profile edit
-  const userToUse = isOwnProfile ? currentUser : profileData;
   const [fullName, setFullName] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [phone, setPhone] = useState('');
@@ -109,20 +125,20 @@ export default function Profile() {
   const [website, setWebsite] = useState('');
 
   useEffect(() => {
-    if (userToUse) {
-      setFullName(userToUse.full_name || '');
-      setUsernameInput(userToUse.username || '');
-      setPhone(userToUse.phone || '');
-      setBio(userToUse.bio || '');
-      setVillage(userToUse.village || '');
-      setDistrict(userToUse.district || '');
-      setState(userToUse.state || '');
-      setFarmSize(userToUse.farm_size || '');
-      setExperience(userToUse.experience || '');
-      setCropSpecialization(userToUse.crop_specialization || '');
-      setWebsite(userToUse.website || '');
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setUsernameInput(profile.username || '');
+      setPhone(profile.phone || '');
+      setBio(profile.bio || '');
+      setVillage(profile.village || '');
+      setDistrict(profile.district || '');
+      setState(profile.state || '');
+      setFarmSize(profile.farm_size || '');
+      setExperience(profile.experience || '');
+      setCropSpecialization(profile.crop_specialization || '');
+      setWebsite(profile.website || '');
     }
-  }, [userToUse]);
+  }, [profile]);
 
   // Password reset forms
   const [newPassword, setNewPassword] = useState('');
@@ -142,11 +158,6 @@ export default function Profile() {
     const trimmedFullName = fullName.trim();
     if (!trimmedFullName) {
       setLocalErr('Full name is required.');
-      return;
-    }
-
-    if (bio.trim().length > 250) {
-      setLocalErr('Bio cannot exceed 250 characters.');
       return;
     }
 
@@ -170,20 +181,7 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
       setSuccessMsg('Profile updated successfully');
     } catch (err: any) {
-      const status = err?.response?.status;
-      const detail = err?.response?.data?.detail;
-
-      if (status === 400 || status === 422) {
-        setLocalErr(typeof detail === 'string' ? detail : 'Validation failed. Please check your inputs.');
-      } else if (status === 401) {
-        setLocalErr('Session expired. Please log in again.');
-      } else if (status === 409) {
-        setLocalErr('Username already exists. Please choose a different username.');
-      } else if (status >= 500) {
-        setLocalErr('Server unavailable. Please try again shortly.');
-      } else {
-        setLocalErr(typeof detail === 'string' ? detail : 'Profile update failed. Please check your internet connection.');
-      }
+      setLocalErr(err?.response?.data?.detail || 'Failed to update profile.');
     } finally {
       setIsSubmitting(false);
     }
@@ -199,12 +197,10 @@ export default function Profile() {
       setLocalErr('Password fields cannot be empty.');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setLocalErr('Passwords do not match.');
       return;
     }
-
     if (newPassword.length < 6) {
       setLocalErr('Password must be at least 6 characters long.');
       return;
@@ -228,8 +224,8 @@ export default function Profile() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${displayName} on AgriNex`,
-          text: `Check out ${displayName}'s profile on AgriNex AI platform!`,
+          title: `${displayName} on AgriNex AI`,
+          text: `Check out ${displayName}'s farm profile on AgriNex AI!`,
           url: url,
         });
         return;
@@ -242,48 +238,40 @@ export default function Profile() {
 
   if (loadingProfile && !isOwnProfile) {
     return (
-      <div className="glass-card p-12 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+      <div className="farm-card p-12 text-center text-[#546E7A] text-xs flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-[#185C2B]" />
         <span>Loading farmer profile...</span>
       </div>
     );
   }
 
-  const profile = profileData || currentUser;
-  const displayName = profile?.display_name || profile?.full_name || 'Farmer';
-  const username = profile?.username || profile?.email?.split('@')[0] || 'farmer';
-  const followersCount = profile?.followers_count ?? 0;
-  const followingCount = profile?.following_count ?? 0;
-  const postsCount = profile?.posts_count ?? userPosts.length ?? 0;
-  const isFollowing = profile?.is_following ?? profile?.isFollowing ?? false;
-  const avatarSrc = profile?.profile_photo || profile?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${profile?.email || 'farmer'}`;
-
   return (
-    <div className="space-y-6 font-sans selection:bg-emerald-500/20 selection:text-emerald-400">
-      
-      {/* ─── PROFESSIONAL SOCIAL PROFILE HEADER CARD ─── */}
+    <div className="space-y-6 font-sans">
+      {/* ─── AGRICULTURAL FARMER PROFILE HERO ─── */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-card overflow-hidden p-0 relative border-slate-200 shadow-sm"
+        className="farm-card overflow-hidden p-0 relative shadow-farm-md"
       >
-        
-        {/* Banner Gradient */}
-        <div className="h-44 sm:h-56 w-full relative bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/30 via-emerald-800/60 to-slate-950" />
-          <div className="absolute inset-0 bg-black/20" />
+        {/* Banner with Farm Panorama */}
+        <div className="h-44 sm:h-52 w-full relative overflow-hidden bg-[#123B24]">
+          <img
+            src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=2000&q=80"
+            alt="Farm banner"
+            className="w-full h-full object-cover opacity-35"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#123B24] via-transparent to-transparent" />
         </div>
 
         {/* Profile Card Body */}
         <div className="px-6 pb-6 pt-0 relative">
           <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-4">
-            
-            {/* Avatar Display */}
+            {/* Avatar with green ring */}
             <div className="relative shrink-0">
               <img
                 src={avatarSrc}
                 alt={displayName}
-                className="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-white object-cover bg-white shadow-xl"
+                className="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-white object-cover bg-white shadow-farm-lg ring-4 ring-[#A7D96A]/60"
               />
             </div>
 
@@ -301,7 +289,7 @@ export default function Profile() {
                   <button
                     type="button"
                     onClick={() => navigate(`/messages?userId=${targetId}`)}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-900/20 transition-all active:scale-95"
+                    className="btn-primary py-2.5 px-4 text-xs font-bold rounded-xl flex items-center gap-2"
                   >
                     <MessageSquare className="w-4 h-4" />
                     <span>Message</span>
@@ -313,9 +301,9 @@ export default function Profile() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('settings')}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-800 hover:bg-slate-50 font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95"
+                  className="px-5 py-2.5 rounded-xl border border-[#EEF3E8] bg-[#F5F7EF] text-[#123B24] hover:bg-[#EEF3E8] font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
                 >
-                  <Settings className="w-4 h-4 text-slate-500" />
+                  <Settings className="w-4 h-4 text-[#185C2B]" />
                   <span>Edit Profile</span>
                 </button>
               )}
@@ -323,57 +311,58 @@ export default function Profile() {
               <button
                 type="button"
                 onClick={handleShareProfile}
-                className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95"
+                className="px-4 py-2.5 rounded-xl border border-[#EEF3E8] text-[#546E7A] hover:bg-[#F5F7EF] font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
                 title="Share Profile"
               >
                 {copiedLink ? (
                   <>
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="text-emerald-600">Copied</span>
+                    <Check className="w-4 h-4 text-[#185C2B]" />
+                    <span className="text-[#185C2B]">Copied</span>
                   </>
                 ) : (
                   <>
-                    <Share2 className="w-4 h-4 text-slate-500" />
+                    <Share2 className="w-4 h-4" />
                     <span className="hidden sm:inline">Share</span>
                   </>
                 )}
               </button>
             </div>
-
           </div>
 
           {/* User Bio & Verified Details */}
           <div className="space-y-3">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">{displayName}</h1>
-                <span title="Verified Farmer">
-                  <BadgeCheck className="w-5 h-5 text-emerald-500 shrink-0" />
-                </span>
-                <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  {profile?.crop_specialization || profile?.specialization || 'Agriculture'}
+                <h1 className="text-2xl font-black text-[#123B24] tracking-tight">{displayName}</h1>
+                <BadgeCheck className="w-5 h-5 text-[#185C2B] shrink-0" />
+                <span className="text-xs text-[#185C2B] font-bold bg-[#EEF3E8] px-2.5 py-0.5 rounded-full border border-[#A7D96A]">
+                  {profile?.crop_specialization || 'Progressive Farmer'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">@{username}</p>
+              <p className="text-xs text-[#546E7A] font-medium mt-0.5">@{username}</p>
             </div>
 
             {profile?.bio && (
-              <p className="text-xs text-slate-700 leading-relaxed font-medium max-w-2xl">
+              <p className="text-xs text-[#1A2E1A] leading-relaxed font-medium max-w-2xl">
                 {profile.bio}
               </p>
             )}
 
-            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 font-medium pt-1">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-[#546E7A] font-medium pt-1">
               <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{profile?.village ? `${profile.village}, ${profile.district || ''} ${profile.state || ''}` : 'Local Agricultural Hub'}</span>
+                <MapPin className="w-4 h-4 text-[#185C2B] shrink-0" />
+                <span>
+                  {profile?.village
+                    ? `${profile.village}, ${profile.district || ''} ${profile.state || ''}`
+                    : 'Agricultural Region'}
+                </span>
               </span>
               {profile?.website && (
                 <a
                   href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 text-emerald-600 hover:underline font-semibold"
+                  className="flex items-center gap-1.5 text-[#185C2B] hover:underline font-semibold"
                 >
                   <Globe className="w-4 h-4 shrink-0" />
                   <span className="max-w-xs truncate">{profile.website.replace(/^https?:\/\//, '')}</span>
@@ -381,69 +370,89 @@ export default function Profile() {
               )}
               {profile?.created_at && (
                 <span className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span>Joined {new Date(profile.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span>
+                  <Calendar className="w-4 h-4 text-[#546E7A] shrink-0" />
+                  <span>
+                    Joined{' '}
+                    {new Date(profile.created_at).toLocaleDateString(undefined, {
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
                 </span>
               )}
             </div>
           </div>
 
           {/* Social Stats Counters */}
-          <div className="flex items-center gap-8 border-t border-slate-100 mt-6 pt-4 text-xs">
-            <div className="text-center sm:text-left">
-              <span className="font-extrabold text-slate-900 text-base block leading-none">{postsCount}</span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-1">Posts</span>
+          <div className="flex items-center gap-8 border-t border-[#EEF3E8] mt-6 pt-4 text-xs">
+            <div>
+              <span className="font-black text-[#123B24] text-base block leading-none">{postsCount}</span>
+              <span className="text-[10px] text-[#546E7A] font-bold uppercase tracking-wider block mt-1">Posts</span>
             </div>
-            
-            <button
-              type="button"
-              onClick={() => setNetworkModal('followers')}
-              className="text-center sm:text-left hover:opacity-80 transition-opacity"
-            >
-              <span className="font-extrabold text-slate-900 text-base block leading-none">{followersCount}</span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-1 hover:text-emerald-600">Followers</span>
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => setNetworkModal('following')}
-              className="text-center sm:text-left hover:opacity-80 transition-opacity"
-            >
-              <span className="font-extrabold text-slate-900 text-base block leading-none">{followingCount}</span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-1 hover:text-emerald-600">Following</span>
-            </button>
+            <div>
+              <span className="font-black text-[#123B24] text-base block leading-none">{followersCount}</span>
+              <span className="text-[10px] text-[#546E7A] font-bold uppercase tracking-wider block mt-1">Followers</span>
+            </div>
+            <div>
+              <span className="font-black text-[#123B24] text-base block leading-none">{followingCount}</span>
+              <span className="text-[10px] text-[#546E7A] font-bold uppercase tracking-wider block mt-1">Following</span>
+            </div>
           </div>
-
         </div>
-
       </motion.div>
 
-      {/* ─── TAB NAVIGATION BAR ─── */}
-      <div className="flex items-center border-b border-slate-200 bg-white rounded-2xl p-1 shadow-xs">
+      {/* ─── TAB NAVIGATION BAR: Farm Profile | My Posts | Disease Reports | Activity ─── */}
+      <div className="flex items-center border border-[#EEF3E8] bg-white rounded-2xl p-1 shadow-farm-sm overflow-x-auto no-scrollbar">
         <button
           type="button"
-          onClick={() => setActiveTab('posts')}
-          className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
-            activeTab === 'posts'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+          onClick={() => setActiveTab('farm_profile')}
+          className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all whitespace-nowrap px-4 cursor-pointer ${
+            activeTab === 'farm_profile'
+              ? 'bg-[#123B24] text-white shadow-farm-sm'
+              : 'text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF]'
           }`}
         >
-          <Grid className="w-4 h-4" />
-          <span>Posts ({userPosts.length})</span>
+          <User className="w-4 h-4" />
+          <span>Farm Profile</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab('overview')}
-          className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
-            activeTab === 'overview'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+          onClick={() => setActiveTab('posts')}
+          className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all whitespace-nowrap px-4 cursor-pointer ${
+            activeTab === 'posts'
+              ? 'bg-[#123B24] text-white shadow-farm-sm'
+              : 'text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF]'
           }`}
         >
-          <User className="w-4 h-4" />
-          <span>Farm Details</span>
+          <Grid className="w-4 h-4" />
+          <span>My Posts ({userPosts.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('disease_reports')}
+          className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all whitespace-nowrap px-4 cursor-pointer ${
+            activeTab === 'disease_reports'
+              ? 'bg-[#123B24] text-white shadow-farm-sm'
+              : 'text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF]'
+          }`}
+        >
+          <Microscope className="w-4 h-4" />
+          <span>Disease Reports ({userScans.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('activity')}
+          className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all whitespace-nowrap px-4 cursor-pointer ${
+            activeTab === 'activity'
+              ? 'bg-[#123B24] text-white shadow-farm-sm'
+              : 'text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF]'
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          <span>Community Activity</span>
         </button>
 
         {isOwnProfile && (
@@ -451,23 +460,23 @@ export default function Profile() {
             <button
               type="button"
               onClick={() => setActiveTab('settings')}
-              className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
+              className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all whitespace-nowrap px-4 cursor-pointer ${
                 activeTab === 'settings'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-[#123B24] text-white shadow-farm-sm'
+                  : 'text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF]'
               }`}
             >
               <Settings className="w-4 h-4" />
-              <span>Edit Profile</span>
+              <span>Settings</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('security')}
-              className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
+              className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all whitespace-nowrap px-4 cursor-pointer ${
                 activeTab === 'security'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-[#123B24] text-white shadow-farm-sm'
+                  : 'text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF]'
               }`}
             >
               <Lock className="w-4 h-4" />
@@ -479,8 +488,68 @@ export default function Profile() {
 
       {/* ─── TAB CONTENT PANELS ─── */}
       <AnimatePresence mode="wait">
-        
-        {/* POSTS TAB */}
+        {/* SECTION 1: FARM PROFILE (bio, location, crops) */}
+        {activeTab === 'farm_profile' && (
+          <motion.div
+            key="farm_profile"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-6"
+          >
+            <div className="farm-card p-6 flex gap-4 items-start">
+              <div className="w-12 h-12 rounded-2xl bg-[#EEF3E8] flex items-center justify-center text-[#185C2B] shrink-0 shadow-sm">
+                <MapPin className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-[10px] text-[#546E7A] font-bold uppercase tracking-wider">Region / Village</h4>
+                <p className="text-sm font-black text-[#123B24] mt-1">
+                  {profile?.village
+                    ? `${profile.village}, ${profile.district || ''} ${profile.state || ''}`
+                    : 'Not Specified'}
+                </p>
+              </div>
+            </div>
+
+            <div className="farm-card p-6 flex gap-4 items-start">
+              <div className="w-12 h-12 rounded-2xl bg-[#EEF3E8] flex items-center justify-center text-[#185C2B] shrink-0 shadow-sm">
+                <Sprout className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-[10px] text-[#546E7A] font-bold uppercase tracking-wider">Crops Grown</h4>
+                <p className="text-sm font-black text-[#123B24] mt-1">
+                  {profile?.crop_specialization || 'Not Specified'}
+                </p>
+              </div>
+            </div>
+
+            <div className="farm-card p-6 flex gap-4 items-start">
+              <div className="w-12 h-12 rounded-2xl bg-[#EEF3E8] flex items-center justify-center text-[#8B6B45] shrink-0 shadow-sm">
+                <Compass className="w-6 h-6 text-[#8B6B45]" />
+              </div>
+              <div>
+                <h4 className="text-[10px] text-[#546E7A] font-bold uppercase tracking-wider">Farm Land Area</h4>
+                <p className="text-sm font-black text-[#123B24] mt-1">
+                  {profile?.farm_size ? `${profile.farm_size} Acres` : 'Not Specified'}
+                </p>
+              </div>
+            </div>
+
+            <div className="farm-card p-6 flex gap-4 items-start">
+              <div className="w-12 h-12 rounded-2xl bg-[#EEF3E8] flex items-center justify-center text-[#F9A825] shrink-0 shadow-sm">
+                <Award className="w-6 h-6 text-[#8B6B45]" />
+              </div>
+              <div>
+                <h4 className="text-[10px] text-[#546E7A] font-bold uppercase tracking-wider">Experience Level</h4>
+                <p className="text-sm font-black text-[#123B24] mt-1">
+                  {profile?.experience ? `${profile.experience} Years` : 'Experienced Farmer'}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* SECTION 2: MY POSTS */}
         {activeTab === 'posts' && (
           <motion.div
             key="posts"
@@ -490,46 +559,52 @@ export default function Profile() {
             className="space-y-6"
           >
             {loadingPosts ? (
-              <div className="glass-card p-12 text-center text-slate-500 text-xs flex justify-center items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+              <div className="farm-card p-12 text-center text-xs flex justify-center items-center gap-2 text-[#546E7A]">
+                <Loader2 className="w-4 h-4 animate-spin text-[#185C2B]" />
                 <span>Loading posts...</span>
               </div>
             ) : userPosts.length === 0 ? (
-              <div className="glass-card p-12 text-center text-slate-500 text-xs space-y-2">
-                <Grid className="w-8 h-8 text-slate-300 mx-auto" />
-                <p className="font-bold text-slate-900">No posts published yet</p>
-                <p className="text-slate-400">When {displayName} shares community updates, they will appear here.</p>
+              <div className="farm-card p-12 text-center text-xs space-y-2 text-[#546E7A]">
+                <Grid className="w-8 h-8 text-[#A7D96A] mx-auto" />
+                <p className="font-bold text-[#123B24]">No community posts yet</p>
+                <p>When updates are posted to the community feed, they will appear here.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {userPosts.map((post: any) => (
-                  <div key={post.id} className="glass-card p-5 space-y-3 hover:border-emerald-500/40 transition-all flex flex-col justify-between hover:shadow-md">
+                  <div
+                    key={post.id}
+                    className="farm-card p-5 space-y-3 flex flex-col justify-between"
+                  >
                     <div>
                       {post.image_url && (
-                        <div className="rounded-xl overflow-hidden mb-3 h-44 bg-slate-100">
+                        <div className="rounded-xl overflow-hidden mb-3 h-44 bg-[#F5F7EF]">
                           <img
                             src={post.image_url}
                             alt="Post media"
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover"
                           />
                         </div>
                       )}
-                      <p className="text-xs text-slate-700 font-medium line-clamp-3 leading-relaxed">
+                      <p className="text-xs text-[#1A2E1A] font-medium line-clamp-3 leading-relaxed">
                         {post.content}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-[11px] text-slate-500 font-bold">
-                      <span className="flex items-center gap-1 text-rose-500">
-                        <Heart className="w-3.5 h-3.5 fill-rose-500" />
+                    <div className="flex items-center justify-between pt-3 border-t border-[#EEF3E8] text-[11px] text-[#546E7A] font-bold">
+                      <span className="flex items-center gap-1 text-red-500">
+                        <Heart className="w-3.5 h-3.5 fill-red-500" />
                         <span>{post.likes_count || 0}</span>
                       </span>
-                      <span className="flex items-center gap-1 text-slate-500">
+                      <span className="flex items-center gap-1">
                         <MessageCircle className="w-3.5 h-3.5" />
-                        <span>{post.comments_count || 0} comments</span>
+                        <span>{post.comments_count || 0}</span>
                       </span>
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(post.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      <span>
+                        {new Date(post.created_at).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
                       </span>
                     </div>
                   </div>
@@ -539,246 +614,246 @@ export default function Profile() {
           </motion.div>
         )}
 
-        {/* FARM DETAILS OVERVIEW TAB */}
-        {activeTab === 'overview' && (
+        {/* SECTION 3: DISEASE REPORTS */}
+        {activeTab === 'disease_reports' && (
           <motion.div
-            key="overview"
+            key="disease_reports"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-6"
+            className="space-y-4"
           >
-            <div className="glass-card p-6 flex gap-4 items-start hover:border-emerald-500/30 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 border border-emerald-100">
-                <MapPin className="w-5 h-5 text-emerald-600" />
+            {loadingScans ? (
+              <div className="farm-card p-12 text-center text-xs flex justify-center items-center gap-2 text-[#546E7A]">
+                <Loader2 className="w-4 h-4 animate-spin text-[#185C2B]" />
+                <span>Loading disease diagnostic reports...</span>
               </div>
-              <div>
-                <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-1">Region Location</h4>
-                <span className="text-sm font-bold text-slate-900 mt-1 block">
-                  {profile?.village ? `${profile.village}, ${profile.district || ''} ${profile.state || ''}` : 'Not Specified'}
-                </span>
+            ) : userScans.length === 0 ? (
+              <div className="farm-card p-12 text-center text-xs space-y-2 text-[#546E7A]">
+                <Microscope className="w-8 h-8 text-[#A7D96A] mx-auto" />
+                <p className="font-bold text-[#123B24]">No diagnostic reports recorded</p>
+                <p>Use the AI Crop Diagnostic tool to scan foliage and generate pathology reports.</p>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {userScans.map((scan: any, i: number) => (
+                  <div key={scan.id || i} className="farm-card p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl">
+                        {scan.severity_level === 'Healthy' ? '🌱' : '⚠️'}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          scan.severity_level === 'Healthy'
+                            ? 'bg-green-100 text-[#185C2B]'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {scan.severity_level || 'Evaluated'}
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-black text-[#123B24]">{scan.disease_name}</h4>
+                    <p className="text-xs text-[#546E7A] line-clamp-2">
+                      {scan.symptoms || scan.treatment || 'Pathology evaluation complete.'}
+                    </p>
+                    <div className="pt-2 border-t border-[#EEF3E8] flex justify-between items-center text-[10px] text-[#546E7A]">
+                      <span>{new Date(scan.created_at).toLocaleDateString()}</span>
+                      <span className="font-bold text-[#185C2B]">Confidence: {Math.round(scan.confidence || 92)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
 
-            <div className="glass-card p-6 flex gap-4 items-start hover:border-emerald-500/30 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 border border-emerald-100">
-                <Sprout className="w-5 h-5 text-emerald-600" />
+        {/* SECTION 4: COMMUNITY ACTIVITY */}
+        {activeTab === 'activity' && (
+          <motion.div
+            key="activity"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="farm-card p-6 space-y-4"
+          >
+            <h3 className="text-base font-black text-[#123B24]">Farmer Community Engagement</h3>
+            <div className="divide-y divide-[#EEF3E8]">
+              <div className="py-3 flex items-center justify-between text-xs">
+                <span className="text-[#546E7A]">Total Community Discussions Started</span>
+                <span className="font-black text-[#123B24]">{postsCount}</span>
               </div>
-              <div>
-                <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-1">Crop Specialization</h4>
-                <span className="text-sm font-bold text-slate-900 mt-1 block">
-                  {profile?.crop_specialization || profile?.specialization || 'Not Specified'}
-                </span>
+              <div className="py-3 flex items-center justify-between text-xs">
+                <span className="text-[#546E7A]">Agronomist Followers</span>
+                <span className="font-black text-[#123B24]">{followersCount}</span>
               </div>
-            </div>
-
-            <div className="glass-card p-6 flex gap-4 items-start hover:border-emerald-500/30 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0 border border-amber-100">
-                <Award className="w-5 h-5 text-amber-600" />
+              <div className="py-3 flex items-center justify-between text-xs">
+                <span className="text-[#546E7A]">Farmers Followed</span>
+                <span className="font-black text-[#123B24]">{followingCount}</span>
               </div>
-              <div>
-                <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-1">Farming Experience</h4>
-                <span className="text-sm font-bold text-slate-900 mt-1 block">
-                  {profile?.experience ? `${profile.experience} Years` : 'Not Specified'}
-                </span>
-              </div>
-            </div>
-
-            <div className="glass-card p-6 flex gap-4 items-start hover:border-emerald-500/30 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 border border-blue-100">
-                <Compass className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-1">Farm Land Size</h4>
-                <span className="text-sm font-bold text-slate-900 mt-1 block">
-                  {profile?.farm_size ? `${profile.farm_size} Acres` : 'Not Specified'}
-                </span>
+              <div className="py-3 flex items-center justify-between text-xs">
+                <span className="text-[#546E7A]">Moderation Trust Status</span>
+                <span className="font-black text-[#185C2B]">Verified • Good Standing</span>
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* EDIT PROFILE TAB (TEXT PROFILE INFORMATION ONLY) */}
+        {/* EDIT PROFILE TAB */}
         {activeTab === 'settings' && isOwnProfile && (
           <motion.div
             key="settings"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="glass-card p-6 md:p-8"
+            className="farm-card p-6 md:p-8"
           >
-            <div className="border-b border-slate-100 pb-4 mb-6">
-              <h3 className="font-extrabold text-slate-900 text-lg">Edit Profile Details</h3>
-              <p className="text-xs text-slate-500">Update your public profile, contact info, and agricultural background.</p>
+            <div className="border-b border-[#EEF3E8] pb-4 mb-6">
+              <h3 className="font-black text-[#123B24] text-lg">Edit Farm Profile</h3>
+              <p className="text-xs text-[#546E7A]">Update your public bio, location, and crops grown.</p>
             </div>
 
             {successMsg && (
-              <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 font-bold animate-fade-in">
-                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div className="mb-6 p-4 rounded-2xl bg-green-50 border border-green-200 text-[#185C2B] text-xs flex items-center gap-2 font-bold">
+                <CheckCircle className="w-4 h-4 text-[#185C2B] shrink-0" />
                 <span>{successMsg}</span>
               </div>
             )}
 
             {localErr && (
-              <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 font-bold animate-fade-in">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2 font-bold">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                 <span>{localErr}</span>
               </div>
             )}
-            
+
             <form onSubmit={handleUpdateProfileSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Full Name */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Full Name *</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Full Name *</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                   />
                 </div>
 
-                {/* Username */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Username</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Username</label>
                   <input
                     type="text"
                     placeholder="farmer"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={usernameInput}
                     onChange={(e) => setUsernameInput(e.target.value)}
                   />
                 </div>
 
-                {/* Bio with Character Counter */}
                 <div className="space-y-1.5 md:col-span-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Bio Note</label>
-                    <span className={`text-[10px] font-bold ${bio.length > 250 ? 'text-rose-500' : 'text-slate-400'}`}>
-                      {bio.length} / 250
-                    </span>
-                  </div>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Bio Note</label>
                   <textarea
                     rows={3}
                     maxLength={250}
-                    placeholder="Tell the AgriNex community about your farm and experience..."
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all resize-none font-medium"
+                    placeholder="Describe your farming methods and land..."
+                    className="agri-input text-xs resize-none"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                   />
                 </div>
 
-                {/* Village */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Village / Town</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Village / Town</label>
                   <input
                     type="text"
-                    placeholder="e.g. Baramati"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={village}
                     onChange={(e) => setVillage(e.target.value)}
                   />
                 </div>
 
-                {/* District */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">District</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">District</label>
                   <input
                     type="text"
-                    placeholder="e.g. Pune"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                   />
                 </div>
 
-                {/* State */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">State</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">State</label>
                   <input
                     type="text"
-                    placeholder="e.g. Maharashtra"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={state}
                     onChange={(e) => setState(e.target.value)}
                   />
                 </div>
 
-                {/* Phone */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Phone Number</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Phone</label>
                   <input
                     type="text"
-                    placeholder="+91 98765 43210"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                   />
                 </div>
 
-                {/* Farm Size */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Farm Size (Acres)</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Farm Land Area (Acres)</label>
                   <input
                     type="text"
-                    placeholder="e.g. 5.5"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={farmSize}
                     onChange={(e) => setFarmSize(e.target.value)}
                   />
                 </div>
 
-                {/* Crop Specialization */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Crop Specialization</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Crops Grown</label>
                   <input
                     type="text"
-                    placeholder="e.g. Sugarcane, Wheat, Organic Vegetables"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    placeholder="e.g. Rice, Wheat, Cotton"
+                    className="agri-input text-xs"
                     value={cropSpecialization}
                     onChange={(e) => setCropSpecialization(e.target.value)}
                   />
                 </div>
 
-                {/* Experience */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Experience (Years)</label>
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Experience (Years)</label>
                   <input
                     type="text"
-                    placeholder="e.g. 8"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={experience}
                     onChange={(e) => setExperience(e.target.value)}
                   />
                 </div>
 
-                {/* Website */}
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Website / Social Link</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Website / Social</label>
                   <input
                     type="url"
-                    placeholder="https://myfarm.org"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                    className="agri-input text-xs"
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
                   />
                 </div>
-
               </div>
 
-              <div className="flex justify-end pt-4 border-t border-slate-100">
+              <div className="flex justify-end pt-4 border-t border-[#EEF3E8]">
                 <button
                   type="submit"
                   disabled={authLoading || isSubmitting}
-                  className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white font-extrabold text-xs flex items-center gap-2 shadow-md shadow-emerald-900/20 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
+                  className="btn-primary py-3 px-6 text-xs font-bold rounded-xl"
                 >
                   {authLoading || isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Saving Changes...</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
                     <>
@@ -799,129 +874,65 @@ export default function Profile() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="glass-card p-6 md:p-8 max-w-xl"
+            className="farm-card p-6 md:p-8 max-w-xl"
           >
-            <h3 className="font-extrabold text-slate-900 text-base mb-1">Security Credentials</h3>
-            <p className="text-xs text-slate-500 mb-6">Update your account password to ensure maximum security.</p>
-            
+            <div className="border-b border-[#EEF3E8] pb-4 mb-6">
+              <h3 className="font-black text-[#123B24] text-lg">Change Password</h3>
+              <p className="text-xs text-[#546E7A]">Update your login password securely.</p>
+            </div>
+
+            {successMsg && (
+              <div className="mb-6 p-4 rounded-2xl bg-green-50 border border-green-200 text-[#185C2B] text-xs flex items-center gap-2 font-bold">
+                <CheckCircle className="w-4 h-4 text-[#185C2B] shrink-0" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            {localErr && (
+              <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2 font-bold">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{localErr}</span>
+              </div>
+            )}
+
             <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">New Password</label>
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">New Password</label>
                 <input
                   type="password"
                   required
-                  minLength={6}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                  placeholder="Min 6 characters"
+                  className="agri-input text-xs"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Confirm New Password</label>
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider">Confirm Password</label>
                 <input
                   type="password"
                   required
-                  minLength={6}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 outline-none transition-all font-medium"
+                  placeholder="Retype new password"
+                  className="agri-input text-xs"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
 
-              <div className="pt-4">
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={authLoading || isSubmitting}
-                  className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
+                  className="btn-primary py-3 px-6 text-xs font-bold rounded-xl"
                 >
-                  {authLoading || isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Account Password'}
+                  {authLoading || isSubmitting ? 'Updating...' : 'Update Password'}
                 </button>
               </div>
             </form>
           </motion.div>
         )}
-
       </AnimatePresence>
-
-      {/* ─── FOLLOWERS / FOLLOWING NETWORK LIST MODAL ─── */}
-      <AnimatePresence>
-        {networkModal && (
-          <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
-            onClick={() => setNetworkModal(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 max-h-[80vh] flex flex-col"
-            >
-              <div className="flex justify-between items-center pb-4 border-b border-slate-100 shrink-0">
-                <h3 className="font-extrabold text-slate-900 text-base capitalize flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-600" />
-                  <span>{networkModal} ({networkList.length})</span>
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setNetworkModal(null)}
-                  className="p-1.5 text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-all"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto divide-y divide-slate-50 py-2">
-                {loadingNetwork ? (
-                  <div className="py-8 text-center text-slate-500 text-xs flex justify-center items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                    <span>Loading network members...</span>
-                  </div>
-                ) : networkList.length === 0 ? (
-                  <div className="py-8 text-center text-slate-500 text-xs">
-                    No {networkModal} yet.
-                  </div>
-                ) : (
-                  networkList.map((netUser: any) => (
-                    <div key={netUser.id} className="py-3 flex items-center justify-between gap-3">
-                      <Link
-                        to={`/profile/${netUser.id}`}
-                        onClick={() => setNetworkModal(null)}
-                        className="flex items-center gap-3 min-w-0 group flex-1"
-                      >
-                        <img
-                          src={netUser.profile_photo || netUser.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${netUser.email}`}
-                          alt="avatar"
-                          className="w-10 h-10 rounded-full border border-slate-200 object-cover bg-white shrink-0 group-hover:ring-2 group-hover:ring-emerald-500 transition-all"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-extrabold text-xs text-slate-900 truncate group-hover:text-emerald-600 transition-colors">
-                            {netUser.display_name || netUser.full_name || 'Farmer'}
-                          </h4>
-                          <p className="text-[10px] text-slate-400 truncate">{netUser.village || 'Agricultural Hub'}</p>
-                        </div>
-                      </Link>
-
-                      {currentUser && currentUser.id !== netUser.id && (
-                        <FollowButton
-                          userId={netUser.id}
-                          userName={netUser.display_name || netUser.full_name}
-                          initialIsFollowing={netUser.is_following || netUser.isFollowing}
-                          initialFollowersCount={netUser.followers_count || netUser.followers || 0}
-                          size="sm"
-                          className="shrink-0"
-                        />
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
     </div>
   );
 }

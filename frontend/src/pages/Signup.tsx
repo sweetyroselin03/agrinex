@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Sparkles } from 'lucide-react';
+import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, ShieldCheck, ArrowRight } from 'lucide-react';
+
+const steps = [
+  { num: 1, label: 'Details' },
+  { num: 2, label: 'Verify OTP' },
+  { num: 3, label: 'Password' },
+];
 
 export default function Signup() {
   const [step, setStep] = useState(1);
@@ -14,388 +20,393 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [devOtp, setDevOtp] = useState<string | null>(null);
-  
   const [localError, setLocalError] = useState<string | null>(null);
-  const navigate = useNavigate();
 
-  const { 
-    checkAccount, 
-    sendOTP, 
-    verifyOTP, 
-    register, 
-    setPassword: setStorePassword, 
-    isLoading, 
-    error, 
-    clearError 
-  } = useAuthStore();
+  const navigate = useNavigate();
+  const { checkAccount, sendOTP, verifyOTP, register, setPassword: setStorePassword, isLoading, error, clearError } = useAuthStore();
 
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     clearError();
-
     if (!fullName.trim() || !email.trim() || !phone.trim()) {
       setLocalError('All fields are required.');
       return;
     }
-
     try {
-      // 1. Verify if account exists
       const checkRes = await checkAccount(email.trim());
       if (checkRes.exists) {
-        setLocalError(checkRes.message || 'Account already exists. Please login.');
+        setLocalError(checkRes.message || 'An account with this email already exists. Please sign in.');
         return;
       }
-
-      // 2. Send OTP
       const otpRes = await sendOTP(email.trim());
-      if (otpRes.dev_otp) {
-        setDevOtp(otpRes.dev_otp);
-      }
+      if (otpRes.dev_otp) setDevOtp(otpRes.dev_otp);
       setStep(2);
-    } catch (err) {}
+    } catch (_) {}
   };
 
   const handleStep2Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     clearError();
-
     if (!otp.trim()) {
-      setLocalError('Please enter the verification code.');
+      setLocalError('Please enter the 6-digit verification code.');
       return;
     }
-
     try {
       await verifyOTP(email.trim(), otp.trim());
       setStep(3);
-    } catch (err) {}
+    } catch (_) {}
   };
 
   const handleStep3Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     clearError();
-
     if (!password || !confirmPassword) {
-      setLocalError('Please fill in password fields.');
+      setLocalError('Please fill in both password fields.');
       return;
     }
-
     if (password !== confirmPassword) {
       setLocalError('Passwords do not match.');
       return;
     }
-
     if (password.length < 6) {
       setLocalError('Password must be at least 6 characters long.');
       return;
     }
-
     try {
-      // 1. Complete DB user creation
-      await register({
-        full_name: fullName.trim(),
-        email: email.trim(),
-        phone: phone.trim()
-      });
-
-      // 2. Set password & receive token
+      await register({ full_name: fullName.trim(), email: email.trim(), phone: phone.trim() });
       await setStorePassword(email.trim(), password);
       navigate('/dashboard');
-    } catch (err) {}
+    } catch (_) {}
   };
 
-  const stepsList = [
-    { num: 1, label: 'Details' },
-    { num: 2, label: 'Verification' },
-    { num: 3, label: 'Security' }
-  ];
+  const displayError = localError || error;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans selection:bg-brandLight selection:text-brandDark">
-      
-      {/* LEFT COLUMN: BRANDING */}
-      <div className="hidden lg:flex lg:w-1/2 bg-brandDark text-white p-16 flex-col justify-between relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,217,139,0.18),transparent_55%)]" />
-        
-        <div className="flex items-center gap-3 relative z-10">
-          <span className="text-3xl">🌱</span>
-          <h2 className="text-xl font-extrabold tracking-tight">AgriNex <span className="text-primary">AI</span></h2>
-        </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden font-sans"
+    >
+      {/* ─── FULL-SCREEN FARM BACKGROUND ─── */}
+      <div className="absolute inset-0 z-0">
+        <img
+          src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=2000&q=80"
+          alt="Lush agricultural landscape"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#123B24]/90 via-[#185C2B]/85 to-[#123B24]/95 backdrop-blur-[2px]" />
+      </div>
 
-        <div className="space-y-6 relative z-10 max-w-lg">
-          <span className="bg-primary/20 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-            Join the Network
-          </span>
-          <h1 className="text-4xl sm:text-5xl font-black leading-tight tracking-tight">
-            Smart Farming Made Exceptionally Simple
+      {/* Floating ambient glow */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#6BCB45]/15 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#A7D96A]/15 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* ─── CENTERED GLASS CARD ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 25, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 sm:p-10 shadow-2xl border border-white/60"
+      >
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 mx-auto rounded-3xl bg-gradient-to-br from-[#123B24] to-[#185C2B] flex items-center justify-center text-2xl shadow-farm-md mb-3 border border-white/20">
+            🌱
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-[#123B24] tracking-tight">
+            Start Growing Smarter
           </h1>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Create an account to join over 10,000 farmers diagnostic scan logs, chat archives, and localized crop forums.
+          <p className="text-xs sm:text-sm text-[#546E7A] font-medium mt-1">
+            Create your AgriNex account.
           </p>
         </div>
 
-        <div className="relative z-10 text-xs text-slate-500">
-          &copy; {new Date().getFullYear()} AgriNex Inc.
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN: MULTI-STEP CARD */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 md:p-20 bg-white">
-        <div className="w-full max-w-md space-y-8">
-          
-          {/* Step indicators */}
-          <div className="flex items-center justify-between pb-6 border-b border-slate-100">
-            {stepsList.map((s, idx) => (
-              <div key={s.num} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+        {/* Step Indicator */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {steps.map((s, idx) => (
+            <div key={s.num} className="flex items-center gap-2">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${
                   step === s.num
-                    ? 'bg-primary text-brandDark shadow-[0_0_15px_rgba(0,217,139,0.3)]'
+                    ? 'bg-[#185C2B] text-white shadow-farm-sm'
                     : step > s.num
-                    ? 'bg-brandDark text-white'
-                    : 'bg-slate-100 text-slate-400'
-                }`}>
-                  {step > s.num ? '✓' : s.num}
-                </div>
-                <span className={`text-xs font-bold tracking-wide hidden sm:block ${
-                  step === s.num ? 'text-brandDark' : 'text-slate-400'
-                }`}>
-                  {s.label}
-                </span>
-                {idx < stepsList.length - 1 && (
-                  <div className="w-8 h-0.5 bg-slate-100 hidden sm:block" />
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-2xl font-extrabold text-brandDark tracking-tight">
-              {step === 1 && 'Create Your Account'}
-              {step === 2 && 'Verify Your Email'}
-              {step === 3 && 'Choose a Password'}
-            </h2>
-            <p className="text-sm text-textSec font-medium">
-              {step === 1 && 'Enter details to verify and register your farm.'}
-              {step === 2 && `We sent a 6-digit OTP code to ${email}.`}
-              {step === 3 && 'Choose a secure password to complete signup.'}
-            </p>
-          </div>
-
-          {/* Dev OTP Helper */}
-          {step === 2 && devOtp && (
-            <div className="p-4 rounded-xl bg-brandLight border border-primary/20 text-brandDark text-xs flex items-center gap-3">
-              <Sparkles className="w-5 h-5 text-primary shrink-0 animate-pulse" />
-              <div>
-                <span className="font-bold">Dev Sandbox Notice:</span>
-                <p className="mt-0.5">Use OTP code <strong className="text-md underline font-black">{devOtp}</strong> to verify this test account.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Errors display */}
-          {(localError || error) && (
-            <div className="p-4 rounded-xl bg-rose/5 border border-rose/10 flex items-start gap-3 text-rose text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold">Error:</span>
-                <p className="mt-0.5">{localError || error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Multi-step Forms Wrapper */}
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.form
-                key="step-1"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleStep1Submit}
-                className="space-y-5"
+                    ? 'bg-[#EEF3E8] text-[#185C2B]'
+                    : 'bg-[#EEF3E8] text-[#546E7A]'
+                }`}
               >
-                {/* Full Name */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Full Name</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Jane Doe"
-                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                    />
-                  </div>
-                </div>
+                {step > s.num ? '✓' : s.num}
+              </div>
+              <span className={`text-[11px] font-bold ${step === s.num ? 'text-[#123B24]' : 'text-[#546E7A]'}`}>
+                {s.label}
+              </span>
+              {idx < steps.length - 1 && <span className="text-[#546E7A]/40 text-xs">›</span>}
+            </div>
+          ))}
+        </div>
 
-                {/* Email Address */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Email Address</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="w-5 h-5" />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      placeholder="jane@example.com"
-                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                </div>
+        {/* Dev OTP Box */}
+        {step === 2 && devOtp && (
+          <div className="mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs text-center font-bold">
+            <span>Dev OTP Code: <strong className="text-base tracking-widest">{devOtp}</strong></span>
+          </div>
+        )}
 
-                {/* Mobile Phone */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Mobile Number</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Phone className="w-5 h-5" />
-                    </div>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="+919876543210"
-                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </div>
-                </div>
+        {/* Error notification */}
+        {displayError && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-5 p-4 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 text-xs"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+            <p className="flex-1">{displayError}</p>
+          </motion.div>
+        )}
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Send Verification OTP'}
-                </button>
-              </motion.form>
-            )}
-
-            {step === 2 && (
-              <motion.form
-                key="step-2"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleStep2Submit}
-                className="space-y-5"
-              >
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Verification OTP Code</label>
+        {/* Form Steps */}
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.form
+              key="step1"
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
+              onSubmit={handleStep1Submit}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
                   <input
+                    id="signup-fullname"
                     type="text"
                     required
-                    placeholder="Enter 6-digit code"
-                    maxLength={6}
-                    className="w-full py-4 px-4 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark outline-none text-center text-xl font-bold tracking-[0.25em] transition-all"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                    className="agri-input pl-11"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
+              </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-primary text-brandDark font-extrabold text-sm hover:shadow-lg hover:shadow-primary/25 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify & Continue'}
-                </button>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
+                  <input
+                    id="signup-email"
+                    type="email"
+                    required
+                    placeholder="farmer@agrinex.ai"
+                    className="agri-input pl-11"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="w-full text-center text-xs font-bold text-slate-400 hover:text-brandDark"
-                >
-                  Change Email or details
-                </button>
-              </motion.form>
-            )}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                  Mobile Number
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
+                  <input
+                    id="signup-phone"
+                    type="tel"
+                    required
+                    placeholder="+91 98765 43210"
+                    className="agri-input pl-11"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
 
-            {step === 3 && (
-              <motion.form
-                key="step-3"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleStep3Submit}
-                className="space-y-5"
+              <motion.button
+                id="signup-step1-submit"
+                type="submit"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md mt-2"
+                disabled={isLoading}
               >
-                {/* Password */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Password</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-5 h-5" />
-                    </div>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Min 6 characters"
-                      className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Sending Verification Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Continue to Verification</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </motion.button>
+            </motion.form>
+          )}
 
-                {/* Confirm Password */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-brandDark uppercase tracking-wider block">Confirm Password</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-5 h-5" />
-                    </div>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Retype password"
-                      className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 text-brandDark placeholder-slate-400 outline-none text-sm transition-all"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-brandDark text-white font-extrabold text-sm hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2 transition-all cursor-pointer animate-pulse"
+          {step === 2 && (
+            <motion.form
+              key="step2"
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
+              onSubmit={handleStep2Submit}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5 text-center">
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                  Enter 6-Digit OTP Sent to {email}
+                </label>
+                <input
+                  id="signup-otp"
+                  type="text"
+                  required
+                  maxLength={6}
+                  placeholder="• • • • • •"
+                  className="agri-input text-center text-2xl font-black tracking-[0.3em] py-3.5"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
                   disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Complete Registration'}
-                </button>
-              </motion.form>
-            )}
-          </AnimatePresence>
+                />
+              </div>
 
-          {/* Redirect to Sign In */}
-          <div className="text-center pt-4 border-t border-slate-100">
-            <p className="text-sm text-textSec font-medium">
-              Already have an account?{' '}
-              <Link to="/login" className="font-bold text-primary hover:underline">
-                Sign In
-              </Link>
-            </p>
-          </div>
+              <motion.button
+                id="signup-step2-submit"
+                type="submit"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Verifying Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Verify & Continue</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </motion.button>
 
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="w-full text-center text-xs font-bold text-[#546E7A] hover:text-[#185C2B] transition-colors"
+              >
+                ← Change email or details
+              </button>
+            </motion.form>
+          )}
+
+          {step === 3 && (
+            <motion.form
+              key="step3"
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
+              onSubmit={handleStep3Submit}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                  Create Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
+                  <input
+                    id="signup-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Min 6 characters"
+                    className="agri-input pl-11 pr-12"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#546E7A] hover:text-[#123B24]"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#546E7A]" />
+                  <input
+                    id="signup-confirm-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Retype password"
+                    className="agri-input pl-11"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <motion.button
+                id="signup-step3-submit"
+                type="submit"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating AgriNex Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Complete Registration</span>
+                  </>
+                )}
+              </motion.button>
+            </motion.form>
+          )}
+        </AnimatePresence>
+
+        {/* Footer */}
+        <div className="mt-8 pt-6 border-t border-[#EEF3E8] text-center">
+          <p className="text-xs text-[#546E7A] font-medium">
+            Already have an account?{' '}
+            <Link
+              to="/login"
+              className="font-black text-[#185C2B] hover:text-[#123B24] hover:underline transition-colors"
+            >
+              Sign In
+            </Link>
+          </p>
         </div>
-      </div>
-
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
