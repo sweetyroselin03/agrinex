@@ -2,16 +2,16 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { Lock, Mail, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, ArrowRight, Sprout, Sparkles, Microscope, Cpu, Users } from 'lucide-react';
 
-const LOGIN_TIMEOUT_MS = 15000; // 15 seconds
+const LOGIN_TIMEOUT_MS = 15000; // 15s timeout protection
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [localLoading, setLocalLoading] = useState(false); // Own loading state — never stuck
+  const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -20,7 +20,7 @@ export default function Login() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (localLoading) return; // Prevent duplicate submissions
+    if (localLoading) return;
 
     setLocalError(null);
     clearError();
@@ -32,242 +32,237 @@ export default function Login() {
 
     setLocalLoading(true);
 
-    // Safety timeout — button NEVER stays disabled forever
     timeoutRef.current = setTimeout(() => {
       setLocalLoading(false);
-      setLocalError('Sign-in is taking too long. Please check your connection and try again.');
+      setLocalError('Sign-in is taking longer than expected. Please check connection.');
     }, LOGIN_TIMEOUT_MS);
 
     try {
       localStorage.setItem('agrinex_remember_me', rememberMe ? 'true' : 'false');
       await login({ email: email.trim(), password });
 
-      // Clear the timeout — we succeeded
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      // Map error codes to user-friendly messages
       const status = err?.response?.status;
       if (!err?.response) {
-        setLocalError('Unable to connect to AgriNex services. Please try again.');
+        setLocalError('Unable to connect to AgriNex services. Please verify your connection.');
       } else if (status === 401 || status === 403 || status === 422) {
         setLocalError('Invalid email or password. Please check your credentials.');
       } else if (status && status >= 500) {
         setLocalError('AgriNex service is temporarily unavailable. Please try again shortly.');
       } else {
-        setLocalError(err?.message || 'Sign-in failed. Please try again.');
+        setLocalError(err?.message || 'Sign-in failed. Please check your inputs.');
       }
     } finally {
-      // Always reset loading — regardless of outcome
       setLocalLoading(false);
     }
   };
 
   const displayError = localError || error;
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.08,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-  };
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-      className="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden font-sans"
-    >
-      {/* ─── FULL-SCREEN FARM BACKGROUND ─── */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=2000&q=80"
-          alt="Lush green field"
-          className="w-full h-full object-cover"
-        />
-        {/* Dark green atmospheric gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#123B24]/90 via-[#185C2B]/85 to-[#123B24]/95 backdrop-blur-[2px]" />
-      </div>
-
-      {/* Floating ambient blur */}
-      <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#6BCB45]/15 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-[#A7D96A]/15 rounded-full blur-[100px] pointer-events-none" />
-
-      {/* ─── CENTERED GLASS CARD ─── */}
-      <motion.div
-        initial={{ opacity: 0, y: 25, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 sm:p-10 shadow-2xl border border-white/60"
-      >
-        {/* Logo & Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-br from-[#123B24] to-[#185C2B] flex items-center justify-center text-3xl shadow-farm-md mb-4 border border-white/20">
-            🌱
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[#123B24] tracking-tight">
-            Welcome Back
-          </h1>
-          <p className="text-xs sm:text-sm text-[#546E7A] font-medium mt-1">
-            Continue your journey toward smarter farming.
-          </p>
-        </div>
-
-        {/* Error notification */}
-        {displayError && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mb-5 p-4 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 text-xs"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-            <div className="flex-1">
-              <span className="font-bold">Authentication error:</span>
-              <p className="mt-0.5 text-red-600">{displayError}</p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Login Form with Staggered Elements */}
-        <motion.form
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          onSubmit={handleLoginSubmit}
-          className="space-y-5"
-        >
-          {/* Email Field */}
-          <motion.div variants={itemVariants} className="space-y-1.5">
-            <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
-              Email Address
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#546E7A]">
-                <Mail className="w-4 h-4" />
-              </div>
-              <input
-                id="login-email"
-                type="email"
-                placeholder="farmer@agrinex.ai"
-                required
-                className="agri-input pl-11"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={localLoading}
-                autoComplete="email"
-              />
-            </div>
-          </motion.div>
-
-          {/* Password Field */}
-          <motion.div variants={itemVariants} className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
-                Password
-              </label>
-              <Link
-                to="/forgot-password"
-                className="text-xs font-bold text-[#185C2B] hover:text-[#123B24] hover:underline transition-colors"
-              >
-                Forgot Password?
-              </Link>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#546E7A]">
-                <Lock className="w-4 h-4" />
-              </div>
-              <input
-                id="login-password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                required
-                className="agri-input pl-11 pr-12"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={localLoading}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#546E7A] hover:text-[#123B24] transition-colors"
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </motion.div>
-
-          {/* Remember Me Checkbox */}
-          <motion.div variants={itemVariants} className="flex items-center gap-2.5">
-            <input
-              id="remember-me"
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded-md border-[#EEF3E8] text-[#185C2B] focus:ring-[#185C2B] cursor-pointer"
+    <div className="min-h-screen w-full bg-[#F5F7EF] flex items-center justify-center p-4 sm:p-6 md:p-10 font-sans">
+      <div className="w-full max-w-5xl farm-card overflow-hidden grid grid-cols-1 lg:grid-cols-12 shadow-2xl min-h-[640px]">
+        {/* ─── LEFT BRAND PANEL (LG: 5 COLS) ─── */}
+        <div className="lg:col-span-5 relative p-8 sm:p-10 text-white flex flex-col justify-between overflow-hidden bg-[#123B24]">
+          {/* Background image & gradient overlay */}
+          <div className="absolute inset-0 z-0">
+            <img
+              src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1200&q=80"
+              alt="Botanical field"
+              className="w-full h-full object-cover opacity-35"
             />
-            <label htmlFor="remember-me" className="text-xs font-semibold text-[#546E7A] cursor-pointer select-none">
-              Remember me
-            </label>
-          </motion.div>
+            <div className="absolute inset-0 bg-gradient-to-b from-[#123B24]/90 via-[#185C2B]/85 to-[#123B24]/95" />
+          </div>
 
-          {/* Sign In Primary Button */}
-          <motion.div variants={itemVariants}>
-            <motion.button
-              id="login-submit"
-              type="submit"
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              className="btn-primary w-full py-4 rounded-2xl text-sm font-black shadow-farm-md"
-              disabled={localLoading}
-            >
-              {localLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </motion.button>
-          </motion.div>
-        </motion.form>
+          <div className="relative z-10 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+                <Sprout className="w-6 h-6 text-[#6BCB45]" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-tight text-white">AgriNex AI</h2>
+                <p className="text-[10px] font-semibold text-[#A7D96A] tracking-wider uppercase">
+                  Agricultural Intelligence
+                </p>
+              </div>
+            </div>
 
-        {/* Card Footer: Create Account Link */}
-        <div className="mt-8 pt-6 border-t border-[#EEF3E8] text-center">
-          <p className="text-xs text-[#546E7A] font-medium">
-            New to AgriNex?{' '}
-            <Link
-              to="/register"
-              className="font-black text-[#185C2B] hover:text-[#123B24] hover:underline transition-colors"
-            >
-              Create Account
-            </Link>
-          </p>
+            <div className="pt-8 space-y-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-[#A7D96A] border border-white/15">
+                <Sparkles className="w-3.5 h-3.5 text-[#6BCB45]" />
+                <span>Next-Gen Smart Farming</span>
+              </span>
+              <h1 className="text-3xl font-black text-white leading-tight">
+                Intelligence for Every Acre.
+              </h1>
+              <p className="text-xs text-white/80 leading-relaxed font-medium">
+                Empowering farmers with PyTorch vision diagnostics, Llama 3 agronomist advisory, and real-time community insights.
+              </p>
+            </div>
+
+            {/* Highlights */}
+            <div className="space-y-3 pt-4">
+              <div className="flex items-center gap-3 text-xs text-white/90 font-semibold">
+                <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                  <Microscope className="w-4 h-4 text-[#6BCB45]" />
+                </div>
+                <span>99%+ Foliage Disease Pattern Accuracy</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-white/90 font-semibold">
+                <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                  <Cpu className="w-4 h-4 text-[#A7D96A]" />
+                </div>
+                <span>AgriGPT 24/7 Soil & Crop Advisory</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-white/90 font-semibold">
+                <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-[#6BCB45]" />
+                </div>
+                <span>Verified Farmer Community Network</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 pt-8 border-t border-white/15">
+            <p className="text-[11px] text-white/70">
+              © {new Date().getFullYear()} AgriNex Platform. All Rights Reserved.
+            </p>
+          </div>
         </div>
 
-        {/* Security badge */}
-        <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-[#546E7A]/80 font-semibold">
-          <ShieldCheck className="w-3.5 h-3.5 text-[#185C2B]" />
-          <span>Encrypted JWT Authentication</span>
+        {/* ─── RIGHT AUTH FORM PANEL (LG: 7 COLS) ─── */}
+        <div className="lg:col-span-7 p-8 sm:p-12 bg-white flex flex-col justify-center">
+          <div className="max-w-md mx-auto w-full space-y-6">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black text-[#123B24] tracking-tight">
+                Welcome Back
+              </h2>
+              <p className="text-xs text-[#5B7065] font-medium mt-1">
+                Enter your credentials to access your farm intelligence hub.
+              </p>
+            </div>
+
+            {/* Error Notification */}
+            {displayError && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 text-xs"
+              >
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="font-bold">Authentication failed:</span>
+                  <p className="mt-0.5 text-red-600 font-medium">{displayError}</p>
+                </div>
+              </motion.div>
+            )}
+
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B7065]" />
+                  <input
+                    id="login-email"
+                    type="email"
+                    placeholder="farmer@agrinex.ai"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={localLoading}
+                    autoComplete="email"
+                    className="agri-input pl-10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-[#123B24] uppercase tracking-wider block">
+                    Password
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-bold text-[#185C2B] hover:underline"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B7065]" />
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={localLoading}
+                    autoComplete="current-password"
+                    className="agri-input pl-10 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5B7065] hover:text-[#123B24]"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 text-xs font-semibold text-[#5B7065] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded border-[#E0E7D8] text-[#185C2B] focus:ring-[#185C2B]"
+                  />
+                  <span>Remember me</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={localLoading}
+                className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold shadow-md cursor-pointer"
+              >
+                {localLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Verifying Credentials...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-[#EEF3E8] text-center space-y-3">
+              <p className="text-xs text-[#5B7065] font-medium">
+                Don't have an account?{' '}
+                <Link to="/register" className="font-bold text-[#185C2B] hover:underline">
+                  Create Account
+                </Link>
+              </p>
+
+              <div className="flex items-center justify-center gap-1.5 text-[10px] text-[#5B7065] font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#185C2B]" />
+                <span>Protected by 256-bit Encrypted Token Authentication</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

@@ -13,24 +13,27 @@ import {
   Share2,
   Bookmark,
   RefreshCw,
-  Loader2
+  Loader2,
+  HelpCircle,
+  Image as ImageIcon
 } from 'lucide-react';
 import api from '../api/client';
 import ImageCropperModal from '../components/ImageCropperModal';
+import PageHeader from '../components/ui/PageHeader';
 
 const tabs = [
   { key: 'symptoms', label: 'Symptoms', icon: '🔍' },
   { key: 'treatment', label: 'Treatment', icon: '💊' },
   { key: 'prevention', label: 'Prevention', icon: '🛡️' },
-  { key: 'organic', label: 'Organic Solution', icon: '🌱' },
+  { key: 'organic', label: 'Organic Remedy', icon: '🌱' },
 ];
 
 const getSeverityBadge = (severity?: string) => {
   const s = (severity || 'Healthy').toLowerCase();
-  if (s.includes('healthy')) return { icon: '🟢', label: 'Healthy Foliage', cls: 'bg-green-100 text-[#185C2B] border-green-200' };
-  if (s.includes('low')) return { icon: '🟡', label: 'Low Severity', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
-  if (s.includes('moderate')) return { icon: '🟠', label: 'Moderate Severity', cls: 'bg-orange-100 text-orange-800 border-orange-200' };
-  return { icon: '🔴', label: 'Severe Infection', cls: 'bg-red-100 text-red-800 border-red-200' };
+  if (s.includes('healthy')) return { label: 'Healthy Foliage', cls: 'bg-green-100 text-[#185C2B] border-green-200' };
+  if (s.includes('low')) return { label: 'Low Severity', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
+  if (s.includes('moderate')) return { label: 'Moderate Severity', cls: 'bg-orange-100 text-orange-800 border-orange-200' };
+  return { label: 'Severe Infection', cls: 'bg-red-100 text-red-800 border-red-200' };
 };
 
 export default function Scanner() {
@@ -127,47 +130,41 @@ export default function Scanner() {
     setShowCropper(false);
   };
 
-  const badge = result ? getSeverityBadge(result.severity_level) : null;
+  // Safe confidence extraction (scale to 0-100)
+  const getRawConfidence = (res: any) => {
+    if (!res || res.confidence === undefined) return 0;
+    const val = Number(res.confidence);
+    return val <= 1 ? Math.round(val * 100) : Math.round(val);
+  };
+
+  const confidencePct = result ? getRawConfidence(result) : 0;
+  const isReliable = confidencePct >= 50; // Critical diagnostic threshold
+
+  const badge = result && isReliable ? getSeverityBadge(result.severity_level) : null;
 
   return (
-    <div className="space-y-8 pb-12 font-sans">
-      {/* ─── HEADER ─── */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="farm-card p-6 sm:p-8 flex items-center justify-between gap-4 relative overflow-hidden"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#EEF3E8] flex items-center justify-center text-3xl shadow-farm-sm">
-            <Microscope className="w-7 h-7 text-[#185C2B]" />
+    <div className="space-y-6 pb-12 font-sans">
+      {/* ─── PAGE HEADER ─── */}
+      <PageHeader
+        title="AI Crop Diagnostic Lab"
+        description="Upload foliage images for real-time PyTorch deep learning pathogen analysis and curative action plans."
+        icon={<Microscope className="w-7 h-7" />}
+        badgeText="PyTorch ML Model Ready"
+        action={
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EEF3E8] border border-[#E0E7D8] text-xs font-bold text-[#185C2B]">
+            <span className="w-2 h-2 rounded-full bg-[#2D6A4F] animate-ping" />
+            <span>Vision Engine Active</span>
           </div>
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-wider text-[#185C2B]">
-              PyTorch Deep Learning Engine
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#123B24] tracking-tight">
-              AI Crop Diagnostic Lab
-            </h1>
-            <p className="text-xs text-[#546E7A] font-medium mt-0.5">
-              Instant pathogen analysis, symptom evaluation & treatment regimens
-            </p>
-          </div>
-        </div>
+        }
+      />
 
-        <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#EEF3E8] border border-[#A7D96A]">
-          <span className="w-2 h-2 rounded-full bg-[#185C2B] animate-ping" />
-          <span className="text-xs font-bold text-[#123B24]">Model Ready</span>
-        </div>
-      </motion.div>
-
-      {/* ─── MAIN DIAGNOSTIC WORKSPACE ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        {/* LEFT: Upload Zone / Preview */}
-        <div className="farm-card p-6 sm:p-8 space-y-6">
+      {/* ─── DIAGNOSTIC WORKSPACE GRID ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 items-start">
+        {/* LEFT PANEL: Upload / Preview */}
+        <div className="farm-card p-6 sm:p-7 space-y-5">
           <h2 className="text-base font-black text-[#123B24] flex items-center gap-2">
-            <Upload className="w-5 h-5 text-[#185C2B]" />
-            <span>Upload Crop Foliage</span>
+            <Upload className="w-4 h-4 text-[#185C2B]" />
+            <span>Upload Leaf / Plant Specimen</span>
           </h2>
 
           {!image ? (
@@ -178,26 +175,25 @@ export default function Scanner() {
               }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
-              className={`p-8 sm:p-12 rounded-[28px] border-2 border-dashed transition-all flex flex-col items-center justify-center text-center space-y-5 cursor-pointer ${
+              className={`p-8 sm:p-12 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center space-y-4 cursor-pointer ${
                 dragOver
                   ? 'border-[#185C2B] bg-[#EEF3E8]'
-                  : 'border-[#A7D96A] bg-[#F5F7EF] hover:bg-[#EEF3E8]/70'
+                  : 'border-[#E0E7D8] bg-[#F5F7EF] hover:bg-[#EEF3E8]/60'
               }`}
             >
-              {/* Circular dashed icon container */}
-              <div className="w-24 h-24 rounded-full border-2 border-dashed border-[#185C2B] bg-white flex items-center justify-center shadow-farm-sm">
-                <Leaf className="w-10 h-10 text-[#185C2B] animate-float-1" />
+              <div className="w-20 h-20 rounded-full border border-[#E0E7D8] bg-white flex items-center justify-center shadow-sm">
+                <Leaf className="w-9 h-9 text-[#185C2B]" />
               </div>
 
               <div>
-                <h3 className="text-base font-black text-[#123B24]">Drop crop image here</h3>
-                <p className="text-xs text-[#546E7A] mt-1">Direct upload • JPG, PNG, WEBP up to 8MB</p>
+                <h3 className="text-base font-black text-[#123B24]">Drag crop image here</h3>
+                <p className="text-xs text-[#5B7065] mt-1 font-medium">Supports JPG, PNG, WEBP up to 8MB</p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs pt-2">
-                <label className="btn-primary flex-1 py-3 text-center cursor-pointer text-xs font-bold rounded-xl shadow-farm-sm">
+                <label className="btn-primary flex-1 py-3 text-center cursor-pointer text-xs font-bold rounded-xl shadow-sm">
                   <Camera className="w-4 h-4" />
-                  <span>📷 Take Photo</span>
+                  <span>Take Photo</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -208,7 +204,7 @@ export default function Scanner() {
                 </label>
                 <label className="btn-outline-green flex-1 py-3 text-center cursor-pointer text-xs font-bold rounded-xl">
                   <Upload className="w-4 h-4" />
-                  <span>🖼️ Choose File</span>
+                  <span>Choose File</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -219,50 +215,37 @@ export default function Scanner() {
               </div>
             </div>
           ) : (
-            <div className="space-y-5">
-              {/* Image Preview Area with Scanning State */}
-              <div className="relative rounded-[24px] overflow-hidden bg-[#123B24] max-h-[380px] flex items-center justify-center border border-[#EEF3E8]">
+            <div className="space-y-4">
+              {/* Image Container — Strict Aspect Ratio Preservation (`object-contain`) */}
+              <div className="relative rounded-2xl overflow-hidden bg-[#123B24] max-h-[360px] flex items-center justify-center border border-[#E0E7D8]">
                 <img
                   src={image}
                   alt="Crop preview"
-                  className="w-full h-full object-contain max-h-[380px]"
+                  className="w-full h-full object-contain max-h-[360px]"
                 />
 
-                {/* Sweeping Green Scan Line Overlay */}
+                {/* Scan animation sweep overlay */}
                 {scanning && (
                   <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-[#123B24]/40 backdrop-blur-[2px]" />
                     <div className="animate-scan-line" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white">
-                      <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-[#6BCB45] animate-spin" />
-                      </div>
+                      <Loader2 className="w-8 h-8 text-[#80B918] animate-spin" />
                       <div className="text-center">
-                        <p className="text-sm font-black">Analyzing your crop...</p>
-                        <p className="text-xs text-[#A7D96A] mt-0.5">Evaluating neural pathology indicators</p>
-                      </div>
-                      <div className="w-48">
-                        <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
-                          <motion.div
-                            animate={{ width: `${scanProgress}%` }}
-                            transition={{ duration: 0.3 }}
-                            className="h-full rounded-full bg-gradient-to-r from-[#6BCB45] to-[#A7D96A]"
-                          />
-                        </div>
-                        <p className="text-xs text-center mt-1 font-bold text-[#A7D96A]">{scanProgress}%</p>
+                        <p className="text-sm font-black">Analyzing foliage pathology...</p>
+                        <p className="text-xs text-[#A7D96A]">Evaluating crop disease vectors</p>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={clearImage}
                   disabled={scanning}
-                  className="px-4 py-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-4 py-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Clear</span>
@@ -271,9 +254,9 @@ export default function Scanner() {
                   type="button"
                   onClick={handleStartScan}
                   disabled={scanning}
-                  className="btn-primary flex-1 py-3 rounded-xl text-xs font-bold disabled:opacity-50"
+                  className="btn-primary flex-1 py-3 rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-[#A7D96A]" />
+                  <Sparkles className="w-4 h-4 text-[#80B918]" />
                   <span>{scanning ? 'Analyzing Crop...' : 'Start AI Diagnosis'}</span>
                 </button>
               </div>
@@ -281,187 +264,205 @@ export default function Scanner() {
           )}
         </div>
 
-        {/* RIGHT: Results Card */}
+        {/* RIGHT PANEL: Results or Safety Warning */}
         <div>
           {!result && !scanning && (
-            <div className="farm-card p-12 text-center space-y-4 py-24 flex flex-col items-center justify-center">
-              <div className="w-16 h-16 rounded-3xl bg-[#EEF3E8] flex items-center justify-center text-3xl shadow-farm-sm">
-                🔬
+            <div className="farm-card p-10 text-center space-y-4 py-24 flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#EEF3E8] flex items-center justify-center text-3xl text-[#185C2B]">
+                <Leaf className="w-8 h-8 text-[#185C2B]" />
               </div>
               <h3 className="text-base font-black text-[#123B24]">Awaiting Foliage Upload</h3>
-              <p className="text-xs text-[#546E7A] max-w-xs leading-relaxed">
-                Take or choose a leaf photo. The PyTorch vision model will detect symptoms, compute confidence, and provide remedy plans.
+              <p className="text-xs text-[#5B7065] max-w-xs leading-relaxed font-medium">
+                Upload or capture a leaf photo. The PyTorch vision model will detect symptoms and compute diagnostic confidence.
               </p>
             </div>
           )}
 
           {scanning && !result && (
-            <div className="farm-card p-12 text-center space-y-4 py-24 flex flex-col items-center justify-center">
-              <div className="w-16 h-16 rounded-3xl bg-[#EEF3E8] flex items-center justify-center animate-spin">
-                <Loader2 className="w-8 h-8 text-[#185C2B]" />
-              </div>
-              <h3 className="text-base font-black text-[#123B24]">Analyzing Pathology Patterns...</h3>
-              <p className="text-xs text-[#546E7A]">Checking 60+ crop disease classes</p>
+            <div className="farm-card p-10 text-center space-y-4 py-24 flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 text-[#185C2B] animate-spin" />
+              <h3 className="text-base font-black text-[#123B24]">Running Pathology Analysis...</h3>
+              <p className="text-xs text-[#5B7065]">Comparing against crop disease classes</p>
             </div>
           )}
 
+          {/* ─── RESULT DISPLAY WITH CONFIDENCE PROTECTION ─── */}
           {result && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
+              initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4 }}
-              className="farm-card p-6 sm:p-8 space-y-6"
+              transition={{ duration: 0.3 }}
+              className="farm-card p-6 sm:p-7 space-y-5"
             >
-              {/* Disease Name & Severity Badge */}
-              <div className="flex flex-wrap items-start justify-between gap-3 pb-5 border-b border-[#EEF3E8]">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-[#185C2B]">
-                    Diagnostic Result
-                  </span>
-                  <h2 className="text-2xl sm:text-3xl font-black text-[#123B24] mt-0.5">
-                    {result.disease_name}
-                  </h2>
-                  <p className="text-xs text-[#546E7A] font-semibold mt-0.5">
-                    Target Crop: {result.crop_type || 'Agricultural Specimen'}
-                  </p>
-                </div>
-                {badge && (
-                  <span className={`px-3.5 py-1.5 rounded-full border font-black text-xs flex items-center gap-1.5 ${badge.cls}`}>
-                    <span>{badge.icon}</span>
-                    <span>{badge.label}</span>
-                  </span>
-                )}
-              </div>
+              {/* UNRELIABLE / LOW CONFIDENCE PROTECTION CARD */}
+              {!isReliable ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-800">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <h3 className="text-base font-black">Unable to Make a Reliable Diagnosis</h3>
+                    </div>
+                    <p className="text-xs text-amber-800/90 leading-relaxed font-medium">
+                      The uploaded image does not provide sufficient neural pattern confidence ({confidencePct}%) for a confirmed disease diagnosis.
+                    </p>
+                    <p className="text-xs text-amber-700 font-semibold italic">
+                      Notice: The specimen may be outside the model's supported crop/disease set (e.g. non-crop flowers like Hibiscus) or the image may be blurry.
+                    </p>
+                  </div>
 
-              {/* Animated Confidence Bar Fill */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-[#546E7A]">Model Confidence</span>
-                  <span className="text-[#185C2B] font-black">
-                    {Math.round(result.confidence || 94)}% Match
-                  </span>
-                </div>
-                <div className="w-full h-3 bg-[#EEF3E8] rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.round(result.confidence || 94)}%` }}
-                    transition={{ duration: 1.2, ease: 'easeOut' }}
-                    className="h-full rounded-full"
-                    style={{ background: 'linear-gradient(90deg, #6BCB45 0%, #185C2B 100%)' }}
-                  />
-                </div>
-              </div>
+                  <div className="space-y-2 pt-2 border-t border-[#EEF3E8]">
+                    <h4 className="text-xs font-bold text-[#123B24]">Suggested Next Actions:</h4>
+                    <ul className="text-xs text-[#5B7065] space-y-1.5 list-disc pl-4 font-medium">
+                      <li>Upload a clearer, close-up photo of the affected crop leaf.</li>
+                      <li>Ensure proper lighting and focus on leaf lesion edges.</li>
+                      <li>Verify the specimen belongs to a supported agricultural crop.</li>
+                    </ul>
+                  </div>
 
-              {/* 4 Tabs: Symptoms | Treatment | Prevention | Organic */}
-              <div>
-                <div className="flex items-center gap-1.5 border-b border-[#EEF3E8] pb-2 overflow-x-auto no-scrollbar">
-                  {tabs.map((tab) => (
+                  <div className="flex flex-wrap gap-2 pt-2">
                     <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                        activeTab === tab.key
-                          ? 'bg-[#123B24] text-white shadow-farm-sm'
-                          : 'text-[#546E7A] hover:bg-[#EEF3E8]'
-                      }`}
+                      onClick={clearImage}
+                      className="btn-primary py-2.5 px-4 text-xs font-bold rounded-xl"
                     >
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Try Another Image</span>
                     </button>
-                  ))}
+                  </div>
                 </div>
+              ) : (
+                /* CONFIRMED HIGH-CONFIDENCE DIAGNOSIS */
+                <div className="space-y-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-[#EEF3E8]">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#185C2B]">
+                        Diagnostic Result
+                      </span>
+                      <h2 className="text-2xl font-black text-[#123B24] mt-0.5">
+                        {result.disease_name}
+                      </h2>
+                      <p className="text-xs text-[#5B7065] font-semibold mt-0.5">
+                        Target Crop: {result.crop_type || 'Agricultural Specimen'}
+                      </p>
+                    </div>
+                    {badge && (
+                      <span className={`px-3 py-1 rounded-full border font-bold text-xs ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                    )}
+                  </div>
 
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeTab}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    className="mt-4 text-xs text-[#1A2E1A] leading-relaxed bg-[#F5F7EF] rounded-2xl p-4 border border-[#EEF3E8] min-h-[110px]"
-                  >
-                    {activeTab === 'symptoms' && (
-                      <p>{result.symptoms || 'Chlorotic spot patterns, foliage discoloration, or wilting observed around leaf edges.'}</p>
-                    )}
-                    {activeTab === 'treatment' && (
-                      <p>{result.treatment || 'Apply systemic fungicide (e.g. Mancozeb or Copper Oxychloride 50% WP @ 2g/L) during early morning hours.'}</p>
-                    )}
-                    {activeTab === 'prevention' && (
-                      <p>{result.prevention || 'Ensure adequate row spacing, sanitize pruning tools, avoid overhead sprinkler spray during humid afternoons, and practice crop rotation.'}</p>
-                    )}
-                    {activeTab === 'organic' && (
-                      <p>{result.organic_treatment || 'Apply 5% Neem Seed Kernel Extract (NSKE) or spray Trichoderma viride bio-agent into root and foliage zones.'}</p>
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+                  {/* Confidence Bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-[#5B7065]">Model Confidence</span>
+                      <span className="text-[#185C2B] font-black">{confidencePct}% Match</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-[#EEF3E8] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[#80B918] to-[#185C2B]"
+                        style={{ width: `${confidencePct}%` }}
+                      />
+                    </div>
+                  </div>
 
-              {/* Save Report + Share + Scan Again buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-[#EEF3E8]">
-                <button
-                  type="button"
-                  onClick={() => alert('Diagnostic Report saved to your profile history.')}
-                  className="btn-primary py-2.5 px-5 text-xs font-bold rounded-xl"
-                >
-                  <Bookmark className="w-3.5 h-3.5" />
-                  <span>Save Report</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(`AgriNex Diagnosis: ${result.disease_name} (${result.confidence}%)`);
-                    alert('Diagnostic summary copied to clipboard!');
-                  }}
-                  className="btn-outline-green py-2.5 px-5 text-xs font-bold rounded-xl flex items-center gap-1.5"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Share</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  className="px-5 py-2.5 rounded-xl border border-[#EEF3E8] text-[#546E7A] font-bold text-xs hover:bg-[#EEF3E8] flex items-center gap-1.5 transition-all"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Scan Again</span>
-                </button>
-              </div>
+                  {/* Diagnostic Remedy Tabs */}
+                  <div>
+                    <div className="flex items-center gap-1 border-b border-[#EEF3E8] pb-2 overflow-x-auto no-scrollbar">
+                      {tabs.map((tab) => (
+                        <button
+                          key={tab.key}
+                          onClick={() => setActiveTab(tab.key)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
+                            activeTab === tab.key
+                              ? 'bg-[#123B24] text-white'
+                              : 'text-[#5B7065] hover:bg-[#EEF3E8]'
+                          }`}
+                        >
+                          <span>{tab.icon}</span>
+                          <span>{tab.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 text-xs text-[#1A2E1A] leading-relaxed bg-[#F5F7EF] rounded-xl p-4 border border-[#EEF3E8] min-h-[90px]">
+                      {activeTab === 'symptoms' && (
+                        <p>{result.symptoms || 'Chlorotic spot patterns or leaf edge discoloration observed.'}</p>
+                      )}
+                      {activeTab === 'treatment' && (
+                        <p>{result.treatment || 'Apply recommended systemic fungicide during early morning hours.'}</p>
+                      )}
+                      {activeTab === 'prevention' && (
+                        <p>{result.prevention || 'Ensure proper row spacing and avoid overhead watering in afternoons.'}</p>
+                      )}
+                      {activeTab === 'organic' && (
+                        <p>{result.organic_treatment || 'Apply 5% Neem Seed Kernel Extract (NSKE) spray.'}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-[#EEF3E8]">
+                    <button
+                      type="button"
+                      onClick={() => alert('Report saved to your profile history.')}
+                      className="btn-primary py-2 px-4 text-xs font-bold rounded-xl"
+                    >
+                      <Bookmark className="w-3.5 h-3.5" />
+                      <span>Save Report</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`AgriNex Diagnosis: ${result.disease_name} (${confidencePct}%)`);
+                        alert('Copied to clipboard!');
+                      }}
+                      className="btn-outline-green py-2 px-4 text-xs font-bold rounded-xl"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Share</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearImage}
+                      className="px-4 py-2 rounded-xl border border-[#EEF3E8] text-[#5B7065] font-bold text-xs hover:bg-[#EEF3E8] flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Scan Again</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </div>
       </div>
 
-      {/* ─── PAST SCANS GRID ─── */}
+      {/* ─── PAST SCANS HISTORY ─── */}
       {pastScans.length > 0 && (
-        <div className="farm-card p-6 sm:p-8 space-y-4">
-          <h3 className="text-base font-black text-[#123B24]">Past Diagnostics History</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="farm-card p-6 space-y-4">
+          <h3 className="text-base font-black text-[#123B24]">Diagnostic Scan History</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {pastScans.map((scan, i) => (
-              <motion.div
+              <div
                 key={scan.id || i}
-                whileHover={{ scale: 1.02 }}
-                className="p-4 rounded-2xl border border-[#EEF3E8] bg-[#F5F7EF] space-y-2.5"
+                className="p-3.5 rounded-xl border border-[#EEF3E8] bg-[#F5F7EF] space-y-2"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xl">
-                    {scan.severity_level === 'Healthy' ? '🌱' : '⚠️'}
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#546E7A] border border-[#EEF3E8]">
-                    {new Date(scan.created_at).toLocaleDateString()}
+                <div className="flex items-center justify-between text-[10px] font-bold text-[#5B7065]">
+                  <span>{new Date(scan.created_at).toLocaleDateString()}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-white border border-[#E0E7D8]">
+                    {scan.severity_level || 'Evaluated'}
                   </span>
                 </div>
                 <h4 className="text-xs font-bold text-[#123B24] truncate">
                   {scan.disease_name}
                 </h4>
-                <p className="text-[11px] text-[#546E7A]">
-                  Severity: {scan.severity_level || 'Evaluated'}
-                </p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Crop Editor Modal */}
+      {/* Image Cropper Modal */}
       {showCropper && rawOriginalImage && (
         <ImageCropperModal
           imageUrl={rawOriginalImage}
