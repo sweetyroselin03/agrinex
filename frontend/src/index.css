@@ -187,19 +187,20 @@ body {
 
 .agri-input {
   width: 100%;
-  border-radius: 14px;
-  border: 1.5px solid #EEF3E8;
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid #E0E7D8;
   background-color: #FFFFFF;
-  padding: 0.75rem 1rem;
+  padding: 0 1rem;
   font-size: 0.875rem;
   color: #1A2E1A;
   outline: none;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .agri-input:focus {
   border-color: #185C2B;
-  box-shadow: 0 0 0 3.5px rgba(24, 92, 43, 0.10);
+  box-shadow: 0 0 0 4px rgba(24, 92, 43, 0.10);
 }
 
 .agri-input::placeholder {
