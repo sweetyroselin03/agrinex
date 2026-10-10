@@ -164,10 +164,10 @@ export default function Dashboard() {
     year: 'numeric',
   });
 
-  const firstName = user?.full_name ? user.full_name.split(' ')[0] : user?.username || 'Farmer';
+  const firstName = user?.full_name ? String(user.full_name).split(' ')[0] : user?.username || 'Farmer';
 
   const totalScansCount = scans.length > 0 ? scans.length : 12;
-  const healthyCount = scans.filter((s) => s.severity_level && s.severity_level.toLowerCase().includes('healthy')).length;
+  const healthyCount = scans.filter((s) => s && typeof s.severity_level === 'string' && s.severity_level.toLowerCase().includes('healthy')).length;
   const recentDiagnosis = scans.length > 0 ? scans[0] : null;
 
   return (
@@ -306,24 +306,24 @@ export default function Dashboard() {
             <div className="p-4 rounded-xl bg-[#F5F7EF] border border-[#EEF3E8] space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#185C2B] uppercase tracking-wider">
-                  Target: {recentDiagnosis.crop_type || 'Agricultural Crop'}
+                  Target: {typeof recentDiagnosis.crop_type === 'string' ? recentDiagnosis.crop_type : 'Agricultural Crop'}
                 </span>
                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white text-[#5B7065] border border-[#E0E7D8]">
-                  {new Date(recentDiagnosis.created_at).toLocaleDateString()}
+                  {recentDiagnosis.created_at ? new Date(recentDiagnosis.created_at).toLocaleDateString() : 'Recent'}
                 </span>
               </div>
               <h4 className="text-lg font-black text-[#123B24]">
-                {recentDiagnosis.disease_name}
+                {recentDiagnosis.disease_name || 'Crop Diagnosis'}
               </h4>
               <p className="text-xs text-[#5B7065] leading-relaxed">
                 {recentDiagnosis.symptoms || 'Diagnostic analysis completed with PyTorch deep learning vision model.'}
               </p>
               <div className="pt-2 flex items-center justify-between text-xs">
                 <span className="font-bold text-[#185C2B]">
-                  Confidence: {Math.round(recentDiagnosis.confidence || 92)}%
+                  Confidence: {Math.round(Number(recentDiagnosis.confidence) || 92)}%
                 </span>
                 <span className="font-bold text-[#5B7065]">
-                  Severity: {recentDiagnosis.severity_level || 'Evaluated'}
+                  Severity: {typeof recentDiagnosis.severity_level === 'string' ? recentDiagnosis.severity_level : 'Evaluated'}
                 </span>
               </div>
             </div>
