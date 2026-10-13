@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, ArrowRight, Sprout, Check } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, ArrowRight, Sprout, Check } from 'lucide-react';
 
 const steps = [
   { num: 1, label: 'Details' },
@@ -14,7 +14,6 @@ export default function Signup() {
   const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,8 +29,8 @@ export default function Signup() {
     e.preventDefault();
     setLocalError(null);
     clearError();
-    if (!fullName.trim() || !email.trim() || !phone.trim()) {
-      setLocalError('All fields are required.');
+    if (!fullName.trim() || !email.trim()) {
+      setLocalError('Please fill in your name and email address.');
       return;
     }
     try {
@@ -77,7 +76,7 @@ export default function Signup() {
       return;
     }
     try {
-      await register({ full_name: fullName.trim(), email: email.trim(), phone: phone.trim() });
+      await register({ full_name: fullName.trim(), email: email.trim() });
       await setStorePassword(email.trim(), password);
       navigate('/dashboard');
     } catch (_) {}
@@ -246,28 +245,6 @@ export default function Signup() {
                     className="agri-input pl-11 pr-4"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="signup-phone"
-                  className="block text-xs font-bold text-[#123B24] uppercase tracking-wider text-left"
-                >
-                  Mobile Number
-                </label>
-                <div className="relative w-full">
-                  <Phone className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B7065] pointer-events-none" />
-                  <input
-                    id="signup-phone"
-                    type="tel"
-                    required
-                    placeholder="+91 98765 43210"
-                    className="agri-input pl-11 pr-4"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
                     disabled={isLoading}
                   />
                 </div>

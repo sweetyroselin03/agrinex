@@ -178,7 +178,7 @@ export default function Login() {
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B7065]" />
+                  <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B7065] pointer-events-none" />
                   <input
                     id="login-email"
                     type="email"
@@ -188,7 +188,7 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={localLoading}
                     autoComplete="email"
-                    className="agri-input pl-10"
+                    className="agri-input pl-11 pr-4"
                   />
                 </div>
               </div>
@@ -206,7 +206,7 @@ export default function Login() {
                   </Link>
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B7065]" />
+                  <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B7065] pointer-events-none" />
                   <input
                     id="login-password"
                     type={showPassword ? 'text' : 'password'}
@@ -216,12 +216,12 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={localLoading}
                     autoComplete="current-password"
-                    className="agri-input pl-10 pr-10"
+                    className="agri-input pl-11 pr-11"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5B7065] hover:text-[#123B24]"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#5B7065] hover:text-[#123B24] p-1"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
