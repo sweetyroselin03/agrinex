@@ -118,12 +118,80 @@ export default function Community() {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  const [moderationWarning, setModerationWarning] = useState<string | null>(null);
+
+  const checkContentModeration = (text: string): { isValid: boolean; reason?: string } => {
+    const lower = text.toLowerCase();
+
+    // 1. Common abusive / profanity word list
+    const profanities = [
+      'abuse', 'bastard', 'bitch', 'crap', 'damn', 'dick', 'fuck', 'idiot',
+      'moron', 'nigger', 'piss', 'porn', 'scam', 'sex', 'shit', 'slut', 'whore',
+      'chutiya', 'madarchod', 'bhenchod', 'harami', 'kutta', 'gandu', 'saala', 'kamina'
+    ];
+    for (const word of profanities) {
+      const regex = new RegExp(`\\b${word}\\b`, 'i');
+      if (regex.test(lower)) {
+        return {
+          isValid: false,
+          reason: 'Please keep content respectful and farming-related'
+        };
+      }
+    }
+
+    // 2. Hate speech indicators
+    const hatePatterns = [
+      /\bkill\s+(you|them|all)\b/i,
+      /\bhate\s+(you|them|all)\b/i,
+      /\bdie\b/i,
+      /\battack\b/i
+    ];
+    for (const pat of hatePatterns) {
+      if (pat.test(lower)) {
+        return {
+          isValid: false,
+          reason: 'Please keep content respectful and farming-related'
+        };
+      }
+    }
+
+    // 3. Spam patterns: excessive repeated characters or excessive all-caps
+    if (/(.)\1{5,}/.test(text)) {
+      return {
+        isValid: false,
+        reason: 'Please keep content respectful and farming-related'
+      };
+    }
+    const letters = text.replace(/[^a-zA-Z]/g, '');
+    if (letters.length > 20) {
+      const uppers = (letters.match(/[A-Z]/g) || []).length;
+      if (uppers / letters.length > 0.85) {
+        return {
+          isValid: false,
+          reason: 'Please keep content respectful and farming-related'
+        };
+      }
+    }
+
+    return { isValid: true };
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContent.trim()) {
       showToast('Please enter post content before publishing.', 'error');
       return;
     }
+
+    // Client-side content moderation pre-check
+    const modCheck = checkContentModeration(newContent.trim());
+    if (!modCheck.isValid) {
+      const warning = modCheck.reason || 'Please keep content respectful and farming-related';
+      setModerationWarning(warning);
+      showToast(warning, 'error');
+      return;
+    }
+    setModerationWarning(null);
 
     try {
       setPublishing(true);
@@ -142,19 +210,16 @@ export default function Community() {
       setSelectedFile(null);
       setImagePreview(null);
       setNewLocation('');
+      setModerationWarning(null);
       showToast('🌾 Post published to AgriNex community!');
     } catch (err: any) {
       const detail = err?.response?.data?.detail || err?.response?.data?.message || '';
-      if (
-        detail.toLowerCase().includes('inappropriate') ||
-        detail.toLowerCase().includes('moderation') ||
-        err?.response?.status === 400 ||
-        err?.response?.status === 422
-      ) {
-        showToast('This post cannot be published because it contains inappropriate content.', 'error');
-      } else {
-        showToast(detail || 'This post cannot be published because it contains inappropriate content.', 'error');
-      }
+      const flagged = err?.response?.data?.flagged_words || err?.response?.data?.words;
+      const flaggedInfo = Array.isArray(flagged) && flagged.length > 0 ? ` (Problematic: ${flagged.join(', ')})` : '';
+
+      const errorMsg = `Your post contains inappropriate content and cannot be published.${flaggedInfo}`;
+      setModerationWarning(errorMsg);
+      showToast(errorMsg, 'error');
       // Note: newContent is PRESERVED so the user can edit their text!
     } finally {
       setPublishing(false);
@@ -211,7 +276,7 @@ export default function Community() {
     try {
       setSubmittingReport(true);
       await api.post(`/posts/${reportingPost.id}/report`, { reason: reportReason.toLowerCase() });
-      showToast('🚩 Post reported. Our moderation team will review it.');
+      showToast('Post reported. Thank you.');
       setHiddenPostIds((prev) => [...prev, reportingPost.id]);
       setReportingPost(null);
     } catch (err: any) {
@@ -364,11 +429,21 @@ export default function Community() {
               <div className="flex-1 space-y-3">
                 <textarea
                   value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
+                  onChange={(e) => {
+                    setNewContent(e.target.value);
+                    if (moderationWarning) setModerationWarning(null);
+                  }}
                   placeholder="Share a farming observation, ask a crop question, or post a pest alert..."
                   rows={3}
                   className="agri-input resize-none bg-[#F5F7EF]"
                 />
+
+                {moderationWarning && (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{moderationWarning}</span>
+                  </div>
+                )}
 
                 {/* Attached Image Preview */}
                 {imagePreview && (
@@ -832,7 +907,7 @@ export default function Community() {
               </p>
 
               <div className="space-y-2">
-                {['Offensive', 'Spam', 'Harassment', 'Misinformation', 'Other'].map((reason) => (
+                {['Spam', 'Offensive', 'Harassment', 'Irrelevant'].map((reason) => (
                   <label
                     key={reason}
                     className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all ${

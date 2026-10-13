@@ -138,7 +138,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/set-password', { email, password });
           const { access_token, user } = response.data;
-          // Sync token to memory immediately so interceptor picks it up
+          try {
+            localStorage.setItem('agrinex_token', access_token);
+          } catch (_) {}
           setMemoryToken(access_token);
           set({
             token: access_token,
@@ -160,6 +162,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/login', credentials);
           const { access_token, user } = response.data;
+          // Store token in localStorage as 'agrinex_token'
+          try {
+            localStorage.setItem('agrinex_token', access_token);
+          } catch (_) {}
           // Sync token to memory immediately so subsequent requests have auth
           setMemoryToken(access_token);
           set({
@@ -173,7 +179,7 @@ export const useAuthStore = create<AuthState>()(
           set({ error: msg });
           throw error;
         } finally {
-          // Always reset loading — this is the critical fix for stuck spinner
+          // Always reset loading
           set({ isLoading: false });
         }
       },
@@ -234,20 +240,41 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        const { token } = get();
-        if (!token) {
+        let currentToken = get().token;
+        if (!currentToken) {
+          try {
+            const stored = localStorage.getItem('agrinex_token');
+            if (stored && stored.trim() && stored !== 'null' && stored !== 'undefined') {
+              currentToken = stored.trim();
+              set({ token: currentToken });
+            }
+          } catch (_) {}
+        }
+
+        if (!currentToken) {
           set({ isAuthenticated: false, user: null, isAuthInitialized: true });
           return;
         }
+
         // Sync token to memory so interceptor includes it
-        setMemoryToken(token);
+        setMemoryToken(currentToken);
         try {
           const response = await api.get('/auth/me');
           set({ user: response.data, isAuthenticated: true, isAuthInitialized: true });
-        } catch (error) {
-          // Token expired or invalid — clear session
-          setMemoryToken(null);
-          set({ token: null, user: null, isAuthenticated: false, isAuthInitialized: true });
+        } catch (error: any) {
+          // Only clear session on genuine 401 unauthorized
+          if (error?.response?.status === 401) {
+            setMemoryToken(null);
+            try {
+              localStorage.removeItem('agrinex_token');
+              localStorage.removeItem('agrinex-web-auth');
+            } catch (_) {}
+            set({ token: null, user: null, isAuthenticated: false, isAuthInitialized: true });
+          } else {
+            // Network error / cold start / timeout — keep session active!
+            console.warn('[Auth] checkAuth encountered non-401 error, keeping session:', error?.message);
+            set({ isAuthenticated: true, isAuthInitialized: true });
+          }
         }
       },
 

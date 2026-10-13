@@ -42,11 +42,11 @@ async function fetchChatStream(
     });
     if (!response.ok) {
       const errData = await response.json().catch(() => null);
-      onError(errData?.detail || errData?.message || 'AgriGPT is temporarily offline.');
+      onError(errData?.detail || errData?.message || 'AgriGPT temporarily unavailable');
       return;
     }
     if (!response.body) {
-      onError('No response received from model server.');
+      onError('AgriGPT temporarily unavailable');
       return;
     }
     const reader = response.body.getReader();
@@ -73,7 +73,7 @@ async function fetchChatStream(
       }
     }
   } catch (err: any) {
-    onError(err.message || 'AgriGPT service is currently offline.');
+    onError(err.message || 'AgriGPT temporarily unavailable');
   }
 }
 

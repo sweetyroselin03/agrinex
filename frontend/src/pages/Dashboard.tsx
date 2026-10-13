@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import CountUp from 'react-countup';
 import {
   Sun,
   Droplets,
@@ -93,9 +92,37 @@ const quickActions = [
   },
 ];
 
+function StatCounter({ value }: { value: number }) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const end = Number(value) || 0;
+    let start = 0;
+    const duration = 1000;
+    const stepTime = 30;
+    const steps = Math.max(Math.floor(duration / stepTime), 1);
+    const stepValue = (end - start) / steps;
+
+    const timer = setInterval(() => {
+      start += stepValue;
+      if ((stepValue >= 0 && start >= end) || (stepValue < 0 && start <= end)) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(Math.round(start));
+      }
+    }, stepTime);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return <span>{count}</span>;
+}
+
 export default function Dashboard() {
   const { user } = useAuthStore();
-  
+
+
   // Independent widget states — API failure isolation!
   const [weather, setWeather] = useState<any>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
@@ -140,8 +167,14 @@ export default function Dashboard() {
     try {
       setScansLoading(true);
       setScansError(false);
-      const res = await api.get('/ai/scans', { params: { limit: 5 } });
-      setScans(Array.isArray(res.data) ? res.data : []);
+      let res;
+      try {
+        res = await api.get('/ai/scan-history', { params: { limit: 5 } });
+      } catch {
+        res = await api.get('/ai/scans', { params: { limit: 5 } });
+      }
+      const rawScans = Array.isArray(res.data) ? res.data : (res.data?.scans ?? res.data?.data ?? []);
+      setScans(Array.isArray(rawScans) ? rawScans : []);
     } catch {
       setScansError(true);
       setScans([]);
@@ -246,7 +279,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-[#123B24]">
-              <CountUp end={totalScansCount} duration={1.5} />
+              <StatCounter value={totalScansCount} />
             </span>
             <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
               PyTorch AI
@@ -441,34 +474,39 @@ export default function Dashboard() {
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div
-            key={tipIndex}
-            initial={{ opacity: 0, x: 15 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -15 }}
-            transition={{ duration: 0.3 }}
-            className="p-4 rounded-xl bg-[#F5F7EF] border border-[#EEF3E8] flex items-start gap-4"
-          >
-            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-[#185C2B] shrink-0 border border-[#E0E7D8] shadow-sm">
-              <Sparkles className="w-6 h-6 text-[#185C2B]" />
-            </div>
-            <div className="space-y-1 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-[#185C2B] text-white text-[10px] font-bold">
-                  {seasonalTips[tipIndex].category}
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black">
-                  {seasonalTips[tipIndex].tag}
-                </span>
-              </div>
-              <h4 className="text-sm font-black text-[#123B24]">
-                {seasonalTips[tipIndex].title}
-              </h4>
-              <p className="text-xs text-[#5B7065] leading-relaxed">
-                {seasonalTips[tipIndex].desc}
-              </p>
-            </div>
-          </motion.div>
+          {(() => {
+            const currentTip = seasonalTips[tipIndex] || seasonalTips[0];
+            return (
+              <motion.div
+                key={tipIndex}
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -15 }}
+                transition={{ duration: 0.3 }}
+                className="p-4 rounded-xl bg-[#F5F7EF] border border-[#EEF3E8] flex items-start gap-4"
+              >
+                <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-[#185C2B] shrink-0 border border-[#E0E7D8] shadow-sm">
+                  <Sparkles className="w-6 h-6 text-[#185C2B]" />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#185C2B] text-white text-[10px] font-bold">
+                      {currentTip.category}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black">
+                      {currentTip.tag}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-black text-[#123B24]">
+                    {currentTip.title}
+                  </h4>
+                  <p className="text-xs text-[#5B7065] leading-relaxed">
+                    {currentTip.desc}
+                  </p>
+                </div>
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
       </div>
     </div>

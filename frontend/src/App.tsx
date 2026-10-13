@@ -114,6 +114,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
               <p className="text-xs text-[#5B7065] font-medium leading-relaxed">
                 AgriNex encountered an unexpected component error. Your data and account remain safe.
               </p>
+              {this.state.error?.message && (
+                <p className="text-[11px] text-red-600 bg-red-50 p-2 rounded-lg font-mono text-left break-all mt-2">
+                  {this.state.error.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">

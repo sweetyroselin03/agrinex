@@ -393,13 +393,13 @@ export default function Messages() {
             <div className="flex flex-col items-center justify-center p-10 text-[#546E7A] text-center gap-3">
               <span className="text-4xl block">🌾</span>
               <div className="space-y-1">
-                <h4 className="text-sm font-black text-[#123B24]">No conversations yet 🌾</h4>
+                <h4 className="text-sm font-black text-[#123B24]">No conversations yet</h4>
                 <p className="text-xs font-medium text-[#546E7A] max-w-xs">
                   {activeTab === 'unread'
                     ? 'No unread messages.'
                     : activeTab === 'archived'
                     ? 'No archived conversations.'
-                    : 'Search for farmers above to start chatting!'}
+                    : 'Search for farmers to start chatting!'}
                 </p>
               </div>
             </div>

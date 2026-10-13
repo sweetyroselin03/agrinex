@@ -53,7 +53,12 @@ export default function Scanner() {
 
   const fetchHistory = async () => {
     try {
-      const res = await api.get('/ai/scans');
+      let res;
+      try {
+        res = await api.get('/ai/scan-history');
+      } catch {
+        res = await api.get('/ai/scans');
+      }
       setPastScans(Array.isArray(res.data) ? res.data : []);
     } catch (_) {}
   };
