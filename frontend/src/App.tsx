@@ -215,6 +215,7 @@ export default function App() {
               >
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/scan" element={<Scanner />} />
+                <Route path="/scanner" element={<Navigate to="/scan" replace />} />
                 <Route path="/chat" element={<Chatbot />} />
                 <Route path="/community" element={<Community />} />
                 <Route path="/profile" element={<Profile />} />

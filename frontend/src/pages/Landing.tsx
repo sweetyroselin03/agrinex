@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   Microscope,
   Bot,
@@ -22,6 +23,9 @@ import {
 export default function Landing() {
   const [scrolled, setScrolled] = useState(false);
   const [typedTextIndex, setTypedTextIndex] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
 
   const sampleQuestions = [
     "What is the organic treatment for tomato leaf curl?",
@@ -99,11 +103,11 @@ export default function Landing() {
             </a>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-3">
+          {/* Action buttons (desktop) */}
+          <div className="hidden md:flex items-center gap-3">
             <Link
               to="/login"
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 hover:scale-[1.02] ${
                 scrolled
                   ? 'text-[#123B24] hover:bg-[#EEF3E8]'
                   : 'text-white hover:bg-white/10'
@@ -113,12 +117,37 @@ export default function Landing() {
             </Link>
             <Link
               to="/register"
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6BCB45] to-[#A7D96A] text-[#123B24] text-xs font-black shadow-farm-sm hover:shadow-glow-green transition-all"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6BCB45] to-[#A7D96A] text-[#123B24] text-xs font-black shadow-farm-sm hover:shadow-glow-green transition-all duration-200 hover:scale-[1.02]"
             >
               Get Started
             </Link>
           </div>
+
+          {/* Hamburger menu button (mobile) */}
+          <button
+            className="md:hidden flex flex-col gap-1.5 p-2 rounded-lg transition-colors cursor-pointer"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            <span className={`block w-5 h-0.5 rounded-full transition-all duration-200 ${scrolled ? 'bg-[#123B24]' : 'bg-white'} ${mobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`} />
+            <span className={`block w-5 h-0.5 rounded-full transition-all duration-200 ${scrolled ? 'bg-[#123B24]' : 'bg-white'} ${mobileMenuOpen ? 'opacity-0' : ''}`} />
+            <span className={`block w-5 h-0.5 rounded-full transition-all duration-200 ${scrolled ? 'bg-[#123B24]' : 'bg-white'} ${mobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+          </button>
         </div>
+
+        {/* Mobile dropdown menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white/95 backdrop-blur-xl border-t border-[#EEF3E8] px-6 py-4 space-y-3 shadow-farm-md">
+            <a href="#home" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-bold text-[#1A2E1A] hover:text-[#185C2B] py-2">Home</a>
+            <a href="#diagnosis" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-bold text-[#1A2E1A] hover:text-[#185C2B] py-2">AI Diagnosis</a>
+            <a href="#agrigpt" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-bold text-[#1A2E1A] hover:text-[#185C2B] py-2">AgriGPT</a>
+            <a href="#community" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-bold text-[#1A2E1A] hover:text-[#185C2B] py-2">Community</a>
+            <div className="pt-2 border-t border-[#EEF3E8] flex flex-col gap-2">
+              <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="w-full py-2.5 text-center text-sm font-bold text-[#123B24] hover:bg-[#EEF3E8] rounded-xl transition-colors">Sign In</Link>
+              <Link to="/register" onClick={() => setMobileMenuOpen(false)} className="w-full py-2.5 text-center text-sm font-black bg-gradient-to-r from-[#6BCB45] to-[#A7D96A] text-[#123B24] rounded-xl shadow-farm-sm">Get Started</Link>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* ─── HERO SECTION ─── */}
@@ -220,16 +249,16 @@ export default function Landing() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
           >
-            <Link
-              to="/register"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-[#6BCB45] to-[#A7D96A] text-[#123B24] font-black text-sm shadow-farm-md hover:shadow-glow-green flex items-center justify-center gap-2 transition-all active:scale-95"
+            <button
+              onClick={() => navigate(isAuthenticated ? '/scanner' : '/register')}
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-[#6BCB45] to-[#A7D96A] text-[#123B24] font-black text-sm shadow-farm-md hover:shadow-glow-green flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.02] active:scale-95 cursor-pointer border-none"
             >
               <span>Start Free Diagnostic</span>
               <ArrowRight className="w-4 h-4" />
-            </Link>
+            </button>
             <a
               href="#features"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl glass-dark text-white border border-white/20 font-bold text-sm hover:bg-white/15 flex items-center justify-center gap-2 transition-all"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl glass-dark text-white border border-white/20 font-bold text-sm hover:bg-white/15 flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.02]"
             >
               <span>Explore AgriNex</span>
               <ChevronRight className="w-4 h-4 text-[#A7D96A]" />

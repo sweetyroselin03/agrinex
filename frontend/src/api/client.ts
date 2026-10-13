@@ -83,6 +83,18 @@ export const getLocalToken = (): string | null => {
     }
   } catch (_) {}
 
+  // Check sessionStorage (for Remember Me unchecked sessions)
+  try {
+    const sessionToken = sessionStorage.getItem('agrinex_token');
+    if (sessionToken && typeof sessionToken === 'string') {
+      const trimmed = sessionToken.trim();
+      if (trimmed && trimmed !== 'null' && trimmed !== 'undefined') {
+        memoryToken = trimmed;
+        return trimmed;
+      }
+    }
+  } catch (_) {}
+
   return null;
 };
 
@@ -159,6 +171,7 @@ api.interceptors.response.use(
         try {
           setMemoryToken(null);
           localStorage.removeItem('agrinex_token');
+          sessionStorage.removeItem('agrinex_token');
           localStorage.removeItem('agrinex-web-auth');
         } catch (_) {}
       }

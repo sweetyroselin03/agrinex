@@ -277,7 +277,7 @@ export default function Signup() {
                 id="signup-step1-submit"
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-[52px] mt-6 rounded-xl bg-gradient-to-r from-[#123B24] to-[#185C2B] hover:from-[#185C2B] hover:to-[#2D6A4F] text-white font-bold text-sm shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-[#185C2B]/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none transition-all flex items-center justify-center gap-2 px-6 cursor-pointer"
+                className="w-full h-[52px] mt-6 rounded-lg bg-gradient-to-r from-[#2D6A4F] to-[#185C2B] hover:from-[#185C2B] hover:to-[#2D6A4F] text-white font-bold text-base shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-[#185C2B]/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none transition-all duration-200 hover:scale-[1.02] flex items-center justify-center gap-2 px-6 cursor-pointer"
               >
                 {isLoading ? (
                   <>
@@ -333,7 +333,7 @@ export default function Signup() {
                 id="signup-step2-submit"
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-[52px] mt-6 rounded-xl bg-gradient-to-r from-[#123B24] to-[#185C2B] hover:from-[#185C2B] hover:to-[#2D6A4F] text-white font-bold text-sm shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-[#185C2B]/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none transition-all flex items-center justify-center gap-2 px-6 cursor-pointer"
+                className="w-full h-[52px] mt-6 rounded-lg bg-gradient-to-r from-[#2D6A4F] to-[#185C2B] hover:from-[#185C2B] hover:to-[#2D6A4F] text-white font-bold text-base shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-[#185C2B]/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none transition-all duration-200 hover:scale-[1.02] flex items-center justify-center gap-2 px-6 cursor-pointer"
               >
                 {isLoading ? (
                   <>
@@ -430,7 +430,7 @@ export default function Signup() {
                 id="signup-step3-submit"
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-[52px] mt-6 rounded-xl bg-gradient-to-r from-[#123B24] to-[#185C2B] hover:from-[#185C2B] hover:to-[#2D6A4F] text-white font-bold text-sm shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-[#185C2B]/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none transition-all flex items-center justify-center gap-2 px-6 cursor-pointer"
+                className="w-full h-[52px] mt-6 rounded-lg bg-gradient-to-r from-[#2D6A4F] to-[#185C2B] hover:from-[#185C2B] hover:to-[#2D6A4F] text-white font-bold text-base shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-[#185C2B]/20 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none transition-all duration-200 hover:scale-[1.02] flex items-center justify-center gap-2 px-6 cursor-pointer"
               >
                 {isLoading ? (
                   <>

@@ -38,10 +38,22 @@ export default function Login() {
     }, LOGIN_TIMEOUT_MS);
 
     try {
+      // Store the remember me preference before login
       localStorage.setItem('agrinex_remember_me', rememberMe ? 'true' : 'false');
       await login({ email: email.trim(), password });
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      // Handle token persistence based on Remember Me
+      if (!rememberMe) {
+        // Move token from localStorage to sessionStorage only
+        const token = localStorage.getItem('agrinex_token');
+        if (token) {
+          sessionStorage.setItem('agrinex_token', token);
+          localStorage.removeItem('agrinex_token');
+        }
+      }
+
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -65,8 +77,8 @@ export default function Login() {
   return (
     <div className="min-h-screen w-full bg-[#F5F7EF] flex items-center justify-center p-4 sm:p-6 md:p-10 font-sans">
       <div className="w-full max-w-5xl farm-card overflow-hidden grid grid-cols-1 lg:grid-cols-12 shadow-2xl min-h-[640px]">
-        {/* ─── LEFT BRAND PANEL (LG: 5 COLS) ─── */}
-        <div className="lg:col-span-5 relative p-8 sm:p-10 text-white flex flex-col justify-between overflow-hidden bg-[#123B24]">
+        {/* ─── LEFT BRAND PANEL (LG: 5 COLS, hidden on mobile) ─── */}
+        <div className="hidden lg:flex lg:col-span-5 relative p-8 sm:p-10 text-white flex-col justify-between overflow-hidden bg-[#123B24]">
           {/* Background image & gradient overlay */}
           <div className="absolute inset-0 z-0">
             <img

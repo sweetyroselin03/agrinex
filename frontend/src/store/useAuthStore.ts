@@ -243,10 +243,18 @@ export const useAuthStore = create<AuthState>()(
         let currentToken = get().token;
         if (!currentToken) {
           try {
+            // Check localStorage first (Remember Me checked)
             const stored = localStorage.getItem('agrinex_token');
             if (stored && stored.trim() && stored !== 'null' && stored !== 'undefined') {
               currentToken = stored.trim();
               set({ token: currentToken });
+            } else {
+              // Then check sessionStorage (Remember Me unchecked)
+              const sessionStored = sessionStorage.getItem('agrinex_token');
+              if (sessionStored && sessionStored.trim() && sessionStored !== 'null' && sessionStored !== 'undefined') {
+                currentToken = sessionStored.trim();
+                set({ token: currentToken });
+              }
             }
           } catch (_) {}
         }
@@ -284,6 +292,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           localStorage.removeItem('agrinex-web-auth');
           localStorage.removeItem('agrinex_token');
+          localStorage.removeItem('agrinex_remember_me');
+          sessionStorage.removeItem('agrinex_token');
         } catch (_) {}
       },
 

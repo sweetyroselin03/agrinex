@@ -252,6 +252,87 @@ body {
   100% { top: 0%;  opacity: 0.8; }
 }
 
+/* ─────────────────────────────────────────
+   FLOATING DATA CARDS (Landing Hero)
+───────────────────────────────────────── */
+.floating-data-card {
+  background: white;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  min-width: 140px;
+  z-index: 10;
+  border: 1px solid rgba(255,255,255,0.8);
+}
+
+/* Float animations for hero data cards */
+@keyframes float-1 {
+  0%, 100% { transform: translateY(0px); }
+  50%     { transform: translateY(-12px); }
+}
+@keyframes float-2 {
+  0%, 100% { transform: translateY(0px); }
+  50%     { transform: translateY(-10px); }
+}
+@keyframes float-3 {
+  0%, 100% { transform: translateY(0px); }
+  50%     { transform: translateY(-14px); }
+}
+@keyframes float-4 {
+  0%, 100% { transform: translateY(0px); }
+  50%     { transform: translateY(-8px); }
+}
+.animate-float-1 { animation: float-1 4.5s ease-in-out infinite; }
+.animate-float-2 { animation: float-2 5.2s ease-in-out infinite 0.5s; }
+.animate-float-3 { animation: float-3 4.8s ease-in-out infinite 1s; }
+.animate-float-4 { animation: float-4 5.5s ease-in-out infinite 0.3s; }
+
+/* ─────────────────────────────────────────
+   GLASS NAV
+───────────────────────────────────────── */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid rgba(238, 243, 232, 0.8);
+}
+
+/* ─────────────────────────────────────────
+   ACCENT BUTTON
+───────────────────────────────────────── */
+.btn-accent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.375rem;
+  border-radius: 14px;
+  color: #123B24;
+  font-weight: 800;
+  font-size: 0.875rem;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6BCB45 0%, #A7D96A 100%);
+  box-shadow: 0 4px 14px rgba(107, 203, 69, 0.3);
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-accent:hover:not(:disabled) {
+  background: linear-gradient(135deg, #A7D96A 0%, #6BCB45 100%);
+  box-shadow: 0 6px 20px rgba(107, 203, 69, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ─────────────────────────────────────────
+   MOBILE RESPONSIVE OVERRIDES
+───────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Landing: hide floating data cards on mobile */
+  .floating-data-card {
+    display: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

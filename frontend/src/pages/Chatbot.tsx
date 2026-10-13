@@ -183,7 +183,7 @@ export default function Chatbot() {
           ...prev,
           {
             id: `ai_err_${Date.now()}`,
-            message: errorMsg || 'AgriGPT is temporarily offline. Please ensure the Llama model service is active.',
+            message: errorMsg || 'AgriGPT is temporarily unavailable. Please try again shortly.',
             is_ai: true,
             created_at: new Date().toISOString(),
           },
@@ -433,7 +433,7 @@ export default function Chatbot() {
 
         <div className="pt-3 border-t border-[#EEF3E8]">
           <p className="text-[10px] text-[#5B7065] font-semibold">
-            Model: Ollama / Llama 3<br />
+            Model: Llama 3 (Groq Cloud)<br />
             Streaming SSE Protocol Active
           </p>
         </div>
