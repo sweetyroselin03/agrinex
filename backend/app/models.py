@@ -50,6 +50,7 @@ class Post(Base):
     images = Column(Text, nullable=True)
     report_count = Column(Integer, default=0)
     is_hidden = Column(Boolean, default=False)
+    post_visibility = Column(String, default="public")
 
     user = relationship("User", back_populates="posts")
     likes = relationship("Like", back_populates="post", cascade="all, delete-orphan")
@@ -76,6 +77,8 @@ class Comment(Base):
     post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), index=True)
     content = Column(Text)
     parent_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
+    report_count = Column(Integer, default=0)
+    is_hidden = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="comments")

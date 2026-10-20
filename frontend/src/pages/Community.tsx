@@ -47,6 +47,7 @@ export default function Community() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [postCategory, setPostCategory] = useState('Tips');
+  const [postVisibility, setPostVisibility] = useState<'public' | 'community' | 'private'>('public');
   const [newLocation, setNewLocation] = useState('');
   const [publishing, setPublishing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,12 +59,23 @@ export default function Community() {
   // Moderation & Action states
   const [activeMenuPostId, setActiveMenuPostId] = useState<number | null>(null);
   const [reportingPost, setReportingPost] = useState<any | null>(null);
-  const [reportReason, setReportReason] = useState('Offensive');
+  const [reportReason, setReportReason] = useState('Spam or Advertisement');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [blockingUserConfirm, setBlockingUserConfirm] = useState<{ id: number; name: string } | null>(null);
+  const [reportingComment, setReportingComment] = useState<{ id: number; postId: number } | null>(null);
+  const [commentReportReason, setCommentReportReason] = useState('Offensive or Abusive Content');
+  const [submittingCommentReport, setSubmittingCommentReport] = useState(false);
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'info' | 'error'>('info');
   const [hiddenPostIds, setHiddenPostIds] = useState<number[]>([]);
-  const [blockedUserIds, setBlockedUserIds] = useState<number[]>([]);
+  const [blockedUserIds, setBlockedUserIds] = useState<number[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('agrinex_blocked_users') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   // Expanded comments state: map of postId -> boolean
   const [expandedComments, setExpandedComments] = useState<Record<number, boolean>>({});
@@ -72,6 +84,13 @@ export default function Community() {
   const [loadingCommentsMap, setLoadingCommentsMap] = useState<Record<number, boolean>>({});
 
   const categories = ['All', 'Disease Alert', 'Tips', 'Market', 'Q&A'];
+  const reportOptions = [
+    'Spam or Advertisement',
+    'Offensive or Abusive Content',
+    'Harassment or Bullying',
+    'Misinformation',
+    'Not Related to Farming',
+  ];
 
   const showToast = (msg: string, type: 'info' | 'error' = 'info') => {
     setToastMessage(msg);
@@ -86,11 +105,16 @@ export default function Community() {
 
   const fetchBlockedUsers = async () => {
     try {
+      const local = JSON.parse(localStorage.getItem('agrinex_blocked_users') || '[]');
       const res = await api.get('/users/blocked');
-      if (Array.isArray(res.data)) {
-        setBlockedUserIds(res.data.map((u: any) => u.id));
-      }
-    } catch (_) {}
+      const serverIds = Array.isArray(res.data) ? res.data.map((u: any) => u.id) : [];
+      const combined = Array.from(new Set([...local, ...serverIds]));
+      setBlockedUserIds(combined);
+      localStorage.setItem('agrinex_blocked_users', JSON.stringify(combined));
+    } catch (_) {
+      const local = JSON.parse(localStorage.getItem('agrinex_blocked_users') || '[]');
+      setBlockedUserIds(local);
+    }
   };
 
   const fetchPosts = async () => {
@@ -123,54 +147,30 @@ export default function Community() {
   const checkContentModeration = (text: string): { isValid: boolean; reason?: string } => {
     const lower = text.toLowerCase();
 
-    // 1. Common abusive / profanity word list
-    const profanities = [
-      'abuse', 'bastard', 'bitch', 'crap', 'damn', 'dick', 'fuck', 'idiot',
-      'moron', 'nigger', 'piss', 'porn', 'scam', 'sex', 'shit', 'slut', 'whore',
-      'chutiya', 'madarchod', 'bhenchod', 'harami', 'kutta', 'gandu', 'saala', 'kamina'
+    // 1. Common offensive words and patterns
+    const offensivePatterns = [
+      /\b(spam|scam|fraud|fake)\b/i,
+      /\b(xxx|porn|nude|sex)\b/i,
+      /\b(kill|murder|threat|bomb|attack)\b/i,
+      /\b(hate|racist|discrimination)\b/i,
+      /\b(abuse|bastard|bitch|crap|damn|dick|fuck|idiot|moron|nigger|piss|shit|slut|whore)\b/i,
+      /\b(chutiya|madarchod|bhenchod|harami|kutta|gandu|saala|kamina)\b/i,
     ];
-    for (const word of profanities) {
-      const regex = new RegExp(`\\b${word}\\b`, 'i');
-      if (regex.test(lower)) {
-        return {
-          isValid: false,
-          reason: 'Please keep content respectful and farming-related'
-        };
-      }
-    }
-
-    // 2. Hate speech indicators
-    const hatePatterns = [
-      /\bkill\s+(you|them|all)\b/i,
-      /\bhate\s+(you|them|all)\b/i,
-      /\bdie\b/i,
-      /\battack\b/i
-    ];
-    for (const pat of hatePatterns) {
+    for (const pat of offensivePatterns) {
       if (pat.test(lower)) {
         return {
           isValid: false,
-          reason: 'Please keep content respectful and farming-related'
+          reason: 'Please keep content respectful and farming-related.',
         };
       }
     }
 
-    // 3. Spam patterns: excessive repeated characters or excessive all-caps
+    // 2. Spam patterns: excessive repeated characters
     if (/(.)\1{5,}/.test(text)) {
       return {
         isValid: false,
-        reason: 'Please keep content respectful and farming-related'
+        reason: 'Please keep content respectful and farming-related.',
       };
-    }
-    const letters = text.replace(/[^a-zA-Z]/g, '');
-    if (letters.length > 20) {
-      const uppers = (letters.match(/[A-Z]/g) || []).length;
-      if (uppers / letters.length > 0.85) {
-        return {
-          isValid: false,
-          reason: 'Please keep content respectful and farming-related'
-        };
-      }
     }
 
     return { isValid: true };
@@ -186,7 +186,7 @@ export default function Community() {
     // Client-side content moderation pre-check
     const modCheck = checkContentModeration(newContent.trim());
     if (!modCheck.isValid) {
-      const warning = modCheck.reason || 'Please keep content respectful and farming-related';
+      const warning = modCheck.reason || 'Please keep content respectful and farming-related.';
       setModerationWarning(warning);
       showToast(warning, 'error');
       return;
@@ -198,6 +198,7 @@ export default function Community() {
       const formData = new FormData();
       formData.append('content', newContent.trim());
       formData.append('crop_category', postCategory);
+      formData.append('post_visibility', postVisibility);
       if (newLocation) formData.append('location', newLocation);
       if (selectedFile) formData.append('image', selectedFile);
 
@@ -213,11 +214,7 @@ export default function Community() {
       setModerationWarning(null);
       showToast('🌾 Post published to AgriNex community!');
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || err?.response?.data?.message || '';
-      const flagged = err?.response?.data?.flagged_words || err?.response?.data?.words;
-      const flaggedInfo = Array.isArray(flagged) && flagged.length > 0 ? ` (Problematic: ${flagged.join(', ')})` : '';
-
-      const errorMsg = `Your post contains inappropriate content and cannot be published.${flaggedInfo}`;
+      const errorMsg = '⚠️ Your post contains inappropriate content and cannot be published. Please edit and try again.';
       setModerationWarning(errorMsg);
       showToast(errorMsg, 'error');
       // Note: newContent is PRESERVED so the user can edit their text!
@@ -276,7 +273,7 @@ export default function Community() {
     try {
       setSubmittingReport(true);
       await api.post(`/posts/${reportingPost.id}/report`, { reason: reportReason.toLowerCase() });
-      showToast('Post reported. Thank you.');
+      showToast('✓ Post reported. Thank you for keeping our community safe.');
       setHiddenPostIds((prev) => [...prev, reportingPost.id]);
       setReportingPost(null);
     } catch (err: any) {
@@ -286,14 +283,38 @@ export default function Community() {
     }
   };
 
-  const handleBlockUser = async (targetUserId: number) => {
+  const handleOpenBlockUser = (post: any) => {
     setActiveMenuPostId(null);
+    setBlockingUserConfirm({
+      id: post.user_id,
+      name: post.author_name || `Farmer ${post.user_id}`,
+    });
+  };
+
+  const handleConfirmBlock = async () => {
+    if (!blockingUserConfirm) return;
+    const targetUserId = blockingUserConfirm.id;
     try {
       await api.post(`/users/${targetUserId}/block`);
-      setBlockedUserIds((prev) => [...prev, targetUserId]);
-      showToast('🚫 User blocked. Their updates are now hidden.');
+    } catch (_) {}
+    const updated = Array.from(new Set([...blockedUserIds, targetUserId]));
+    setBlockedUserIds(updated);
+    localStorage.setItem('agrinex_blocked_users', JSON.stringify(updated));
+    showToast('🚫 User blocked. Their updates are now hidden.');
+    setBlockingUserConfirm(null);
+  };
+
+  const handleSubmitCommentReport = async () => {
+    if (!reportingComment) return;
+    try {
+      setSubmittingCommentReport(true);
+      await api.post(`/comments/${reportingComment.id}/report`, { reason: commentReportReason.toLowerCase() });
+      showToast('✓ Comment reported. Thank you for keeping our community safe.');
+      setReportingComment(null);
     } catch (err: any) {
-      showToast(err.response?.data?.detail || 'Failed to block user', 'error');
+      showToast('Failed to report comment. Please try again.', 'error');
+    } finally {
+      setSubmittingCommentReport(false);
     }
   };
 
@@ -324,6 +345,12 @@ export default function Community() {
     const text = (commentInputMap[postId] || '').trim();
     if (!text) return;
 
+    const modCheck = checkContentModeration(text);
+    if (!modCheck.isValid) {
+      showToast('Please keep content respectful and farming-related.', 'error');
+      return;
+    }
+
     try {
       const res = await api.post(`/posts/${postId}/comments`, { content: text });
       const currentList = postCommentsMap[postId] || [];
@@ -331,7 +358,12 @@ export default function Community() {
       setCommentInputMap((prev) => ({ ...prev, [postId]: '' }));
       setPosts(posts.map((p) => (p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p)));
     } catch (err: any) {
-      showToast('Failed to submit comment.', 'error');
+      const detail = err?.response?.data?.detail || '';
+      if (detail === 'COMMENT_OFFENSIVE_CONTENT' || detail.toLowerCase().includes('offensive') || detail.toLowerCase().includes('inappropriate')) {
+        showToast('⚠️ Your comment contains inappropriate content and cannot be published.', 'error');
+      } else {
+        showToast('Failed to submit comment.', 'error');
+      }
     }
   };
 
@@ -439,8 +471,8 @@ export default function Community() {
                 />
 
                 {moderationWarning && (
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
                     <span>{moderationWarning}</span>
                   </div>
                 )}
@@ -516,23 +548,37 @@ export default function Community() {
                     </select>
                   </div>
 
-                  <button
-                    onClick={handleCreatePost}
-                    disabled={publishing || !newContent.trim()}
-                    className="btn-primary py-2.5 px-5 text-xs font-bold rounded-xl"
-                  >
-                    {publishing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Posting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        <span>Post</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Post Visibility Selector */}
+                    <select
+                      value={postVisibility}
+                      onChange={(e) => setPostVisibility(e.target.value as any)}
+                      className="px-3 py-2 rounded-xl bg-[#F5F7EF] text-xs font-bold text-[#123B24] border border-[#EEF3E8] outline-none cursor-pointer"
+                      title="Post Visibility"
+                    >
+                      <option value="public">🌍 Public (everyone)</option>
+                      <option value="community">👥 Community Only (logged in users)</option>
+                      <option value="private">🔒 Private (only me)</option>
+                    </select>
+
+                    <button
+                      onClick={handleCreatePost}
+                      disabled={publishing || !newContent.trim()}
+                      className="btn-primary py-2.5 px-5 text-xs font-bold rounded-xl"
+                    >
+                      {publishing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Posting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          <span>Post</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -579,12 +625,26 @@ export default function Community() {
                           className="w-11 h-11 rounded-full border-2 border-[#185C2B] object-cover bg-white ring-2 ring-[#A7D96A]/60"
                         />
                         <div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <h4 className="text-sm font-black text-[#123B24]">
                               {post.author_name || `Farmer ${post.user_id}`}
                             </h4>
                             {post.author_verified && (
                               <CheckCircle2 className="w-4 h-4 text-[#185C2B]" />
+                            )}
+                            {/* Visibility Badge */}
+                            {post.post_visibility === 'private' ? (
+                              <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full border border-gray-200">
+                                🔒 Private
+                              </span>
+                            ) : post.post_visibility === 'community' ? (
+                              <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                                👥 Community
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold bg-[#EEF3E8] text-[#185C2B] px-2 py-0.5 rounded-full border border-[#A7D96A]/60">
+                                🌍 Public
+                              </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-[11px] text-[#546E7A] font-medium">
@@ -621,7 +681,7 @@ export default function Community() {
                             {post.user_id !== user?.id && (
                               <button
                                 type="button"
-                                onClick={() => handleBlockUser(post.user_id)}
+                                onClick={() => handleOpenBlockUser(post)}
                                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-[#546E7A] hover:bg-[#F5F7EF] text-left transition-all cursor-pointer"
                               >
                                 <UserX className="w-3.5 h-3.5" />
@@ -762,10 +822,20 @@ export default function Community() {
                           ) : (
                             <div className="space-y-2 pt-1 max-h-60 overflow-y-auto no-scrollbar">
                               {commentList.map((c) => (
-                                <div key={c.id} className="p-3 rounded-2xl bg-[#F5F7EF] space-y-1">
+                                <div key={c.id} className="p-3 rounded-2xl bg-[#F5F7EF] space-y-1 group">
                                   <div className="flex items-center justify-between text-[11px]">
                                     <span className="font-bold text-[#123B24]">{c.author_name || `Farmer ${c.user_id}`}</span>
-                                    <span className="text-[#546E7A] text-[10px]">{new Date(c.created_at).toLocaleDateString()}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[#546E7A] text-[10px]">{new Date(c.created_at).toLocaleDateString()}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setReportingComment({ id: c.id, postId: post.id })}
+                                        title="Report comment"
+                                        className="p-1 rounded-lg text-[#546E7A] hover:text-red-600 hover:bg-white transition-all opacity-60 group-hover:opacity-100 cursor-pointer"
+                                      >
+                                        <Flag className="w-3 h-3" />
+                                      </button>
+                                    </div>
                                   </div>
                                   <p className="text-xs text-[#1A2E1A]">{c.content}</p>
                                 </div>
@@ -878,7 +948,7 @@ export default function Community() {
         )}
       </AnimatePresence>
 
-      {/* ─── REPORT REASON MODAL ─── */}
+      {/* ─── REPORT POST MODAL ─── */}
       <AnimatePresence>
         {reportingPost && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -891,7 +961,7 @@ export default function Community() {
               <div className="flex items-center justify-between pb-3 border-b border-[#EEF3E8]">
                 <div className="flex items-center gap-2 text-red-600 font-bold">
                   <Flag className="w-5 h-5" />
-                  <h3 className="text-base font-black text-[#123B24]">Report Community Post</h3>
+                  <h3 className="text-base font-black text-[#123B24]">Report This Post</h3>
                 </div>
                 <button
                   type="button"
@@ -903,11 +973,11 @@ export default function Community() {
               </div>
 
               <p className="text-xs text-[#546E7A]">
-                Select why this update violates agricultural community standards:
+                Select a reason why this post should be reviewed:
               </p>
 
               <div className="space-y-2">
-                {['Spam', 'Offensive', 'Harassment', 'Irrelevant'].map((reason) => (
+                {reportOptions.map((reason) => (
                   <label
                     key={reason}
                     className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
@@ -919,7 +989,7 @@ export default function Community() {
                     <span>{reason}</span>
                     <input
                       type="radio"
-                      name="reportReason"
+                      name="postReportReason"
                       value={reason}
                       checked={reportReason === reason}
                       onChange={(e) => setReportReason(e.target.value)}
@@ -933,7 +1003,7 @@ export default function Community() {
                 <button
                   type="button"
                   onClick={() => setReportingPost(null)}
-                  className="px-4 py-2.5 rounded-xl border border-[#EEF3E8] text-xs font-bold text-[#546E7A]"
+                  className="px-4 py-2.5 rounded-xl border border-[#EEF3E8] text-xs font-bold text-[#546E7A] hover:bg-[#F5F7EF]"
                 >
                   Cancel
                 </button>
@@ -944,6 +1014,117 @@ export default function Community() {
                   className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md disabled:opacity-50"
                 >
                   {submittingReport ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── BLOCK USER CONFIRMATION MODAL ─── */}
+      <AnimatePresence>
+        {blockingUserConfirm && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[24px] p-6 max-w-sm w-full shadow-2xl border border-[#EEF3E8] space-y-4"
+            >
+              <div className="flex items-center gap-2.5 text-red-600">
+                <UserX className="w-5 h-5" />
+                <h3 className="text-base font-black text-[#123B24]">Block User?</h3>
+              </div>
+              <p className="text-xs text-[#546E7A] leading-relaxed">
+                Block <strong className="text-[#123B24]">{blockingUserConfirm.name}</strong>? You won't see their posts anymore.
+              </p>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EEF3E8]">
+                <button
+                  type="button"
+                  onClick={() => setBlockingUserConfirm(null)}
+                  className="px-4 py-2 rounded-xl border border-[#EEF3E8] text-xs font-bold text-[#546E7A] hover:bg-[#F5F7EF]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBlock}
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md"
+                >
+                  Block
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── REPORT COMMENT MODAL ─── */}
+      <AnimatePresence>
+        {reportingComment && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[28px] p-6 max-w-md w-full shadow-2xl border border-[#EEF3E8] space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-[#EEF3E8]">
+                <div className="flex items-center gap-2 text-red-600 font-bold">
+                  <Flag className="w-5 h-5" />
+                  <h3 className="text-base font-black text-[#123B24]">Report Comment</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReportingComment(null)}
+                  className="p-1 rounded-lg text-[#546E7A] hover:text-[#123B24]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-[#546E7A]">
+                Select why this comment should be reported:
+              </p>
+
+              <div className="space-y-2">
+                {reportOptions.map((reason) => (
+                  <label
+                    key={reason}
+                    className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                      commentReportReason === reason
+                        ? 'border-[#185C2B] bg-[#EEF3E8] text-[#123B24]'
+                        : 'border-[#EEF3E8] text-[#1A2E1A] hover:bg-[#F5F7EF]'
+                    }`}
+                  >
+                    <span>{reason}</span>
+                    <input
+                      type="radio"
+                      name="commentReportReason"
+                      value={reason}
+                      checked={commentReportReason === reason}
+                      onChange={(e) => setCommentReportReason(e.target.value)}
+                      className="text-[#185C2B] focus:ring-[#185C2B]"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EEF3E8]">
+                <button
+                  type="button"
+                  onClick={() => setReportingComment(null)}
+                  className="px-4 py-2.5 rounded-xl border border-[#EEF3E8] text-xs font-bold text-[#546E7A] hover:bg-[#F5F7EF]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitCommentReport}
+                  disabled={submittingCommentReport}
+                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md disabled:opacity-50"
+                >
+                  {submittingCommentReport ? 'Submitting...' : 'Submit Report'}
                 </button>
               </div>
             </motion.div>

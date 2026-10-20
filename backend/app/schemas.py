@@ -142,6 +142,7 @@ class PostCreate(BaseModel):
     hashtags: Optional[str] = None
     location: Optional[str] = None
     crop_category: Optional[str] = None
+    post_visibility: Optional[str] = "public"
 
 class PostUpdate(BaseModel):
     content: Optional[str] = None
@@ -150,6 +151,7 @@ class PostUpdate(BaseModel):
     hashtags: Optional[str] = None
     location: Optional[str] = None
     crop_category: Optional[str] = None
+    post_visibility: Optional[str] = None
 
 class PostOut(BaseModel):
     id: int
@@ -172,6 +174,7 @@ class PostOut(BaseModel):
     report_count: Optional[int] = 0
     is_hidden: Optional[bool] = False
     is_reported_by_me: Optional[bool] = False
+    post_visibility: Optional[str] = "public"
 
     @validator('images', pre=True)
     def parse_images(cls, v):
@@ -199,13 +202,25 @@ class PostReportCreate(BaseModel):
     reason: str = "spam"  # spam, offensive, harassment, irrelevant, misinformation
 
 class PostReportOut(BaseModel):
-    id: int
-    post_id: int
-    user_id: int
-    reason: str
-    created_at: datetime
+    id: Optional[int] = None
+    post_id: Optional[int] = None
+    user_id: Optional[int] = None
+    reason: Optional[str] = None
+    created_at: Optional[datetime] = None
     is_hidden: bool = False
-    message: str = "Post reported successfully"
+    reported: bool = True
+    message: str = "Post reported"
+
+    class Config:
+        from_attributes = True
+
+
+class CommentReportCreate(BaseModel):
+    reason: str = "offensive"
+
+class CommentReportOut(BaseModel):
+    reported: bool = True
+    message: str = "Comment reported"
 
     class Config:
         from_attributes = True
@@ -231,6 +246,8 @@ class CommentOut(BaseModel):
     created_at: datetime
     author_name: Optional[str] = None
     author_avatar: Optional[str] = None
+    report_count: Optional[int] = 0
+    is_hidden: Optional[bool] = False
     replies: Optional[List['CommentOut']] = []
 
     class Config:

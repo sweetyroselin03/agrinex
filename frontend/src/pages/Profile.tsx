@@ -27,11 +27,27 @@ import {
   Save,
   Microscope,
   Activity,
-  Leaf
+  Leaf,
+  Shield,
+  UserX
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import FollowButton from '../components/FollowButton';
+
+interface PrivacySettings {
+  showEmail: boolean;
+  showPhone: boolean;
+  showLocation: boolean;
+  allowDirectMessages: 'everyone' | 'followers' | 'none';
+}
+
+const defaultPrivacy: PrivacySettings = {
+  showEmail: false,
+  showPhone: false,
+  showLocation: true,
+  allowDirectMessages: 'everyone',
+};
 
 export default function Profile() {
   const { userId } = useParams<{ userId?: string }>();
@@ -45,13 +61,34 @@ export default function Profile() {
   const targetId = isOwnProfile ? currentUser?.id : Number(userId);
 
   const initialTab =
-    (searchParams.get('tab') as 'posts' | 'farm_profile' | 'disease_reports' | 'activity' | 'settings' | 'security') ||
+    (searchParams.get('tab') as 'posts' | 'farm_profile' | 'disease_reports' | 'activity' | 'settings' | 'security' | 'privacy') ||
     'farm_profile';
   const [activeTab, setActiveTab] = useState<
-    'posts' | 'farm_profile' | 'disease_reports' | 'activity' | 'settings' | 'security'
+    'posts' | 'farm_profile' | 'disease_reports' | 'activity' | 'settings' | 'security' | 'privacy'
   >(initialTab);
 
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Privacy preferences
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>(() => {
+    try {
+      const stored = localStorage.getItem('agrinex_privacy_settings');
+      return stored ? { ...defaultPrivacy, ...JSON.parse(stored) } : defaultPrivacy;
+    } catch {
+      return defaultPrivacy;
+    }
+  });
+
+  const handleTogglePrivacy = (key: keyof PrivacySettings, value?: any) => {
+    setPrivacySettings((prev) => {
+      const updated = {
+        ...prev,
+        [key]: value !== undefined ? value : !prev[key as 'showEmail' | 'showPhone' | 'showLocation'],
+      };
+      localStorage.setItem('agrinex_privacy_settings', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   // Fetch Target User Profile
   const { data: profileData, isLoading: loadingProfile } = useQuery({
@@ -98,6 +135,50 @@ export default function Profile() {
     },
     enabled: Boolean(targetId),
   });
+
+  // Fetch Blocked Users
+  const { data: blockedUsers = [], refetch: refetchBlockedUsers } = useQuery({
+    queryKey: ['blocked_users'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/users/blocked');
+        return Array.isArray(res.data) ? res.data : [];
+      } catch {
+        try {
+          const res2 = await api.get('/api/users/blocked');
+          return Array.isArray(res2.data) ? res2.data : [];
+        } catch {
+          return [];
+        }
+      }
+    },
+    enabled: Boolean(isOwnProfile && activeTab === 'privacy'),
+  });
+
+  const [unblockingId, setUnblockingId] = useState<number | null>(null);
+
+  const handleUnblockUser = async (blockedUserId: number) => {
+    setUnblockingId(blockedUserId);
+    try {
+      try {
+        await api.delete(`/users/${blockedUserId}/block`);
+      } catch {
+        await api.delete(`/api/users/${blockedUserId}/block`);
+      }
+      try {
+        const raw = localStorage.getItem('agrinex_blocked_users');
+        if (raw) {
+          const ids: number[] = JSON.parse(raw);
+          localStorage.setItem('agrinex_blocked_users', JSON.stringify(ids.filter((id) => id !== blockedUserId)));
+        }
+      } catch {}
+      refetchBlockedUsers();
+    } catch (err) {
+      console.error('Failed to unblock user', err);
+    } finally {
+      setUnblockingId(null);
+    }
+  };
 
   const profile = profileData || currentUser;
   const displayName = profile?.display_name || profile?.full_name || 'Farmer';
@@ -481,6 +562,19 @@ export default function Profile() {
             >
               <Lock className="w-4 h-4" />
               <span>Security</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('privacy')}
+              className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 rounded-xl transition-all whitespace-nowrap px-4 cursor-pointer ${
+                activeTab === 'privacy'
+                  ? 'bg-[#123B24] text-white shadow-farm-sm'
+                  : 'text-[#546E7A] hover:text-[#123B24] hover:bg-[#F5F7EF]'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              <span>Privacy & Safety</span>
             </button>
           </>
         )}
@@ -930,6 +1024,173 @@ export default function Profile() {
                 </button>
               </div>
             </form>
+          </motion.div>
+        )}
+
+        {/* PRIVACY & SAFETY TAB */}
+        {activeTab === 'privacy' && isOwnProfile && (
+          <motion.div
+            key="privacy"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6 max-w-2xl"
+          >
+            {/* Privacy Settings Section */}
+            <div className="farm-card p-6 md:p-8">
+              <div className="border-b border-[#EEF3E8] pb-4 mb-6 flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-[#123B24] text-lg flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-[#185C2B]" />
+                    <span>Privacy Settings</span>
+                  </h3>
+                  <p className="text-xs text-[#546E7A] mt-0.5">Control what information other farmers can see on your profile.</p>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                {/* Toggle: Show email */}
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#F5F7EF]/60 hover:bg-[#F5F7EF] transition-colors">
+                  <div>
+                    <div className="text-xs font-bold text-[#123B24]">Show my email to other farmers</div>
+                    <div className="text-[11px] text-[#546E7A]">Allow others to view your registered email address on your profile.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePrivacy('showEmail')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                      privacySettings.showEmail ? 'bg-[#185C2B]' : 'bg-[#DDE3D5]'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        privacySettings.showEmail ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Toggle: Show phone */}
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#F5F7EF]/60 hover:bg-[#F5F7EF] transition-colors">
+                  <div>
+                    <div className="text-xs font-bold text-[#123B24]">Show my phone number</div>
+                    <div className="text-[11px] text-[#546E7A]">Display your contact number for direct farmer queries.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePrivacy('showPhone')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                      privacySettings.showPhone ? 'bg-[#185C2B]' : 'bg-[#DDE3D5]'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        privacySettings.showPhone ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Toggle: Show location */}
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#F5F7EF]/60 hover:bg-[#F5F7EF] transition-colors">
+                  <div>
+                    <div className="text-xs font-bold text-[#123B24]">Show my location</div>
+                    <div className="text-[11px] text-[#546E7A]">Share your village and district to help nearby farmers connect.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePrivacy('showLocation')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                      privacySettings.showLocation ? 'bg-[#185C2B]' : 'bg-[#DDE3D5]'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        privacySettings.showLocation ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Allow direct messages from */}
+                <div className="p-3.5 rounded-xl bg-[#F5F7EF]/60 space-y-2">
+                  <div className="text-xs font-bold text-[#123B24]">Allow direct messages from</div>
+                  <div className="text-[11px] text-[#546E7A]">Specify who can initiate private conversations with you.</div>
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    {(['everyone', 'followers', 'none'] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => handleTogglePrivacy('allowDirectMessages', opt)}
+                        className={`py-2 px-3 text-xs font-bold rounded-lg border capitalize transition-all cursor-pointer ${
+                          privacySettings.allowDirectMessages === opt
+                            ? 'bg-[#123B24] text-white border-[#123B24] shadow-farm-sm'
+                            : 'bg-white text-[#546E7A] border-[#DDE3D5] hover:border-[#123B24] hover:text-[#123B24]'
+                        }`}
+                      >
+                        {opt === 'everyone' ? 'Everyone' : opt === 'followers' ? 'Followers' : 'None'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Blocked Users Section */}
+            <div className="farm-card p-6 md:p-8">
+              <div className="border-b border-[#EEF3E8] pb-4 mb-4">
+                <h3 className="font-black text-[#123B24] text-lg flex items-center gap-2">
+                  <UserX className="w-5 h-5 text-red-600" />
+                  <span>Blocked Users</span>
+                </h3>
+                <p className="text-xs text-[#546E7A] mt-0.5">
+                  Users you've blocked from the community feed won't see your profile and their posts won't appear on your feed.
+                </p>
+              </div>
+
+              {blockedUsers.length === 0 ? (
+                <div className="py-8 text-center text-[#546E7A]">
+                  <UserX className="w-8 h-8 text-[#546E7A]/40 mx-auto mb-2" />
+                  <p className="text-xs font-medium">No blocked users</p>
+                  <p className="text-[11px] text-[#546E7A]/70 mt-1">
+                    When you block someone via the community post menu, they will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[#EEF3E8]">
+                  {blockedUsers.map((bUser: any) => (
+                    <div key={bUser.id} className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-[#EEF3E8] text-[#185C2B] font-black text-sm flex items-center justify-center shrink-0 overflow-hidden">
+                          {bUser.avatar_url ? (
+                            <img src={bUser.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            (bUser.full_name || bUser.username || 'U')[0].toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#123B24] truncate">
+                            {bUser.full_name || bUser.username || `User #${bUser.id}`}
+                          </p>
+                          <p className="text-[10px] text-[#546E7A] truncate">
+                            @{bUser.username || `user${bUser.id}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleUnblockUser(bUser.id)}
+                        disabled={unblockingId === bUser.id}
+                        className="btn-outline border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 py-1.5 px-3.5 text-xs font-bold rounded-lg cursor-pointer shrink-0"
+                      >
+                        {unblockingId === bUser.id ? 'Unblocking...' : 'Unblock'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

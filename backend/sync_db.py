@@ -54,6 +54,9 @@ def sync_db(bind_engine=None):
         add_column_if_missing(conn, "posts", "crop_category", "VARCHAR")
         add_column_if_missing(conn, "posts", "report_count", "INTEGER DEFAULT 0")
         add_column_if_missing(conn, "posts", "is_hidden", "BOOLEAN DEFAULT FALSE")
+        add_column_if_missing(conn, "posts", "post_visibility", "VARCHAR DEFAULT 'public'")
+        add_column_if_missing(conn, "comments", "report_count", "INTEGER DEFAULT 0")
+        add_column_if_missing(conn, "comments", "is_hidden", "BOOLEAN DEFAULT FALSE")
 
         try:
             print("Cleaning duplicate follows before enforcing unique constraint...")

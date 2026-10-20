@@ -452,7 +452,29 @@ def create_notification(db, user_id: int, actor_id: int, notif_type: str, messag
         logger.error(f"[Notification] Failed to create notification: {e}")
         db.rollback()
 
-# ─── Community Posts ───
+# ─── Community Posts & Moderation ───
+import re
+
+OFFENSIVE_PATTERNS = [
+    # Add common offensive words and patterns
+    r'\b(spam|scam|fraud|fake)\b',
+    # Sexual content indicators  
+    r'\b(xxx|porn|nude|sex)\b',
+    # Violence/threats
+    r'\b(kill|murder|threat|bomb|attack)\b',
+    # Hate speech indicators
+    r'\b(hate|racist|discrimination)\b',
+]
+
+def contains_offensive_content(text: str) -> bool:
+    if not text:
+        return False
+    text_lower = text.lower()
+    for pattern in OFFENSIVE_PATTERNS:
+        if re.search(pattern, text_lower):
+            return True
+    return False
+
 @app.post("/posts", response_model=schemas.PostOut)
 async def create_post(
     request: Request,
@@ -467,6 +489,7 @@ async def create_post(
         content = ""
         location = None
         image_url = None
+        post_visibility = "public"
         uploaded_file: Optional[UploadFile] = None
 
         if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
@@ -475,6 +498,10 @@ async def create_post(
             loc_val = form.get("location")
             if loc_val:
                 location = str(loc_val).strip()
+
+            vis_val = form.get("post_visibility")
+            if vis_val and str(vis_val).strip():
+                post_visibility = str(vis_val).strip().lower()
 
             file_val = form.get("image")
             if isinstance(file_val, UploadFile) and file_val.filename:
@@ -486,19 +513,29 @@ async def create_post(
                 content = str(json_body.get("content") or "").strip()
                 location = json_body.get("location")
                 image_url = json_body.get("image_url")
+                vis_val = json_body.get("post_visibility")
+                if vis_val and str(vis_val).strip():
+                    post_visibility = str(vis_val).strip().lower()
             except Exception:
                 raise HTTPException(status_code=400, detail="Invalid request payload format")
 
         if not content:
             raise HTTPException(status_code=400, detail="Post content cannot be empty")
 
-        # Content Moderation Check (local NLP rule engine — no external APIs)
+        # Content Moderation: Reject offensive content immediately
+        if contains_offensive_content(content):
+            raise HTTPException(
+                status_code=400,
+                detail="POST_OFFENSIVE_CONTENT"
+            )
+
+        # Content Moderation Check (local NLP rule engine)
         mod_result = await moderation_service.moderate_content(content)
         if not mod_result.get("is_safe", True):
             logger.warning(f"[Moderation Block] User {current_user.id} post blocked: {mod_result.get('reason')}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Post blocked: contains inappropriate content"
+                detail="POST_OFFENSIVE_CONTENT"
             )
 
         # Process & validate uploaded image file if present
@@ -532,7 +569,8 @@ async def create_post(
             content=content,
             location=location,
             image_url=image_url,
-            user_id=current_user.id
+            user_id=current_user.id,
+            post_visibility=post_visibility
         )
         db.add(db_post)
         db.commit()
@@ -561,12 +599,34 @@ async def create_post(
 @app.get("/posts", response_model=List[schemas.PostOut])
 @app.get("/api/posts", response_model=List[schemas.PostOut])
 def get_feed(skip: int = 0, limit: int = 20, current_user: Optional[models.User] = Depends(get_optional_current_user), db: Session = Depends(get_db)):
+    from sqlalchemy import or_
     current_id = current_user.id if current_user else None
     blocked_ids = get_blocked_user_ids(db, current_id) if current_id else set()
 
     base_query = db.query(models.Post).filter(models.Post.is_hidden == False)
     if blocked_ids:
         base_query = base_query.filter(~models.Post.user_id.in_(blocked_ids))
+
+    # Filter posts by visibility based on auth status:
+    # - Public posts: visible to all
+    # - Community posts: visible to logged in users only
+    # - Private posts: visible to author only
+    if current_id:
+        base_query = base_query.filter(
+            or_(
+                models.Post.post_visibility == "public",
+                models.Post.post_visibility == "community",
+                models.Post.post_visibility == None,
+                models.Post.user_id == current_id
+            )
+        )
+    else:
+        base_query = base_query.filter(
+            or_(
+                models.Post.post_visibility == "public",
+                models.Post.post_visibility == None
+            )
+        )
 
     if current_id:
         following_ids = [f.following_id for f in db.query(models.Follow.following_id).filter(models.Follow.follower_id == current_id).all()]
@@ -591,9 +651,28 @@ def get_user_posts_by_alias(
     current_user: Optional[models.User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
-    current_id = current_user.id if current_user else user_id
-    posts = db.query(models.Post).filter(models.Post.user_id == user_id).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
-    return [prepare_post_out(p, current_id, db) for p in posts]
+    from sqlalchemy import or_
+    current_id = current_user.id if current_user else None
+    query = db.query(models.Post).filter(models.Post.user_id == user_id, models.Post.is_hidden == False)
+    if current_id == user_id:
+        pass
+    elif current_id:
+        query = query.filter(
+            or_(
+                models.Post.post_visibility == "public",
+                models.Post.post_visibility == "community",
+                models.Post.post_visibility == None
+            )
+        )
+    else:
+        query = query.filter(
+            or_(
+                models.Post.post_visibility == "public",
+                models.Post.post_visibility == None
+            )
+        )
+    posts = query.order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+    return [prepare_post_out(p, current_id or 0, db) for p in posts]
 
 @app.put("/posts/{post_id}", response_model=schemas.PostOut)
 def update_post(post_id: int, post_update: schemas.PostUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -637,6 +716,7 @@ def prepare_post_out(post, current_user_id, db, author=None):
     post_out.is_saved = is_saved
     post_out.report_count = getattr(post, 'report_count', 0) or 0
     post_out.is_hidden = getattr(post, 'is_hidden', False) or False
+    post_out.post_visibility = getattr(post, 'post_visibility', 'public') or 'public'
     if current_user_id:
         post_out.is_reported_by_me = db.query(models.PostReport).filter(
             models.PostReport.post_id == post.id,
@@ -701,7 +781,8 @@ def report_post(
             reason=existing_report.reason,
             created_at=existing_report.created_at,
             is_hidden=post.is_hidden or (post.report_count or 0) >= 3,
-            message="Post reported successfully"
+            reported=True,
+            message="Post reported"
         )
 
     new_report = models.PostReport(
@@ -732,8 +813,30 @@ def report_post(
         reason=new_report.reason,
         created_at=new_report.created_at,
         is_hidden=post.is_hidden,
-        message="Post reported successfully"
+        reported=True,
+        message="Post reported"
     )
+
+# ─── Comment Reporting ───
+@app.post("/comments/{comment_id}/report", response_model=schemas.CommentReportOut)
+@app.post("/api/comments/{comment_id}/report", response_model=schemas.CommentReportOut)
+def report_comment(
+    comment_id: int,
+    report_data: Optional[schemas.CommentReportCreate] = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    if hasattr(comment, "report_count"):
+        comment.report_count = (comment.report_count or 0) + 1
+        if hasattr(comment, "is_hidden") and comment.report_count >= 3:
+            comment.is_hidden = True
+        db.commit()
+
+    return schemas.CommentReportOut(reported=True, message="Comment reported")
 
 # ─── Likes & Comments ───
 @app.post("/posts/{post_id}/like")
@@ -769,12 +872,17 @@ def unlike_post(post_id: int, current_user: models.User = Depends(get_current_us
 @app.post("/posts/{post_id}/comments", response_model=schemas.CommentOut)
 def comment_post(post_id: int, comment: schemas.CommentCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     content = (comment.content or "").strip()
+    if contains_offensive_content(content):
+        raise HTTPException(
+            status_code=400,
+            detail="COMMENT_OFFENSIVE_CONTENT"
+        )
     if content:
         mod_result = moderation_service.moderation_service.moderate_text(content)
         if not mod_result["allowed"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This post cannot be published because it contains offensive or inappropriate content. Please edit your message and try again."
+                detail="COMMENT_OFFENSIVE_CONTENT"
             )
     db_comment = models.Comment(post_id=post_id, user_id=current_user.id, content=comment.content, parent_id=comment.parent_id)
     db.add(db_comment)
@@ -793,7 +901,10 @@ def comment_post(post_id: int, comment: schemas.CommentCreate, current_user: mod
 
 @app.get("/posts/{post_id}/comments", response_model=List[schemas.CommentOut])
 def get_comments(post_id: int, db: Session = Depends(get_db)):
-    comments = db.query(models.Comment).filter(models.Comment.post_id == post_id, models.Comment.parent_id == None).order_by(models.Comment.created_at.desc()).all()
+    query = db.query(models.Comment).filter(models.Comment.post_id == post_id, models.Comment.parent_id == None)
+    if hasattr(models.Comment, "is_hidden"):
+        query = query.filter(models.Comment.is_hidden == False)
+    comments = query.order_by(models.Comment.created_at.desc()).all()
     res = []
     for c in comments:
         out = schemas.CommentOut.from_orm(c)

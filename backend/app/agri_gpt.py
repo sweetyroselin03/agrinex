@@ -9,10 +9,20 @@ logger = logging.getLogger("uvicorn.error")
 
 # Groq API Configuration — Llama 3 via Groq Cloud
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_URL = os.getenv("GROQ_API_URL", GROQ_URL)
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 FALLBACK_BUSY_MESSAGE = "AGRIGPT is temporarily unavailable because the Llama model service is offline."
+
+AGRI_SYSTEM_PROMPT = """You are AgriGPT, an expert 
+agricultural AI advisor for AgriNex platform.
+Help farmers with crop diseases, fertilizers,
+irrigation, soil health, pest control, organic farming,
+weather-based advice, and market insights.
+Be practical, concise, and farmer-friendly.
+Reply in the same language the farmer uses.
+Support: English, Tamil, Telugu, Hindi, Malayalam."""
 
 SYSTEM_PROMPT = (
     "You are AgriGPT, an expert AI agricultural and agronomy advisor for AgriNex. "
@@ -30,6 +40,59 @@ SYSTEM_PROMPT = (
     "- Keep advice practical, warm, encouraging, and easy for farmers to execute.\n"
     "- Detect and respond in the user's preferred language: English, Tamil (தமிழ்), Telugu (తెలుగు), Hindi (हिन्दी), or Malayalam (മലയാളം).\n"
 )
+
+
+async def stream_agri_response(
+    message: str,
+    history: list = []
+) -> AsyncGenerator[str, None]:
+    api_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
+    if not api_key:
+        yield "data: AgriGPT service is not configured.\n\n"
+        return
+
+    messages = [{"role": "system", "content": AGRI_SYSTEM_PROMPT}]
+
+    for h in history[-6:]:
+        if isinstance(h, dict) and h.get("role") and h.get("content"):
+            messages.append(h)
+
+    messages.append({"role": "user", "content": message})
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            async with client.stream(
+                "POST",
+                GROQ_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": messages,
+                    "stream": True,
+                    "temperature": 0.7,
+                    "max_tokens": 1024
+                }
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data = line[6:]
+                        if data == "[DONE]":
+                            yield "data: [DONE]\n\n"
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            token = chunk["choices"][0]["delta"].get("content", "")
+                            if token:
+                                yield f"data: {token}\n\n"
+                        except Exception:
+                            continue
+    except Exception as e:
+        logger.error(f"[AgriGPT Groq Error] {e}")
+        yield "data: AgriGPT is temporarily unavailable. Please try again.\n\n"
+        yield "data: [DONE]\n\n"
 
 
 def build_messages(message: str, history: list = [], scan_context: str = "") -> List[Dict[str, str]]:

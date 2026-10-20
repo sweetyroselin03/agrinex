@@ -100,6 +100,18 @@ export default function Chatbot() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const checkBackendStatus = async () => {
+      try {
+        await api.get('/health');
+        setLlamaStatus('online');
+      } catch {
+        setLlamaStatus('offline');
+      }
+    };
+    checkBackendStatus();
+  }, []);
+
+  useEffect(() => {
     fetchHistory(activeConvId);
   }, [activeConvId]);
 
@@ -126,6 +138,7 @@ export default function Chatbot() {
       }
     } catch {
       setMessages([]);
+      setLlamaStatus('offline');
     } finally {
       setLoadingHistory(false);
     }
@@ -261,19 +274,19 @@ export default function Chatbot() {
                 {llamaStatus === 'streaming' && (
                   <>
                     <span className="w-2 h-2 rounded-full bg-[#80B918] animate-ping" />
-                    <span className="text-[10px] font-bold text-[#185C2B]">Llama 3 — Streaming</span>
+                    <span className="text-[10px] font-bold text-[#185C2B]">● Llama 3 (Groq Cloud) — Streaming</span>
                   </>
                 )}
                 {llamaStatus === 'online' && (
                   <>
                     <span className="w-2 h-2 rounded-full bg-[#2D6A4F]" />
-                    <span className="text-[10px] font-bold text-[#2D6A4F]">Llama 3 — Online</span>
+                    <span className="text-[10px] font-bold text-[#2D6A4F]">● Llama 3 (Groq Cloud) — Online</span>
                   </>
                 )}
                 {llamaStatus === 'offline' && (
                   <>
                     <span className="w-2 h-2 rounded-full bg-red-500" />
-                    <span className="text-[10px] font-bold text-red-600">Llama 3 — Offline</span>
+                    <span className="text-[10px] font-bold text-red-600">● Llama 3 — Unavailable</span>
                   </>
                 )}
               </div>
