@@ -7,11 +7,11 @@ from typing import AsyncGenerator, Dict, Any, List
 
 logger = logging.getLogger("uvicorn.error")
 
-# Groq API Configuration — Llama 3 via Groq Cloud
+# Groq API Configuration — GPT OSS 120B via Groq Cloud
 GROQ_API_KEY = os.getenv("groq_api_key") or os.getenv("GROQ_API_KEY", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_API_URL = os.getenv("GROQ_API_URL", GROQ_URL)
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 FALLBACK_BUSY_MESSAGE = "AGRIGPT is temporarily unavailable because the Llama model service is offline."
 
@@ -69,7 +69,7 @@ async def stream_agri_response(
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama-3.3-70b-versatile",
+                    "model": GROQ_MODEL,
                     "messages": messages,
                     "stream": True,
                     "temperature": 0.7,
