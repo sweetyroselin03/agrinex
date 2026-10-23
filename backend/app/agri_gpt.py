@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Dict, Any, List
 logger = logging.getLogger("uvicorn.error")
 
 # Groq API Configuration — Llama 3 via Groq Cloud
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_API_KEY = os.getenv("groq_api_key") or os.getenv("GROQ_API_KEY", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_API_URL = os.getenv("GROQ_API_URL", GROQ_URL)
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -46,7 +46,7 @@ async def stream_agri_response(
     message: str,
     history: list = []
 ) -> AsyncGenerator[str, None]:
-    api_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
+    api_key = os.getenv("groq_api_key") or os.getenv("GROQ_API_KEY", GROQ_API_KEY)
     if not api_key:
         yield "data: AgriGPT service is not configured.\n\n"
         return
@@ -126,7 +126,7 @@ class AgriGPTService:
         logger.info(f"[AgriGPT] Initialized with Groq Llama model: {self.model}")
 
     def _get_api_key(self) -> str:
-        return os.getenv("GROQ_API_KEY", self.api_key)
+        return os.getenv("groq_api_key") or os.getenv("GROQ_API_KEY", self.api_key)
 
     async def check_llama_health(self) -> bool:
         """
